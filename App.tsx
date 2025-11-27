@@ -843,7 +843,7 @@ const App: React.FC = () => {
     };
 
     const handleCancelFeePayment = async (studentId: string, month: string) => {
-        if (!window.confirm(`هل أنت متأكد من رغبتك في إلغاء دفعة شهر ${month}؟`)) {
+        if (!window.confirm(`هل أنت متأكد من إلغاء دفع شهر ${month}؟\nسيتم وضع علامة على هذا الشهر كغير مدفوع.`)) {
             return;
         }
         try {
@@ -854,15 +854,17 @@ const App: React.FC = () => {
             const studentData = studentDoc.data() as Student;
             const updatedFees = studentData.fees.map(fee => {
                 if (fee.month === month) {
+                    // Keep the original amount due, but mark as unpaid and remove payment details
+                    const { paymentDate, amountPaid, receiptNumber, ...rest } = fee;
                     return {
-                        month: fee.month,
-                        amount: fee.amount,
+                        ...rest,
                         paid: false,
                     };
                 }
                 return fee;
             });
             await updateDoc(studentRef, { fees: updatedFees });
+            // No alert needed for success, the UI update is enough and faster
         } catch (error) {
             console.error("Error cancelling fee payment: ", error);
             alert("حدث خطأ أثناء إلغاء الدفعة.");
