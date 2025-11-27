@@ -303,72 +303,70 @@ const GroupComparisonChart: React.FC<{ students: Student[], groups: Group[], sel
   const maxVal = Math.max(...data.map(d => d.stats.total), 1);
 
   return (
-    <div className="space-y-6 overflow-x-auto">
-      <div className="min-w-[600px]">
-        {/* Legend */}
-        <div className="flex justify-center gap-6 mb-6 text-sm">
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-green-500 rounded-sm"></div>
-            <span>جديد</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
-            <span>ماضي قريب</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <div className="w-3 h-3 bg-purple-500 rounded-sm"></div>
-            <span>بعيد</span>
-          </div>
+    <div className="space-y-6">
+      {/* Legend */}
+      <div className="flex justify-center gap-4 sm:gap-6 mb-6 text-xs sm:text-sm flex-wrap">
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-green-500 rounded-sm"></div>
+          <span>جديد</span>
         </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-blue-500 rounded-sm"></div>
+          <span>ماضي قريب</span>
+        </div>
+        <div className="flex items-center gap-2">
+          <div className="w-3 h-3 bg-purple-500 rounded-sm"></div>
+          <span>بعيد</span>
+        </div>
+      </div>
 
-        {/* Chart Bars */}
-        <div className="space-y-4">
-          {data.map((item, index) => (
-            <div key={index} className="flex items-center gap-4">
-              <div className="w-32 text-left text-sm font-semibold text-gray-700 truncate" title={item.groupName}>
-                {item.groupName}
-              </div>
-              <div className="flex-1 h-8 bg-gray-100 rounded-full overflow-hidden flex relative">
-                {item.stats.total > 0 ? (
-                  <>
-                    {/* New Tests Bar */}
-                    <div
-                      className="h-full bg-green-500 hover:bg-green-600 transition-all relative group"
-                      style={{ width: `${(item.stats[TestTypeEnum.NEW] / maxVal) * 100}%` }}
-                    >
-                      <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                        {item.stats[TestTypeEnum.NEW]}
-                      </span>
-                    </div>
-                    {/* Recent Past Bar */}
-                    <div
-                      className="h-full bg-blue-500 hover:bg-blue-600 transition-all relative group"
-                      style={{ width: `${(item.stats[TestTypeEnum.RECENT_PAST] / maxVal) * 100}%` }}
-                    >
-                      <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                        {item.stats[TestTypeEnum.RECENT_PAST]}
-                      </span>
-                    </div>
-                    {/* Distant Past Bar */}
-                    <div
-                      className="h-full bg-purple-500 hover:bg-purple-600 transition-all relative group"
-                      style={{ width: `${(item.stats[TestTypeEnum.DISTANT_PAST] / maxVal) * 100}%` }}
-                    >
-                      <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">
-                        {item.stats[TestTypeEnum.DISTANT_PAST]}
-                      </span>
-                    </div>
-                  </>
-                ) : (
-                  <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">لا توجد اختبارات</div>
-                )}
-              </div>
-              <div className="w-12 text-right text-sm font-bold text-gray-600">
-                {item.stats.total}
-              </div>
+      {/* Chart Bars */}
+      <div className="space-y-4">
+        {data.map((item, index) => (
+          <div key={index} className="flex items-center gap-2 sm:gap-4">
+            <div className="w-20 sm:w-32 text-left text-xs sm:text-sm font-semibold text-gray-700 truncate" title={item.groupName}>
+              {item.groupName}
             </div>
-          ))}
-        </div>
+            <div className="flex-1 h-8 bg-gray-100 rounded-full overflow-hidden flex relative">
+              {item.stats.total > 0 ? (
+                <>
+                  {/* New Tests Bar */}
+                  <div
+                    className="h-full bg-green-500 hover:bg-green-600 transition-all relative group"
+                    style={{ width: `${(item.stats[TestTypeEnum.NEW] / maxVal) * 100}%` }}
+                  >
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                      {item.stats[TestTypeEnum.NEW]}
+                    </span>
+                  </div>
+                  {/* Recent Past Bar */}
+                  <div
+                    className="h-full bg-blue-500 hover:bg-blue-600 transition-all relative group"
+                    style={{ width: `${(item.stats[TestTypeEnum.RECENT_PAST] / maxVal) * 100}%` }}
+                  >
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                      {item.stats[TestTypeEnum.RECENT_PAST]}
+                    </span>
+                  </div>
+                  {/* Distant Past Bar */}
+                  <div
+                    className="h-full bg-purple-500 hover:bg-purple-600 transition-all relative group"
+                    style={{ width: `${(item.stats[TestTypeEnum.DISTANT_PAST] / maxVal) * 100}%` }}
+                  >
+                    <span className="absolute inset-0 flex items-center justify-center text-[10px] text-white font-bold opacity-0 group-hover:opacity-100 transition-opacity">
+                      {item.stats[TestTypeEnum.DISTANT_PAST]}
+                    </span>
+                  </div>
+                </>
+              ) : (
+                <div className="w-full h-full flex items-center justify-center text-xs text-gray-400">لا توجد اختبارات</div>
+              )}
+            </div>
+            <div className="w-8 sm:w-12 text-right text-xs sm:text-sm font-bold text-gray-600">
+              {item.stats.total}
+            </div>
+          </div>
+        ))}
       </div>
     </div>
   );
