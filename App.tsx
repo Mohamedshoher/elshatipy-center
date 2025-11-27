@@ -423,13 +423,16 @@ const App: React.FC = () => {
                     return false; // Not old enough
                 }
 
+                // Skip notifications without target (e.g. public ones) or handle them differently
+                if (!n.target) return false;
+
                 let isFullyRead = false;
                 if (n.target.type === 'teacher') {
-                    isFullyRead = n.readBy.includes(n.target.id);
+                    isFullyRead = n.readBy?.includes(n.target.id);
                 } else if (n.target.type === 'group') {
                     const group = groups.find(g => g.id === n.target.id);
                     if (group && group.teacherId) {
-                        isFullyRead = n.readBy.includes(group.teacherId);
+                        isFullyRead = n.readBy?.includes(group.teacherId);
                     }
                 }
                 return isFullyRead;
