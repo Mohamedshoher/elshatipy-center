@@ -13,11 +13,14 @@
     "types": [
       "node"
     ],
-    "moduleResolution": "bundler",
+    "moduleResolution": "node",
+    "resolveJsonModule": true,
     "isolatedModules": true,
     "moduleDetection": "force",
     "allowJs": true,
     "jsx": "react-jsx",
+    "allowSyntheticDefaultImports": true,
+    "esModuleInterop": true,
     "paths": {
       "@/*": [
         "./*"
