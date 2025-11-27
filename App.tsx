@@ -244,46 +244,125 @@ const App: React.FC = () => {
                 }
             }
 
-            // --- Weekly Checks ---
+            // --- Weekly Checks (5 Consecutive Workdays: Saturday to Wednesday) ---
             const weeklyPromises: Promise<void>[] = [];
-            const dayOfWeek = today.getDay(); // 0 for Sunday
-            // Run weekly checks only on a specific day, e.g., Sunday (0)
-            if (dayOfWeek === 0) {
-                const lastSaturday = new Date(today);
-                lastSaturday.setDate(today.getDate() - 1);
-                const previousSunday = new Date(lastSaturday);
-                previousSunday.setDate(lastSaturday.getDate() - 6);
+            const dayOfWeek = today.getDay(); // 0 for Sunday, 1 for Monday, ..., 6 for Saturday
 
-                const lastSaturdayString = lastSaturday.toISOString().split('T')[0];
-                const previousSundayString = previousSunday.toISOString().split('T')[0];
+            // Run checks on Thursday (4) to evaluate the previous 5 workdays (Sat-Wed)
+            if (dayOfWeek === 4) { // Thursday
+                // Calculate the 5 workdays: Saturday to Wednesday
+                const wednesday = new Date(today);
+                wednesday.setDate(today.getDate() - 1); // Yesterday (Wednesday)
+
+                const saturday = new Date(wednesday);
+                saturday.setDate(wednesday.getDate() - 4); // 4 days before Wednesday = Saturday
+
+                const saturdayString = saturday.toISOString().split('T')[0];
+                const wednesdayString = wednesday.toISOString().split('T')[0];
 
                 for (const teacher of activeTeachersWithStudents) {
-                    if (!teacher.students.some(s => new Date(s.joiningDate) <= lastSaturday)) continue;
+                    if (!teacher.students.some(s => new Date(s.joiningDate) <= wednesday)) continue;
 
-                    // 1. Weekly No-Test Check
-                    const weeklyTestNotificationId = `teacher-no-tests-${teacher.id}-${previousSundayString}`;
-                    const hasTestsInWeek = teacher.students.some(s => s.tests.some(t => t.date >= previousSundayString && t.date <= lastSaturdayString));
-                    if (!hasTestsInWeek) {
-                        const testNotificationRef = doc(db, 'directorNotifications', weeklyTestNotificationId);
+                    // Check if teacher has tests for all 5 consecutive workdays
+                    const workdays = [];
+                    for (let i = 0; i < 5; i++) {
+                        const day = new Date(saturday);
+                        day.setDate(saturday.getDate() + i);
+                        workdays.push(day.toISOString().split('T')[0]);
+                    }
+
+                    // Count how many days have tests
+                    const daysWithTests = workdays.filter(dateString =>
+                        teacher.students.some(s => s.tests.some(t => t.date === dateString))
+                    );
+
+                    const weekIdentifier = saturdayString; // Use Saturday as week identifier
+
+                    // Case 1: No tests for all 5 days → Deduct half day
+                    if (daysWithTests.length === 0) {
+                        const deductionNotificationId = `teacher-5day-no-tests-${teacher.id}-${weekIdentifier}`;
+                        const deductionNotificationRef = doc(db, 'directorNotifications', deductionNotificationId);
+
                         weeklyPromises.push((async () => {
-                            const docSnap = await getDoc(testNotificationRef);
+                            const docSnap = await getDoc(deductionNotificationRef);
                             if (!docSnap.exists()) {
-                                await setDoc(testNotificationRef, {
+                                // Create notification
+                                await setDoc(deductionNotificationRef, {
                                     date: new Date().toISOString(),
-                                    forDate: lastSaturdayString,
-                                    content: `المدرس ${teacher.name} لم يسجل أي اختبارات الأسبوع الماضي.`,
+                                    forDate: wednesdayString,
+                                    content: `⚠️ المدرس ${teacher.name} لم يسجل أي اختبارات لمدة 5 أيام متتالية (${saturdayString} إلى ${wednesdayString}). تم خصم نصف يوم تلقائياً.`,
                                     isRead: false,
-                                    type: 'teacher_no_tests_report',
+                                    type: 'teacher_5day_no_tests_deduction',
                                     teacherId: teacher.id,
                                     teacherName: teacher.name,
                                 });
+
+                                // Apply automatic deduction (half day)
+                                const attendanceId = `auto-deduction-${teacher.id}-${weekIdentifier}`;
+                                const attendanceRef = doc(db, 'teacherAttendance', attendanceId);
+                                const attendanceSnap = await getDoc(attendanceRef);
+                                if (!attendanceSnap.exists()) {
+                                    await setDoc(attendanceRef, {
+                                        teacherId: teacher.id,
+                                        date: wednesdayString,
+                                        status: TeacherAttendanceStatus.DEDUCTION_HALF_DAY,
+                                        reason: `عدم تسجيل اختبارات لمدة 5 أيام متتالية (${saturdayString} - ${wednesdayString})`
+                                    });
+                                }
+                            }
+                        })());
+                    }
+                    // Case 2: Tests recorded for all 5 days → Bonus half day
+                    else if (daysWithTests.length === 5) {
+                        const bonusNotificationId = `teacher-5day-tests-bonus-${teacher.id}-${weekIdentifier}`;
+                        const bonusNotificationRef = doc(db, 'directorNotifications', bonusNotificationId);
+
+                        weeklyPromises.push((async () => {
+                            const docSnap = await getDoc(bonusNotificationRef);
+                            if (!docSnap.exists()) {
+                                // Create notification
+                                await setDoc(bonusNotificationRef, {
+                                    date: new Date().toISOString(),
+                                    forDate: wednesdayString,
+                                    content: `🎉 المدرس ${teacher.name} سجل اختبارات لمدة 5 أيام متتالية (${saturdayString} إلى ${wednesdayString}). تم منحه مكافأة نصف يوم تلقائياً.`,
+                                    isRead: false,
+                                    type: 'teacher_5day_tests_bonus',
+                                    teacherId: teacher.id,
+                                    teacherName: teacher.name,
+                                });
+
+                                // Apply automatic bonus (half day)
+                                const attendanceId = `auto-bonus-${teacher.id}-${weekIdentifier}`;
+                                const attendanceRef = doc(db, 'teacherAttendance', attendanceId);
+                                const attendanceSnap = await getDoc(attendanceRef);
+                                if (!attendanceSnap.exists()) {
+                                    await setDoc(attendanceRef, {
+                                        teacherId: teacher.id,
+                                        date: wednesdayString,
+                                        status: TeacherAttendanceStatus.BONUS_HALF_DAY,
+                                        reason: `تسجيل اختبارات لمدة 5 أيام متتالية (${saturdayString} - ${wednesdayString})`
+                                    });
+                                }
+
+                                // Send public notification to all teachers
+                                const publicNotificationId = `public-bonus-${teacher.id}-${weekIdentifier}`;
+                                const publicNotificationRef = doc(db, 'notifications', publicNotificationId);
+                                const publicNotificationSnap = await getDoc(publicNotificationRef);
+                                if (!publicNotificationSnap.exists()) {
+                                    await setDoc(publicNotificationRef, {
+                                        date: new Date().toISOString(),
+                                        content: `🎉 مكافأة! حصل المدرس/ة ${teacher.name} على مكافأة (نصف يوم) لتسجيل الاختبارات بانتظام لمدة 5 أيام متتالية. بارك الله فيه/ا.`,
+                                        isRead: false,
+                                        recipientId: 'all'
+                                    });
+                                }
                             }
                         })());
                     }
 
-                    // 2. Weekly No-Fee Collection Check
-                    const weeklyFeeNotificationId = `teacher-no-fees-${teacher.id}-${previousSundayString}`;
-                    const hasFeeCollectionsInWeek = teacherCollections.some(c => c.teacherId === teacher.id && c.date >= previousSundayString && c.date <= lastSaturdayString);
+                    // 2. Weekly No-Fee Collection Check (keep existing)
+                    const weeklyFeeNotificationId = `teacher-no-fees-${teacher.id}-${saturdayString}`;
+                    const hasFeeCollectionsInWeek = teacherCollections.some(c => c.teacherId === teacher.id && c.date >= saturdayString && c.date <= wednesdayString);
                     if (!hasFeeCollectionsInWeek) {
                         const feeNotificationRef = doc(db, 'directorNotifications', weeklyFeeNotificationId);
                         weeklyPromises.push((async () => {
@@ -291,7 +370,7 @@ const App: React.FC = () => {
                             if (!docSnap.exists()) {
                                 await setDoc(feeNotificationRef, {
                                     date: new Date().toISOString(),
-                                    forDate: lastSaturdayString,
+                                    forDate: wednesdayString,
                                     content: `المدرس ${teacher.name} لم يقم بتسليم أي مصروفات الأسبوع الماضي.`,
                                     isRead: false,
                                     type: 'teacher_no_fees_report',
@@ -1612,7 +1691,6 @@ const App: React.FC = () => {
                 students={activeStudents}
                 teacherAttendance={teacherAttendance}
                 teacherPayrollAdjustments={teacherPayrollAdjustments}
-                teacherCollections={teacherCollections}
                 onAddTeacherClick={handleOpenAddTeacherForm}
                 onEditTeacherClick={handleEditTeacher}
                 onEditSupervisorClick={handleEditSupervisor}
