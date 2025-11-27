@@ -1760,7 +1760,7 @@ const App: React.FC = () => {
             <StudentDetailsModal
                 isOpen={!!detailsModalState}
                 onClose={handleCloseStudentDetails}
-                student={detailsModalState?.student || null}
+                student={detailsModalState ? students.find(s => s.id === detailsModalState.student.id) || null : null}
                 initialTab={detailsModalState?.initialTab || 'attendanceLog'}
                 currentUser={currentUser}
                 notes={detailsModalState ? notes.filter(n => n.studentId === detailsModalState.student.id) : []}
