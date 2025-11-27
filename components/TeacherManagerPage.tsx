@@ -13,9 +13,6 @@ import SupervisorCard from './SupervisorCard';
 import SearchIcon from './icons/SearchIcon';
 import DeductionReasonModal from './DeductionReasonModal';
 import UserIcon from './icons/UserIcon';
-import EditIcon from './icons/EditIcon';
-import TrashIcon from './icons/TrashIcon';
-import FilterIcon from './icons/FilterIcon';
 
 interface TeacherManagerPageProps {
     onBack: () => void;
@@ -45,22 +42,21 @@ interface TeacherManagerPageProps {
 }
 
 const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
-    const { teachers, supervisors, groups, onViewTeacherDetails, onViewSupervisorDetails, onEditTeacherClick, onEditSupervisorClick, onDeleteSupervisor, isFilterVisible } = props;
+    const { teachers, supervisors, groups, onViewTeacherDetails, onViewSupervisorDetails, isFilterVisible, searchTerm } = props;
 
-    const [activeTab, setActiveTab] = useState<GroupType | 'إقراء'>('تلقين');
+    const [activeTab, setActiveTab] = useState<GroupType | 'الإشراف'>('تلقين');
     const [isDeductionModalOpen, setIsDeductionModalOpen] = useState(false);
     const [deductionDetails, setDeductionDetails] = useState<{ teacherId: string; status: TeacherAttendanceStatus.HALF_DAY | TeacherAttendanceStatus.QUARTER_DAY; isSupervisor?: boolean } | null>(null);
-    const [localSearchTerm, setLocalSearchTerm] = useState(''); // Local search state
 
     // Filter States
     const [filterStatus, setFilterStatus] = useState<TeacherStatus | 'all'>('all');
 
     // Get teachers for current tab
-    const getTeachersForTab = (tab: GroupType | 'إقراء') => {
+    const getTeachersForTab = (tab: GroupType | 'الإشراف') => {
         const sortBySearchRelevance = (items: any[]) => {
-            if (!localSearchTerm) return items;
+            if (!searchTerm) return items;
 
-            const searchLower = localSearchTerm.toLowerCase().trim();
+            const searchLower = searchTerm.toLowerCase().trim();
 
             return items.sort((a, b) => {
                 const aName = a.name.toLowerCase();
@@ -87,11 +83,11 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
             });
         };
 
-        if (tab === 'إقراء') {
-            // إقراء means supervisors
+        if (tab === 'الإشراف') {
+            // الإشراف means supervisors
             const filtered = supervisors
                 .filter(s => {
-                    const matchesSearch = localSearchTerm ? s.name.toLowerCase().includes(localSearchTerm.toLowerCase()) : true;
+                    const matchesSearch = searchTerm ? s.name.toLowerCase().includes(searchTerm.toLowerCase()) : true;
                     const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
                     return matchesSearch && matchesStatus;
                 });
@@ -100,11 +96,11 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
             // Filter teachers by section
             const filtered = teachers
                 .filter(teacher => {
-                    const matchesSearch = localSearchTerm ? teacher.name.toLowerCase().includes(localSearchTerm.toLowerCase()) : true;
+                    const matchesSearch = searchTerm ? teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) : true;
                     const matchesStatus = filterStatus === 'all' || teacher.status === filterStatus;
 
                     // If searching, show all matching teachers regardless of section
-                    if (localSearchTerm) {
+                    if (searchTerm) {
                         return matchesSearch && matchesStatus;
                     }
 
@@ -118,63 +114,45 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
         }
     };
 
-    // Get all teachers and supervisors when searching
+    // Get all items when searching
     const getAllItems = () => {
         const sortBySearchRelevance = (items: any[]) => {
-            const searchLower = localSearchTerm.toLowerCase().trim();
-
+            const searchLower = searchTerm.toLowerCase().trim();
             return items.sort((a, b) => {
                 const aName = a.name.toLowerCase();
                 const bName = b.name.toLowerCase();
-
-                // Check if name starts with search term
                 const aStartsWith = aName.startsWith(searchLower);
                 const bStartsWith = bName.startsWith(searchLower);
-
                 if (aStartsWith && !bStartsWith) return -1;
                 if (!aStartsWith && bStartsWith) return 1;
-
-                // Check if first word starts with search term
-                const aFirstWord = aName.split(' ')[0];
-                const bFirstWord = bName.split(' ')[0];
-                const aFirstWordMatch = aFirstWord.startsWith(searchLower);
-                const bFirstWordMatch = bFirstWord.startsWith(searchLower);
-
-                if (aFirstWordMatch && !bFirstWordMatch) return -1;
-                if (!aFirstWordMatch && bFirstWordMatch) return 1;
-
-                // Otherwise, alphabetical
                 return aName.localeCompare(bName, 'ar');
             });
         };
 
-        const allTeachers = teachers
-            .filter(teacher => {
-                const matchesSearch = teacher.name.toLowerCase().includes(localSearchTerm.toLowerCase());
-                const matchesStatus = filterStatus === 'all' || teacher.status === filterStatus;
-                return matchesSearch && matchesStatus;
-            });
+        const allTeachers = teachers.filter(teacher => {
+            const matchesSearch = teacher.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = filterStatus === 'all' || teacher.status === filterStatus;
+            return matchesSearch && matchesStatus;
+        });
 
-        const allSupervisors = supervisors
-            .filter(s => {
-                const matchesSearch = s.name.toLowerCase().includes(localSearchTerm.toLowerCase());
-                const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
-                return matchesSearch && matchesStatus;
-            });
+        const allSupervisors = supervisors.filter(s => {
+            const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
+            const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
+            return matchesSearch && matchesStatus;
+        });
 
         return {
             teachers: sortBySearchRelevance(allTeachers),
             supervisors: sortBySearchRelevance(allSupervisors)
         };
     };
+
     const filteredItems = useMemo(() => {
-        if (localSearchTerm) {
-            // When searching, return all matching items
+        if (searchTerm) {
             return getAllItems();
         }
-        // Otherwise, return items for current tab
         return getTeachersForTab(activeTab);
-    }, [activeTab, teachers, supervisors, localSearchTerm, filterStatus, groups]);
+    }, [activeTab, teachers, supervisors, searchTerm, filterStatus, groups]);
 
     const handleDeductionClick = (teacherId: string, status: TeacherAttendanceStatus.HALF_DAY | TeacherAttendanceStatus.QUARTER_DAY, isSupervisor = false) => {
         setDeductionDetails({ teacherId, status, isSupervisor });
@@ -184,120 +162,55 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
     const handleConfirmDeduction = (reason: string) => {
         if (!deductionDetails) return;
         const { teacherId, status, isSupervisor } = deductionDetails;
-
-        let name = '';
-        if (isSupervisor) {
-            name = supervisors.find(s => s.id === teacherId)?.name || '';
-        } else {
-            name = teachers.find(t => t.id === deductionDetails.teacherId)?.name || '';
-        }
+        const name = isSupervisor
+            ? supervisors.find(s => s.id === teacherId)?.name
+            : teachers.find(t => t.id === teacherId)?.name;
 
         if (!name) return;
 
-        // 1. Record attendance
         props.onSetTeacherAttendance(teacherId, new Date().toISOString().split('T')[0], status, reason);
 
-        // 2. Send private notification
         let amountText = status === TeacherAttendanceStatus.HALF_DAY ? 'نصف يوم' : 'ربع يوم';
         const notificationContent = `⚠️ تم تسجيل خصم عليك (${amountText}) وذلك لـ: "${reason}".`;
         props.onSendNotificationToTeacher(teacherId, notificationContent);
 
-        // 3. Close modal and reset state
         setIsDeductionModalOpen(false);
         setDeductionDetails(null);
     };
 
     return (
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-
-            {/* Controls Header: Tabs + Search */}
+            {/* Controls Header: Tabs */}
             <div className="flex flex-col items-center justify-center mb-6 gap-4">
-                {/* Search Bar */}
-                <div className="w-full max-w-md">
-                    <div className="relative">
-                        <input
-                            type="search"
-                            placeholder="البحث عن مدرس أو مشرف..."
-                            value={localSearchTerm}
-                            onChange={(e) => setLocalSearchTerm(e.target.value)}
-                            className="w-full pl-4 pr-10 py-2 border rounded-full bg-gray-100 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                        />
-                        <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                            <SearchIcon className="w-5 h-5" />
-                        </div>
-                    </div>
-                </div>
-
                 {/* Tabs */}
                 <div className="bg-white p-1 rounded-lg shadow-md inline-flex flex-wrap justify-center gap-1">
-                    <button
-                        onClick={() => setActiveTab('تلقين')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'تلقين' ? 'bg-purple-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}
-                    >
-                        تلقين
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('نور بيان')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'نور بيان' ? 'bg-orange-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}
-                    >
-                        نور بيان
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('قرآن')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'قرآن' ? 'bg-green-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}
-                    >
-                        قرآن
-                    </button>
-                    <button
-                        onClick={() => setActiveTab('إقراء')}
-                        className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'إقراء' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}
-                    >
-                        إقراء
-                    </button>
+                    <button onClick={() => setActiveTab('تلقين')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'تلقين' ? 'bg-purple-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>تلقين</button>
+                    <button onClick={() => setActiveTab('نور بيان')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'نور بيان' ? 'bg-orange-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>نور بيان</button>
+                    <button onClick={() => setActiveTab('قرآن')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'قرآن' ? 'bg-green-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>قرآن</button>
+                    <button onClick={() => setActiveTab('الإشراف')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'الإشراف' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>الإشراف</button>
                 </div>
             </div>
-
-
 
             {/* Filter Panel */}
             {isFilterVisible && (
                 <div className="bg-white p-5 rounded-xl shadow-lg border border-gray-100 mb-8 animate-fade-in-down">
                     <div className="grid grid-cols-1 gap-6">
-                        {/* Status Filter */}
                         <div>
                             <h4 className="text-sm font-bold text-gray-700 mb-3">الحالة</h4>
                             <div className="flex flex-wrap gap-2">
-                                <button
-                                    onClick={() => setFilterStatus('all')}
-                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterStatus === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}
-                                >
-                                    الكل
-                                </button>
-                                <button
-                                    onClick={() => setFilterStatus(TeacherStatus.ACTIVE)}
-                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterStatus === TeacherStatus.ACTIVE ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}
-                                >
-                                    نشط
-                                </button>
-                                <button
-                                    onClick={() => setFilterStatus(TeacherStatus.INACTIVE)}
-                                    className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterStatus === TeacherStatus.INACTIVE ? 'bg-yellow-500 text-white' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'}`}
-                                >
-                                    غير نشط
-                                </button>
+                                <button onClick={() => setFilterStatus('all')} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterStatus === 'all' ? 'bg-gray-800 text-white' : 'bg-gray-100 text-gray-600 hover:bg-gray-200'}`}>الكل</button>
+                                <button onClick={() => setFilterStatus(TeacherStatus.ACTIVE)} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterStatus === TeacherStatus.ACTIVE ? 'bg-green-600 text-white' : 'bg-green-50 text-green-700 hover:bg-green-100'}`}>نشط</button>
+                                <button onClick={() => setFilterStatus(TeacherStatus.INACTIVE)} className={`px-3 py-1.5 rounded-full text-sm font-medium transition-colors ${filterStatus === TeacherStatus.INACTIVE ? 'bg-yellow-500 text-white' : 'bg-yellow-50 text-yellow-700 hover:bg-yellow-100'}`}>غير نشط</button>
                             </div>
                         </div>
                     </div>
                 </div>
             )}
 
-
             {/* Display Teachers or Supervisors based on active tab */}
             <div className="space-y-4">
-                {localSearchTerm ? (
-                    // When searching, show all matching teachers and supervisors
+                {searchTerm ? (
                     <>
-                        {/* Teachers Section */}
                         {(filteredItems as { teachers: Teacher[]; supervisors: Supervisor[] }).teachers.length > 0 && (
                             <>
                                 <h3 className="text-lg font-bold text-gray-700 mb-2">المدرسين</h3>
@@ -313,8 +226,6 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                                 ))}
                             </>
                         )}
-
-                        {/* Supervisors Section */}
                         {(filteredItems as { teachers: Teacher[]; supervisors: Supervisor[] }).supervisors.length > 0 && (
                             <>
                                 <h3 className="text-lg font-bold text-gray-700 mb-2 mt-6">المشرفين</h3>
@@ -330,8 +241,6 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                                 ))}
                             </>
                         )}
-
-                        {/* No Results */}
                         {(filteredItems as { teachers: Teacher[]; supervisors: Supervisor[] }).teachers.length === 0 &&
                             (filteredItems as { teachers: Teacher[]; supervisors: Supervisor[] }).supervisors.length === 0 && (
                                 <div className="text-center py-20 bg-white rounded-xl shadow border border-gray-100">
@@ -339,17 +248,13 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                                         <SearchIcon className="w-8 h-8 text-gray-400" />
                                     </div>
                                     <h2 className="text-xl font-semibold text-gray-700">لا توجد نتائج</h2>
-                                    <p className="text-gray-500 mt-2">
-                                        لا يوجد مدرسون أو مشرفون يطابقون البحث "{localSearchTerm}"
-                                    </p>
+                                    <p className="text-gray-500 mt-2">لا يوجد مدرسون أو مشرفون يطابقون البحث "{searchTerm}"</p>
                                 </div>
                             )}
                     </>
                 ) : (
-                    // Normal tab view
                     <>
-                        {activeTab === 'إقراء' ? (
-                            // Display Supervisors
+                        {activeTab === 'الإشراف' ? (
                             <>
                                 {(filteredItems as Supervisor[]).map((item: Supervisor) => (
                                     <SupervisorCard
@@ -367,14 +272,11 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                                             <UserIcon className="w-8 h-8 text-gray-400" />
                                         </div>
                                         <h2 className="text-xl font-semibold text-gray-700">لا يوجد مشرفون</h2>
-                                        <p className="text-gray-500 mt-2">
-                                            {filterStatus !== 'all' ? "لا توجد نتائج تطابق معايير البحث." : "قم بإضافة مشرفين جدد."}
-                                        </p>
+                                        <p className="text-gray-500 mt-2">{filterStatus !== 'all' ? "لا توجد نتائج تطابق معايير البحث." : "قم بإضافة مشرفين جدد."}</p>
                                     </div>
                                 )}
                             </>
                         ) : (
-                            // Display Teachers
                             <>
                                 {(filteredItems as Teacher[]).map((item: Teacher) => (
                                     <TeacherCard
@@ -392,9 +294,7 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                                             <SearchIcon className="w-8 h-8 text-gray-400" />
                                         </div>
                                         <h2 className="text-xl font-semibold text-gray-700">لا يوجد مدرسون</h2>
-                                        <p className="text-gray-500 mt-2">
-                                            {filterStatus !== 'all' ? "لا توجد نتائج تطابق معايير البحث." : "قم بإضافة مدرسين جدد للبدء."}
-                                        </p>
+                                        <p className="text-gray-500 mt-2">{filterStatus !== 'all' ? "لا توجد نتائج تطابق معايير البحث." : "قم بإضافة مدرسين جدد للبدء."}</p>
                                     </div>
                                 )}
                             </>

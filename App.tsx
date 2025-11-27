@@ -1336,6 +1336,34 @@ const App: React.FC = () => {
 
             if (isSubView) {
                 leftContent = backButton;
+
+                if (isSearchVisible) {
+                    centerContent = (
+                        <div className="relative">
+                            <input
+                                type="search"
+                                placeholder={isTeacherManagerView ? 'البحث عن مدرس أو مشرف...' : 'البحث...'}
+                                value={searchTerm}
+                                onChange={(e) => setSearchTerm(e.target.value)}
+                                className="w-48 sm:w-72 pl-4 pr-10 py-2 border rounded-full bg-gray-100 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
+                                autoFocus
+                            />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
+                                <SearchIcon className="w-5 h-5" />
+                            </div>
+                        </div>
+                    );
+                } else if (isTeacherManagerView) {
+                    centerContent = (
+                        <div className="flex items-center gap-2">
+                            <button onClick={toggleSearch} className="p-1 rounded-full text-gray-500 hover:bg-gray-100 transition-colors" aria-label="بحث">
+                                <SearchIcon className="w-5 h-5" />
+                            </button>
+                            <h1 className="text-xl sm:text-2xl font-bold text-gray-800 truncate px-2">{title}</h1>
+                        </div>
+                    );
+                }
+
                 if (isTeacherManagerView) {
                     rightContent = (
                         <div className="flex items-center gap-2">
