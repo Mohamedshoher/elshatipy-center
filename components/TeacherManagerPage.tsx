@@ -6,7 +6,7 @@
 
 
 import React, { useMemo, useState } from 'react';
-import type { Teacher, Group, TeacherAttendanceRecord, TeacherPayrollAdjustment, Expense, FinancialSettings, Student, Supervisor, GroupType } from '../types';
+import type { Teacher, Group, TeacherAttendanceRecord, TeacherPayrollAdjustment, Expense, FinancialSettings, Student, Supervisor, GroupType, TeacherCollectionRecord } from '../types';
 import { TeacherStatus, TeacherAttendanceStatus } from '../types';
 import TeacherCard from './TeacherCard';
 import SupervisorCard from './SupervisorCard';
@@ -22,6 +22,7 @@ interface TeacherManagerPageProps {
     students: Student[];
     teacherAttendance: TeacherAttendanceRecord[];
     teacherPayrollAdjustments: TeacherPayrollAdjustment[];
+    teacherCollections: TeacherCollectionRecord[];
     financialSettings: FinancialSettings;
     onAddTeacherClick: () => void;
     onEditTeacherClick: (teacher: Teacher) => void;
@@ -219,6 +220,9 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                                         key={teacher.id}
                                         teacher={teacher}
                                         teacherAttendance={props.teacherAttendance}
+                                        students={props.students}
+                                        groups={groups}
+                                        teacherCollections={props.teacherCollections}
                                         onSetTeacherAttendance={props.onSetTeacherAttendance}
                                         onDeductionClick={(id, status) => handleDeductionClick(id, status, false)}
                                         onClick={() => onViewTeacherDetails(teacher)}
@@ -283,6 +287,9 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                                         key={item.id}
                                         teacher={item}
                                         teacherAttendance={props.teacherAttendance}
+                                        students={props.students}
+                                        groups={groups}
+                                        teacherCollections={props.teacherCollections}
                                         onSetTeacherAttendance={props.onSetTeacherAttendance}
                                         onDeductionClick={(id, status) => handleDeductionClick(id, status, false)}
                                         onClick={() => onViewTeacherDetails(item)}

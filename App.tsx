@@ -1612,6 +1612,7 @@ const App: React.FC = () => {
                 students={activeStudents}
                 teacherAttendance={teacherAttendance}
                 teacherPayrollAdjustments={teacherPayrollAdjustments}
+                teacherCollections={teacherCollections}
                 onAddTeacherClick={handleOpenAddTeacherForm}
                 onEditTeacherClick={handleEditTeacher}
                 onEditSupervisorClick={handleEditSupervisor}
