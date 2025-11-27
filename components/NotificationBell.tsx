@@ -50,7 +50,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ currentUser, notifi
     }, [notifications, currentUser.id, teacherGroups]);
 
     const unreadNotifications = useMemo(() => {
-        return relevantNotifications.filter(n => !n.readBy.includes(currentUser.id));
+        return relevantNotifications.filter(n => !n.readBy?.includes(currentUser.id));
     }, [relevantNotifications, currentUser.id]);
 
 
@@ -81,7 +81,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ currentUser, notifi
 
     const handleClearRead = () => {
         const readNotificationIds = relevantNotifications
-            .filter(n => n.readBy.includes(currentUser.id))
+            .filter(n => n.readBy?.includes(currentUser.id))
             .map(n => n.id);
 
         if (readNotificationIds.length > 0) {
@@ -111,7 +111,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ currentUser, notifi
                                 }
 
                                 return (
-                                    <div key={n.id} className={`p-4 border-b text-sm ${!n.readBy.includes(currentUser.id) ? 'bg-blue-50' : 'bg-white'}`}>
+                                    <div key={n.id} className={`p-4 border-b text-sm ${!n.readBy?.includes(currentUser.id) ? 'bg-blue-50' : 'bg-white'}`}>
                                         <div className="mb-2">
                                             <p className="text-gray-800">{n.content}</p>
                                         </div>
@@ -140,7 +140,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ currentUser, notifi
                             <p className="p-8 text-sm text-center text-gray-500">لا توجد إشعارات.</p>
                         )}
                     </div>
-                    {relevantNotifications.some(n => n.readBy.includes(currentUser.id)) && (
+                    {relevantNotifications.some(n => n.readBy?.includes(currentUser.id)) && (
                         <div className="p-2 bg-gray-50 border-t">
                             <button
                                 onClick={handleClearRead}
