@@ -40,21 +40,17 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && !student.isArchived && onViewDetails(student)}
       >
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
+        <div className="flex flex-col gap-4">
 
-          <div className="w-full sm:w-auto flex items-center justify-between sm:justify-end gap-3">
+          <div className="w-full flex items-center justify-between gap-3 mb-3">
             <div className="flex items-center gap-3 min-w-0">
               <UserIcon className="w-8 h-8 text-blue-500 flex-shrink-0" />
-              <div>
-                <h3 className="text-xl font-bold text-gray-800 truncate">{student.name}</h3>
-              </div>
+              <h3 className="text-xl font-bold text-gray-800 truncate">{student.name}</h3>
             </div>
           </div>
 
-          <div className="w-full sm:w-auto flex flex-wrap items-center justify-start sm:justify-end gap-x-4 gap-y-2" onClick={(e) => e.stopPropagation()}>
-            {groupName && <span className="text-sm font-medium text-gray-500 bg-gray-100 px-2 py-1 rounded-md order-3 sm:order-1">{groupName}</span>}
-
-            <div className="flex gap-2 order-1 sm:order-2">
+          <div className="w-full flex flex-wrap items-center justify-between gap-y-2" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-2">
               {!student.isArchived ? (
                 <>
                   <button onClick={() => onToggleAttendance(student.id, today, AttendanceStatusEnum.PRESENT)} className={`py-1 px-4 rounded-full font-semibold text-sm transition-all border ${todayAttendance?.status === AttendanceStatusEnum.PRESENT ? 'bg-green-600 text-white border-transparent shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`} aria-label={`تسجيل حضور لـ ${student.name}`}>
@@ -78,7 +74,7 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
               )}
             </div>
 
-            <div className="flex items-center flex-shrink-0 gap-x-2 order-2 sm:order-3">
+            <div className="flex items-center gap-x-2">
               <a href={`https://wa.me/${student.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 text-green-500 hover:text-green-600 transition-colors" aria-label={`واتساب ${student.name}`}>
                 <WhatsAppIcon className="w-5 h-5" />
               </a>
