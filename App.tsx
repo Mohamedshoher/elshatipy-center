@@ -28,6 +28,7 @@ import DirectorNotificationBell from './components/DirectorNotificationBell';
 import Sidebar from './components/Sidebar';
 import Header from './components/Header';
 import BottomNavBar from './components/BottomNavBar';
+import ErrorBoundary from './components/ErrorBoundary';
 import { AttendanceStatus as AttendanceEnum, TeacherStatus } from './types';
 import LogoutIcon from './components/icons/LogoutIcon';
 import MenuIcon from './components/icons/MenuIcon';
@@ -1851,10 +1852,12 @@ const App: React.FC = () => {
                 <div className="flex-1 flex flex-col w-full min-w-0 lg:h-screen">
                     {renderHeader()}
                     <main className="flex-1 overflow-y-auto pb-16 lg:pb-0">
-                        {currentUser.role === 'director'
-                            ? renderDirectorContent()
-                            : (currentUser.role === 'supervisor' ? renderSupervisorContent() : renderTeacherContent())
-                        }
+                        <ErrorBoundary>
+                            {currentUser.role === 'director'
+                                ? renderDirectorContent()
+                                : (currentUser.role === 'supervisor' ? renderSupervisorContent() : renderTeacherContent())
+                            }
+                        </ErrorBoundary>
                     </main>
                     <div className="lg:hidden">
                         <BottomNavBar activeView={activeView} onSelectView={handleBottomNavSelect} />
