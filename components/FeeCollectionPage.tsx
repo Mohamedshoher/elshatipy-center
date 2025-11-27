@@ -60,8 +60,8 @@ const FeeCollectionPage: React.FC<FeeCollectionPageProps> = ({ onBack, teachers,
                                 key={tab}
                                 onClick={() => setActiveTab(tab)}
                                 className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${activeTab === tab
-                                        ? 'bg-white text-cyan-700 shadow-sm'
-                                        : 'text-gray-500 hover:text-gray-700'
+                                    ? 'bg-white text-cyan-700 shadow-sm'
+                                    : 'text-gray-500 hover:text-gray-700'
                                     }`}
                             >
                                 {tab === 'all' ? 'الكل' : tab}
@@ -162,27 +162,24 @@ const TeacherFeeCard: React.FC<TeacherFeeCardProps> = ({ teacher, groups, studen
                         </div>
                         <div>
                             <h3 className="text-xl font-bold text-gray-800">{teacher.name}</h3>
-                            {teacher.phone && (
-                                <p className="text-sm text-gray-500 mt-1">{teacher.phone}</p>
-                            )}
+                            <div className="flex gap-3 mt-1 text-xs sm:text-sm">
+                                <div className="flex items-center gap-1">
+                                    <span className="text-gray-500">المحصّل:</span>
+                                    <span className="font-bold text-green-600">{financialData.totalCollectedByTeacher.toLocaleString()}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-gray-500">المُسلَّم:</span>
+                                    <span className="font-bold text-blue-600">{financialData.totalHandedOver.toLocaleString()}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-gray-500">المتبقي:</span>
+                                    <span className="font-bold text-red-600">{financialData.remainingBalance.toLocaleString()}</span>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
                     <div className="flex items-center gap-4 sm:gap-6">
-                        <div className="hidden md:flex gap-4 sm:gap-6 text-center">
-                            <div>
-                                <p className="text-xs text-gray-500">المحصّل</p>
-                                <p className="font-bold text-green-600">{financialData.totalCollectedByTeacher.toLocaleString()}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500">المُسلَّم</p>
-                                <p className="font-bold text-blue-600">{financialData.totalHandedOver.toLocaleString()}</p>
-                            </div>
-                            <div>
-                                <p className="text-xs text-gray-500">المتبقي</p>
-                                <p className="font-bold text-red-600">{financialData.remainingBalance.toLocaleString()}</p>
-                            </div>
-                        </div>
                         <svg className={`w-6 h-6 text-gray-400 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                     </div>
                 </div>
