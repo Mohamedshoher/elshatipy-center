@@ -591,10 +591,28 @@ const App: React.FC = () => {
         const student = students.find(s => s.id === studentId);
         if (!student) return;
 
+        const rejectionReason = prompt(`يرجى إدخال سبب رفض الطالب "${student.name}":`);
+        if (rejectionReason === null || rejectionReason.trim() === '') {
+            return;
+        }
+
         if (window.confirm(`هل أنت متأكد من رفض الطالب "${student.name}"؟ سيتم حذفه نهائياً.`)) {
             try {
+                if (student.addedBy) {
+                    const teacher = teachers.find(t => t.id === student.addedBy);
+                    if (teacher) {
+                        const rejectorName = currentUser.role === 'director' ? 'المدير' : `المشرف ${currentUser.name}`;
+                        await addDoc(collection(db, 'notifications'), {
+                            date: new Date().toISOString(),
+                            content: `تم رفض الطالب "${student.name}" من قبل ${rejectorName}.\nسبب الرفض: ${rejectionReason.trim()}`,
+                            senderName: rejectorName,
+                            target: { type: 'teacher', id: student.addedBy },
+                            readBy: [],
+                        });
+                    }
+                }
                 await deleteDoc(doc(db, 'students', studentId));
-                alert('تم رفض الطالب وحذفه.');
+                alert('تم رفض الطالب وحذفه، وتم إرسال إشعار للمدرس.');
             } catch (error) {
                 console.error("Error rejecting student: ", error);
                 alert("حدث خطأ أثناء رفض الطالب.");
