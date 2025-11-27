@@ -1,0 +1,644 @@
+
+import React, { useState, useMemo } from 'react';
+import type { Teacher, Group, TeacherAttendanceRecord, TeacherPayrollAdjustment, Expense, FinancialSettings, Student, Supervisor } from '../types';
+import { TeacherStatus, ExpenseCategory, TeacherAttendanceStatus } from '../types';
+import PhoneIcon from './icons/PhoneIcon';
+import EditIcon from './icons/EditIcon';
+import TrashIcon from './icons/TrashIcon';
+import UsersIcon from './icons/UsersIcon';
+import DocumentReportIcon from './icons/DocumentReportIcon';
+import CurrencyDollarIcon from './icons/CurrencyDollarIcon';
+import CalendarCheckIcon from './icons/CalendarCheckIcon';
+import WhatsAppIcon from './icons/WhatsAppIcon';
+import XIcon from './icons/XIcon';
+import BonusReasonModal from './BonusReasonModal';
+import DeductionReasonModal from './DeductionReasonModal';
+import UserIcon from './icons/UserIcon';
+import BriefcaseIcon from './icons/BriefcaseIcon';
+
+interface TeacherDetailsModalProps {
+    isOpen: boolean;
+    onClose: () => void;
+    teacher: Teacher | null;
+    supervisor?: Supervisor | null;
+    groups: Group[];
+    students: Student[];
+    teacherAttendance: TeacherAttendanceRecord[];
+    teacherPayrollAdjustments: TeacherPayrollAdjustment[];
+    financialSettings: FinancialSettings;
+    onEditTeacherClick: (teacher: Teacher) => void;
+    onEditSupervisorClick?: (supervisor: Supervisor) => void;
+    onDeleteTeacher: (teacherId: string) => void;
+    onDeleteSupervisor?: (supervisorId: string) => void;
+    onSetTeacherAttendance: (teacherId: string, date: string, status: TeacherAttendanceStatus, reason?: string) => void;
+    onUpdatePayrollAdjustments: (adjustment: Partial<TeacherPayrollAdjustment> & Pick<TeacherPayrollAdjustment, 'teacherId' | 'month'> & { isPaid?: boolean }) => void;
+    onLogExpense: (expense: Omit<Expense, 'id'>) => void;
+    onViewTeacherReport: (teacherId: string) => void;
+    onSendNotificationToAll: (content: string) => void;
+}
+
+const getAbsenceValue = (status: TeacherAttendanceStatus): number => {
+    switch (status) {
+        // Old system (backward compatibility)
+        case TeacherAttendanceStatus.ABSENT: return 1;
+        case TeacherAttendanceStatus.HALF_DAY: return 0.5;
+        case TeacherAttendanceStatus.QUARTER_DAY: return 0.25;
+
+        // New deduction system
+        case TeacherAttendanceStatus.DEDUCTION_FULL_DAY: return 1;
+        case TeacherAttendanceStatus.DEDUCTION_HALF_DAY: return 0.5;
+        case TeacherAttendanceStatus.DEDUCTION_QUARTER_DAY: return 0.25;
+        case TeacherAttendanceStatus.MISSING_REPORT: return 0.25;
+
+        default: return 0;
+    }
+};
+
+const getBonusValue = (status: TeacherAttendanceStatus): number => {
+    switch (status) {
+        case TeacherAttendanceStatus.BONUS_DAY: return 1;
+        case TeacherAttendanceStatus.BONUS_HALF_DAY: return 0.5;
+        case TeacherAttendanceStatus.BONUS_QUARTER_DAY: return 0.25;
+        default: return 0;
+    }
+};
+
+const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
+    isOpen,
+    onClose,
+    teacher,
+    supervisor,
+    groups,
+    students,
+    teacherAttendance,
+    teacherPayrollAdjustments,
+    financialSettings,
+    onEditTeacherClick,
+    onEditSupervisorClick,
+    onDeleteTeacher,
+    onDeleteSupervisor,
+    onSetTeacherAttendance,
+    onUpdatePayrollAdjustments,
+    onLogExpense,
+    onViewTeacherReport,
+    onSendNotificationToAll,
+}) => {
+    const [activeTab, setActiveTab] = useState<'payroll' | 'attendance' | 'groups'>('payroll');
+    const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
+    const [additionalBonus, setAdditionalBonus] = useState('');
+    const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
+    const [bonusTypeToGive, setBonusTypeToGive] = useState<TeacherAttendanceStatus | null>(null);
+    const [isDeductionModalOpen, setIsDeductionModalOpen] = useState(false);
+    const [deductionTypeToApply, setDeductionTypeToApply] = useState<TeacherAttendanceStatus | null>(null);
+
+    const employee = teacher || supervisor;
+    const isSupervisor = !!supervisor;
+    const employeeId = employee?.id || '';
+    const employeeName = employee?.name || '';
+    const employeePhone = employee?.phone || '';
+    const employeeSalary = employee?.salary || 0;
+
+    const isTeacherInUse = useMemo(() => {
+        if (!teacher) return false;
+        return groups.some(g => g.teacherId === teacher.id);
+    }, [groups, teacher]);
+
+    const assignedGroups = useMemo(() => {
+        if (!teacher) return [];
+        return groups.filter(g => g.teacherId === teacher.id);
+    }, [groups, teacher]);
+
+    const today = new Date().toISOString().split('T')[0];
+    const todayAttendance = useMemo(() => {
+        if (!employeeId) return undefined;
+        return teacherAttendance.find(a => a.teacherId === employeeId && a.date === today);
+    }, [teacherAttendance, employeeId, today]);
+
+    const handleBonusClick = (bonusStatus: TeacherAttendanceStatus) => {
+        setBonusTypeToGive(bonusStatus);
+        setIsBonusModalOpen(true);
+    };
+
+    const handleConfirmBonus = (reason: string) => {
+        if (!employeeId || !bonusTypeToGive) return;
+
+        // 1. Record the attendance
+        onSetTeacherAttendance(employeeId, today, bonusTypeToGive, reason);
+
+        // 2. Prepare and send notification
+        let bonusAmountText = '';
+        switch (bonusTypeToGive) {
+            case TeacherAttendanceStatus.BONUS_DAY: bonusAmountText = 'يوم كامل'; break;
+            case TeacherAttendanceStatus.BONUS_HALF_DAY: bonusAmountText = 'نصف يوم'; break;
+            case TeacherAttendanceStatus.BONUS_QUARTER_DAY: bonusAmountText = 'ربع يوم'; break;
+        }
+
+        const roleTitle = isSupervisor ? 'المشرف/ة' : 'المدرس/ة';
+        const notificationContent = `🎉 مكافأة! حصل ${roleTitle} ${employeeName} على مكافأة (${bonusAmountText}) وذلك لـ: "${reason}".`;
+        onSendNotificationToAll(notificationContent);
+
+        // 3. Close modal and reset state
+        setIsBonusModalOpen(false);
+        setBonusTypeToGive(null);
+    };
+
+    const handleDeductionClick = (deductionStatus: TeacherAttendanceStatus) => {
+        setDeductionTypeToApply(deductionStatus);
+        setIsDeductionModalOpen(true);
+    };
+
+    const handleConfirmDeduction = (reason: string) => {
+        if (!employeeId || !deductionTypeToApply) return;
+
+        // Record the deduction
+        onSetTeacherAttendance(employeeId, today, deductionTypeToApply, reason);
+
+        // Close modal and reset state
+        setIsDeductionModalOpen(false);
+        setDeductionTypeToApply(null);
+    };
+
+
+    const getTabClass = (tabName: 'payroll' | 'attendance' | 'groups') => {
+        const baseClass = "py-3 px-2 font-semibold text-center transition-colors duration-200 focus:outline-none flex-shrink-0 flex items-center justify-center gap-2 flex-grow text-sm";
+        if (activeTab === tabName) {
+            return `${baseClass} border-b-2 border-teal-600 text-teal-600 bg-teal-50`;
+        }
+        return `${baseClass} text-gray-500 hover:bg-gray-100`;
+    };
+
+    const attendanceForMonth = useMemo(() => {
+        if (!employeeId) return [];
+        return teacherAttendance.filter(a => a.teacherId === employeeId && a.date.startsWith(selectedMonth));
+    }, [employeeId, teacherAttendance, selectedMonth]);
+
+    const payrollData = useMemo(() => {
+        if (!employeeId) return { baseSalary: 0, adjustments: { bonus: 0, isPaid: false }, absenceDays: 0, bonusDays: 0, absenceDeduction: 0, attendanceBonus: 0, finalSalary: 0, isPaid: false };
+
+        const baseSalary = employeeSalary;
+        const adjustments = teacherPayrollAdjustments.find(p => p.teacherId === employeeId && p.month === selectedMonth) || { bonus: 0, isPaid: false };
+
+        const absenceDays = attendanceForMonth.reduce((total, record) => total + getAbsenceValue(record.status), 0);
+        const bonusDays = attendanceForMonth.reduce((total, record) => total + getBonusValue(record.status), 0);
+
+        const dailyRate = baseSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? baseSalary / financialSettings.workingDaysPerMonth : 0;
+        const absenceDeduction = dailyRate * absenceDays * (financialSettings.absenceDeductionPercentage / 100);
+        const attendanceBonus = dailyRate * bonusDays;
+
+        const finalSalary = baseSalary + adjustments.bonus + attendanceBonus - absenceDeduction;
+        return { baseSalary, adjustments, absenceDays, bonusDays, absenceDeduction, attendanceBonus, finalSalary, isPaid: adjustments.isPaid };
+    }, [employeeId, employeeSalary, selectedMonth, teacherPayrollAdjustments, attendanceForMonth, financialSettings]);
+
+    const bonusRecordsWithReason = useMemo(() =>
+        attendanceForMonth.filter(r => getBonusValue(r.status) > 0 && r.reason),
+        [attendanceForMonth]);
+
+    const deductionRecordsWithReason = useMemo(() =>
+        attendanceForMonth.filter(r => getAbsenceValue(r.status) > 0 && r.status !== TeacherAttendanceStatus.ABSENT && r.reason),
+        [attendanceForMonth]);
+
+    const handlePayEmployee = (finalSalary: number) => {
+        if (!employeeId || !finalSalary || finalSalary <= 0) return;
+        const category = isSupervisor ? ExpenseCategory.SUPERVISOR_SALARY : ExpenseCategory.TEACHER_SALARY;
+        const descRole = isSupervisor ? 'المشرف' : 'المدرس';
+
+        onLogExpense({
+            date: new Date().toISOString().split('T')[0],
+            category: category,
+            description: `راتب ${descRole}: ${employeeName} - شهر ${selectedMonth}`,
+            amount: finalSalary,
+        });
+        onUpdatePayrollAdjustments({
+            teacherId: employeeId,
+            month: selectedMonth,
+            isPaid: true
+        });
+    }
+
+    const handlePayAdditionalBonus = () => {
+        if (!employeeId) return;
+        const amount = parseFloat(additionalBonus);
+        if (!amount || amount <= 0) {
+            alert('يرجى إدخال مبلغ مكافأة صحيح.');
+            return;
+        }
+
+        const descRole = isSupervisor ? 'مشرف' : 'مدرس';
+        onLogExpense({
+            date: new Date().toISOString().split('T')[0],
+            category: ExpenseCategory.TEACHER_BONUS, // Shared for now or add specific
+            description: `مكافأة إضافية لـ ${descRole}: ${employeeName} - شهر ${selectedMonth}`,
+            amount: amount,
+        });
+
+        const newTotalBonus = (payrollData.adjustments.bonus || 0) + amount;
+        onUpdatePayrollAdjustments({
+            teacherId: employeeId,
+            month: selectedMonth,
+            bonus: newTotalBonus,
+        });
+
+        alert(`تم تسليم مكافأة بقيمة ${amount.toLocaleString()} EGP بنجاح.`);
+        setAdditionalBonus('');
+    };
+
+
+    const handleSendWhatsAppReport = () => {
+        if (!employeeId) return;
+        const monthName = new Date(selectedMonth + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' });
+        const roleTitle = isSupervisor ? 'المشرف/ة' : 'المدرس/ة';
+
+        let message = `*تقرير الراتب - ${monthName}*\n`;
+        message += `*${roleTitle}:* ${employeeName}\n\n`;
+        message += `*--- تفاصيل الراتب ---*\n`;
+        message += `*الراتب الأساسي:* ${payrollData.baseSalary.toLocaleString()} EGP\n`;
+        message += `*مكافأة حضور (${payrollData.bonusDays} يوم):* +${payrollData.attendanceBonus.toFixed(2)} EGP\n`;
+
+        if (bonusRecordsWithReason.length > 0) {
+            message += `*تفاصيل المكافآت:*\n`;
+            bonusRecordsWithReason.forEach(r => {
+                let bonusAmountText = '';
+                switch (r.status) {
+                    case TeacherAttendanceStatus.BONUS_DAY: bonusAmountText = 'يوم كامل'; break;
+                    case TeacherAttendanceStatus.BONUS_HALF_DAY: bonusAmountText = 'نصف يوم'; break;
+                    case TeacherAttendanceStatus.BONUS_QUARTER_DAY: bonusAmountText = 'ربع يوم'; break;
+                }
+                message += `  - ${new Date(r.date).toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric' })}: ${r.reason} (${bonusAmountText})\n`;
+            });
+        }
+
+        if (payrollData.adjustments.bonus > 0) {
+            message += `*مكافآت إضافية:* +${payrollData.adjustments.bonus.toLocaleString()} EGP\n`;
+        }
+
+        message += `*خصم الغياب (${payrollData.absenceDays} يوم):* -${payrollData.absenceDeduction.toFixed(2)} EGP\n`;
+
+        if (deductionRecordsWithReason.length > 0) {
+            message += `*تفاصيل الخصومات:*\n`;
+            deductionRecordsWithReason.forEach(r => {
+                let deductionAmountText = '';
+                switch (r.status) {
+                    case TeacherAttendanceStatus.HALF_DAY: deductionAmountText = 'نصف يوم'; break;
+                    case TeacherAttendanceStatus.QUARTER_DAY: deductionAmountText = 'ربع يوم'; break;
+                }
+                message += `  - ${new Date(r.date).toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric' })}: ${r.reason} (${deductionAmountText})\n`;
+            });
+        }
+
+        message += `*الراتب النهائي:* *${payrollData.finalSalary.toFixed(2)} EGP*\n\n`;
+        message += `مع تحيات إدارة مركز الشاطبي.`;
+
+        const phone = employeePhone.replace(/[^0-9]/g, '');
+        if (!phone) {
+            alert('لا يوجد رقم هاتف مسجل.');
+            return;
+        }
+        const encodedMessage = encodeURIComponent(message);
+        window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
+    };
+
+    if (!isOpen || !employee) return null;
+
+    return (
+        <>
+            <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4 backdrop-blur-sm">
+                <div className="bg-white rounded-lg shadow-2xl w-full max-w-4xl flex flex-col max-h-[90vh] animate-scale-up">
+                    <div className="flex-shrink-0 p-4 border-b flex justify-between items-center bg-gray-50 rounded-t-lg">
+                        <div className="flex items-center gap-3">
+                            <div className={`w-12 h-12 rounded-full flex items-center justify-center shadow-sm ${isSupervisor ? 'bg-blue-100 text-blue-600' : 'bg-teal-100 text-teal-600'}`}>
+                                {isSupervisor ? <UserIcon className="w-6 h-6" /> : <BriefcaseIcon className="w-6 h-6" />}
+                            </div>
+                            <div>
+                                <h2 className="text-2xl font-bold text-gray-800">
+                                    {employeeName}
+                                </h2>
+                                <p className="text-sm text-gray-500 flex items-center gap-2">
+                                    {employeePhone && <span>{employeePhone}</span>}
+                                    {employeePhone && <span>•</span>}
+                                    <span className={`font-medium ${isSupervisor ? 'text-blue-600' : 'text-teal-600'}`}>
+                                        {isSupervisor ? 'مشرف' : 'مدرس'}
+                                    </span>
+                                </p>
+                            </div>
+                        </div>
+                        <button onClick={onClose} className="p-2 text-gray-400 hover:text-gray-600 rounded-full hover:bg-gray-200 transition-colors">
+                            <XIcon className="w-6 h-6" />
+                        </button>
+                    </div>
+
+                    <div className="overflow-y-auto p-4">
+                        {/* Attendance Buttons - حاضر/غائب */}
+                        <div className="mb-4">
+                            <h3 className="text-sm font-bold text-gray-700 mb-2">الحضور والغياب</h3>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => onSetTeacherAttendance(employeeId, today, TeacherAttendanceStatus.PRESENT)}
+                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${!todayAttendance || todayAttendance.status === TeacherAttendanceStatus.PRESENT
+                                        ? 'bg-green-600 text-white shadow'
+                                        : 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                                        }`}
+                                >
+                                    ✓ حاضر
+                                </button>
+                                <button
+                                    onClick={() => onSetTeacherAttendance(employeeId, today, TeacherAttendanceStatus.ABSENT)}
+                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.ABSENT
+                                        ? 'bg-red-600 text-white shadow'
+                                        : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+                                        }`}
+                                >
+                                    ✗ غائب
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Deduction Buttons - الخصومات */}
+                        <div className="mb-4">
+                            <h3 className="text-sm font-bold text-gray-700 mb-2">الخصومات</h3>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => handleDeductionClick(TeacherAttendanceStatus.DEDUCTION_FULL_DAY)}
+                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.DEDUCTION_FULL_DAY
+                                        ? 'bg-orange-600 text-white shadow'
+                                        : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
+                                        }`}
+                                >
+                                    خصم يوم
+                                </button>
+                                <button
+                                    onClick={() => handleDeductionClick(TeacherAttendanceStatus.DEDUCTION_HALF_DAY)}
+                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.DEDUCTION_HALF_DAY
+                                        ? 'bg-orange-600 text-white shadow'
+                                        : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
+                                        }`}
+                                >
+                                    خصم نصف
+                                </button>
+                                <button
+                                    onClick={() => handleDeductionClick(TeacherAttendanceStatus.DEDUCTION_QUARTER_DAY)}
+                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.DEDUCTION_QUARTER_DAY
+                                        ? 'bg-orange-600 text-white shadow'
+                                        : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
+                                        }`}
+                                >
+                                    خصم ربع
+                                </button>
+                            </div>
+                        </div>
+
+                        {/* Bonus Buttons - المكافآت */}
+                        <div className="mb-4">
+                            <h3 className="text-sm font-bold text-gray-700 mb-2">المكافآت</h3>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => handleBonusClick(TeacherAttendanceStatus.BONUS_DAY)}
+                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.BONUS_DAY ? 'bg-purple-600 text-white shadow' : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
+                                        }`}
+                                >
+                                    مكافأة يوم
+                                </button>
+                                <button
+                                    onClick={() => handleBonusClick(TeacherAttendanceStatus.BONUS_HALF_DAY)}
+                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.BONUS_HALF_DAY ? 'bg-purple-600 text-white shadow' : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
+                                        }`}
+                                >
+                                    مكافأة نصف
+                                </button>
+                                <button
+                                    onClick={() => handleBonusClick(TeacherAttendanceStatus.BONUS_QUARTER_DAY)}
+                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.BONUS_QUARTER_DAY ? 'bg-purple-600 text-white shadow' : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
+                                        }`}
+                                >
+                                    مكافأة ربع
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="border-t pt-3 flex justify-between items-center mb-4">
+                            <div className="flex items-center gap-2">
+                                <a href={`https://wa.me/${employeePhone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors" title={`واتساب ${employeeName}`}>
+                                    <WhatsAppIcon className="w-5 h-5" />
+                                </a>
+                                <a href={`tel:${employeePhone.replace(/[^0-9]/g, '')}`} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors" title={`اتصال ${employeeName}`}>
+                                    <PhoneIcon className="w-5 h-5" />
+                                </a>
+                                {!isSupervisor && (
+                                    <button onClick={() => onViewTeacherReport(employeeId)} className="p-2 bg-indigo-50 text-indigo-600 rounded-lg hover:bg-indigo-100 transition-colors" title="عرض التقرير التفصيلي">
+                                        <DocumentReportIcon className="w-5 h-5" />
+                                    </button>
+                                )}
+                                <button
+                                    onClick={() => isSupervisor && supervisor && onEditSupervisorClick ? onEditSupervisorClick(supervisor) : (teacher && onEditTeacherClick(teacher))}
+                                    className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                                    title="تعديل"
+                                >
+                                    <EditIcon className="w-5 h-5" />
+                                </button>
+                                <button
+                                    onClick={() => isSupervisor && supervisor && onDeleteSupervisor ? onDeleteSupervisor(supervisor.id) : (teacher && onDeleteTeacher(teacher.id))}
+                                    disabled={isSupervisor ? false : isTeacherInUse}
+                                    className="p-2 bg-red-50 text-red-600 rounded-lg hover:bg-red-100 transition-colors disabled:text-gray-300 disabled:bg-gray-50 disabled:cursor-not-allowed"
+                                    title={isTeacherInUse ? "لا يمكن حذف مدرس مسؤول عن مجموعة" : "حذف"}
+                                >
+                                    <TrashIcon className="w-5 h-5" />
+                                </button>
+                            </div>
+                        </div>
+
+                        <div className="bg-gray-50 border rounded-xl overflow-hidden">
+                            <div className="flex border-b border-gray-200 overflow-x-auto bg-white">
+                                <button onClick={() => setActiveTab('payroll')} className={getTabClass('payroll')}><CurrencyDollarIcon className="w-5 h-5" /> <span className="hidden sm:inline">الرواتب</span></button>
+                                <button onClick={() => setActiveTab('attendance')} className={getTabClass('attendance')}><CalendarCheckIcon className="w-5 h-5" /> <span className="hidden sm:inline">سجل الحضور</span></button>
+                                <button onClick={() => setActiveTab('groups')} className={getTabClass('groups')}><UsersIcon className="w-5 h-5" /> <span className="hidden sm:inline">{isSupervisor ? 'الأقسام' : 'المجموعات'}</span></button>
+                            </div>
+
+                            <div className="p-4">
+                                {activeTab !== 'groups' && (
+                                    <div className="mb-4 max-w-xs">
+                                        <label className="block text-sm font-medium text-gray-600 mb-1">عرض بيانات شهر</label>
+                                        <input type="month" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500" />
+                                    </div>
+                                )}
+                                {activeTab === 'payroll' && (
+                                    <div className="space-y-4">
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                                            <div><label className="text-xs text-gray-500 font-bold uppercase">الراتب الأساسي</label><p className="font-bold text-lg text-gray-800">{payrollData.baseSalary.toLocaleString()} EGP</p></div>
+                                            <div><label className="text-xs text-gray-500 font-bold uppercase">خصم الغياب ({payrollData.absenceDays} يوم)</label><p className="font-bold text-lg text-red-500">{payrollData.absenceDeduction.toFixed(2)}</p></div>
+                                            <div><label className="text-xs text-gray-500 font-bold uppercase">مكافأة حضور ({payrollData.bonusDays} يوم)</label><p className="font-bold text-lg text-green-500">{payrollData.attendanceBonus.toFixed(2)}</p></div>
+                                            <div><label className="text-xs text-gray-500 font-bold uppercase">المكافآت الإضافية</label><p className="font-bold text-lg text-green-500">{payrollData.adjustments.bonus.toLocaleString()}</p></div>
+                                            <div className="col-span-1 sm:col-span-2 pt-2 border-t"><label className="text-sm text-gray-500 font-bold">الراتب النهائي</label><p className="font-bold text-3xl text-blue-600">{payrollData.finalSalary.toFixed(2)} <span className="text-sm text-gray-500 font-normal">EGP</span></p></div>
+                                        </div>
+
+                                        {(bonusRecordsWithReason.length > 0 || deductionRecordsWithReason.length > 0) && (
+                                            <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                                                <h4 className="font-semibold text-gray-700 mb-3 text-sm uppercase tracking-wide">أسباب المكافآت والخصومات</h4>
+                                                {bonusRecordsWithReason.length > 0 && (
+                                                    <div className="mb-3">
+                                                        <h5 className="text-xs font-bold text-green-600 mb-1 uppercase">المكافآت:</h5>
+                                                        <ul className="list-disc list-inside space-y-1 text-sm">
+                                                            {bonusRecordsWithReason.map(r => (
+                                                                <li key={r.id} className="text-gray-600">
+                                                                    {new Date(r.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}: {r.reason}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                                {deductionRecordsWithReason.length > 0 && (
+                                                    <div>
+                                                        <h5 className="text-xs font-bold text-red-600 mb-1 uppercase">الخصومات:</h5>
+                                                        <ul className="list-disc list-inside space-y-1 text-sm">
+                                                            {deductionRecordsWithReason.map(r => (
+                                                                <li key={r.id} className="text-gray-600">
+                                                                    {new Date(r.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}: {r.reason}
+                                                                </li>
+                                                            ))}
+                                                        </ul>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+
+                                        <div className="flex justify-end items-center gap-3">
+                                            <button onClick={handleSendWhatsAppReport} className="flex items-center gap-2 bg-blue-100 text-blue-700 font-bold py-3 px-4 rounded-lg hover:bg-blue-200 transition-all text-sm" title="إرسال التقرير عبر واتساب">
+                                                <WhatsAppIcon className="w-5 h-5" />
+                                                <span className="hidden sm:inline">إرسال تقرير</span>
+                                            </button>
+                                            {payrollData.isPaid ? (
+                                                <span className="inline-block flex-grow text-center py-3 px-4 rounded-lg bg-green-100 text-green-800 font-bold border border-green-200">
+                                                    ✅ تم دفع الراتب
+                                                </span>
+                                            ) : (
+                                                <button onClick={() => handlePayEmployee(payrollData.finalSalary)} className="flex-grow py-3 px-6 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700 shadow-md hover:shadow-lg transition-all">
+                                                    دفع الراتب
+                                                </button>
+                                            )}
+                                        </div>
+
+                                        {payrollData.isPaid && (
+                                            <div className="mt-4 pt-4 border-t border-gray-200">
+                                                <h4 className="font-semibold text-gray-700 mb-3">تسليم مكافأة إضافية</h4>
+                                                <div className="flex items-end gap-2">
+                                                    <div className="flex-grow">
+                                                        <label className="text-sm text-gray-500">مبلغ المكافأة</label>
+                                                        <input
+                                                            type="number"
+                                                            value={additionalBonus}
+                                                            onChange={(e) => setAdditionalBonus(e.target.value)}
+                                                            className="w-full p-2 border rounded bg-white focus:ring-2 focus:ring-purple-500 outline-none"
+                                                            placeholder="أدخل المبلغ"
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        onClick={handlePayAdditionalBonus}
+                                                        className="py-2 px-6 rounded bg-purple-600 text-white font-bold hover:bg-purple-700 h-[42px] shadow-md disabled:bg-gray-300 disabled:shadow-none"
+                                                        disabled={!additionalBonus || parseFloat(additionalBonus) <= 0}
+                                                    >
+                                                        تسليم
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                                {activeTab === 'attendance' && (
+                                    <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                                        <div className="flex justify-around mb-6 text-center">
+                                            <div>
+                                                <p className="text-2xl font-bold text-red-500">{payrollData.absenceDays}</p>
+                                                <p className="text-xs text-gray-500 font-semibold">غياب (مكافئ)</p>
+                                            </div>
+                                            <div>
+                                                <p className="text-2xl font-bold text-green-500">{payrollData.bonusDays}</p>
+                                                <p className="text-xs text-gray-500 font-semibold">إضافي</p>
+                                            </div>
+                                        </div>
+                                        <div className="text-xs text-gray-500 mb-4 bg-blue-50 p-2 rounded text-center">اضغط لتسجيل الغياب الكامل. للمكافآت والخصومات الجزئية استخدم الأزرار العلوية.</div>
+                                        <div className="grid grid-cols-7 gap-2">
+                                            {Array.from({ length: new Date(parseInt(selectedMonth.split('-')[0]), parseInt(selectedMonth.split('-')[1]), 0).getDate() }, (_, i) => i + 1).map(day => {
+                                                const date = `${selectedMonth}-${String(day).padStart(2, '0')}`;
+                                                const record = teacherAttendance.find(a => a.teacherId === employeeId && a.date === date);
+                                                const absenceValue = record ? getAbsenceValue(record.status) : 0;
+                                                const bonusValue = record ? getBonusValue(record.status) : 0;
+
+                                                let buttonClass = 'bg-gray-100 text-gray-600 hover:bg-gray-200';
+                                                if (absenceValue === 1) buttonClass = 'bg-red-500 text-white font-bold shadow-red-500/50';
+                                                else if (absenceValue > 0) buttonClass = 'bg-orange-400 text-white font-bold shadow-orange-400/50';
+                                                else if (bonusValue > 0) buttonClass = 'bg-purple-500 text-white font-bold shadow-purple-500/50';
+                                                else if (!record) buttonClass = 'bg-green-50 text-green-600 hover:bg-green-100 border border-green-200';
+
+
+                                                return (
+                                                    <button key={day} onClick={() => onSetTeacherAttendance(employeeId, date, record ? TeacherAttendanceStatus.PRESENT : TeacherAttendanceStatus.ABSENT)} className={`aspect-square rounded-lg flex items-center justify-center text-sm transition-all duration-200 shadow-sm ${buttonClass}`} title={new Date(date).toLocaleDateString('ar-EG', { weekday: 'long' })}>
+                                                        {day}
+                                                    </button>
+                                                )
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+                                {activeTab === 'groups' && (
+                                    <div className="space-y-3">
+                                        {isSupervisor ? (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                {supervisor?.section.map((section, idx) => (
+                                                    <div key={idx} className="flex items-center bg-white p-4 rounded-xl border border-blue-100 shadow-sm">
+                                                        <div className="w-10 h-10 bg-blue-50 rounded-full flex items-center justify-center text-blue-600 ml-3 flex-shrink-0">
+                                                            <UsersIcon className="w-5 h-5" />
+                                                        </div>
+                                                        <div>
+                                                            <span className="block text-xs text-gray-500 font-bold uppercase mb-1">قسم</span>
+                                                            <span className="font-bold text-lg text-gray-800 bg-blue-100 px-2 py-1 rounded-md">{section}</span>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-3">
+                                                {assignedGroups.length > 0 ? (
+                                                    assignedGroups.map(group => (
+                                                        <div key={group.id} className="flex items-center bg-white p-4 rounded-xl border border-teal-100 shadow-sm">
+                                                            <div className="w-10 h-10 bg-teal-50 rounded-full flex items-center justify-center text-teal-600 ml-3 flex-shrink-0">
+                                                                <UsersIcon className="w-5 h-5" />
+                                                            </div>
+                                                            <div>
+                                                                <span className="block text-sm text-gray-500 font-bold uppercase">مجموعة</span>
+                                                                <span className="font-bold text-lg text-gray-800">{group.name}</span>
+                                                            </div>
+                                                        </div>
+                                                    ))
+                                                ) : (
+                                                    <div className="col-span-full text-center py-10 bg-gray-50 rounded-xl border border-dashed border-gray-300">
+                                                        <p className="text-gray-500 font-medium">لم يتم إسناد أي مجموعات لهذا المدرس.</p>
+                                                    </div>
+                                                )}
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            </div>
+            {isBonusModalOpen && (
+                <BonusReasonModal
+                    isOpen={isBonusModalOpen}
+                    onClose={() => setIsBonusModalOpen(false)}
+                    onConfirm={handleConfirmBonus}
+                    teacherName={employeeName}
+                />
+            )}
+            {isDeductionModalOpen && (
+                <DeductionReasonModal
+                    isOpen={isDeductionModalOpen}
+                    onClose={() => setIsDeductionModalOpen(false)}
+                    onConfirm={handleConfirmDeduction}
+                    teacherName={employeeName}
+                />
+            )}
+        </>
+    );
+};
+
+export default TeacherDetailsModal;
