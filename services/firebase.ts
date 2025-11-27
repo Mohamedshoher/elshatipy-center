@@ -18,23 +18,29 @@ const app = initializeApp(firebaseConfig);
 
 // الحصول على نسخة من Firestore مع تمكين التخزين المحلي
 let db;
-try {
-  db = initializeFirestore(app, {
-    cache: persistentLocalCache({})
-  });
-  console.log("Offline persistence enabled.");
-} catch (err: any) {
-  if (err.code == 'failed-precondition') {
-    console.warn("Multiple tabs open, persistence can only be enabled in one tab at a time. Falling back to in-memory cache.");
-    db = getFirestore(app);
-  } else if (err.code == 'unimplemented') {
-    console.warn("The current browser does not support all of the features required to enable persistence. Falling back to in-memory cache.");
-    db = getFirestore(app);
-  } else {
-    console.error("Error enabling offline persistence: ", err);
-    // Fallback to in-memory cache
-    db = getFirestore(app);
+// Check if we're in a browser environment
+if (typeof window !== 'undefined') {
+  try {
+    db = initializeFirestore(app, {
+      localCache: persistentLocalCache({})
+    });
+    console.log("Offline persistence enabled.");
+  } catch (err: any) {
+    if (err.code == 'failed-precondition') {
+      console.warn("Multiple tabs open, persistence can only be enabled in one tab at a time. Falling back to in-memory cache.");
+      db = getFirestore(app);
+    } else if (err.code == 'unimplemented') {
+      console.warn("The current browser does not support all of the features required to enable persistence. Falling back to in-memory cache.");
+      db = getFirestore(app);
+    } else {
+      console.error("Error enabling offline persistence: ", err);
+      // Fallback to in-memory cache
+      db = getFirestore(app);
+    }
   }
+} else {
+  // Server-side: use default Firestore
+  db = getFirestore(app);
 }
 
 export { db };

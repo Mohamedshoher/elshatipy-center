@@ -158,12 +158,13 @@ const App: React.FC = () => {
         );
 
         // Listener for single settings document
-        const unsubSettings = onSnapshot(doc(db, 'settings', 'financial'), (doc) => {
-            if (doc.exists()) {
-                setFinancialSettings(doc.data() as FinancialSettings);
+        const settingsDocRef = doc(db, 'settings', 'financial');
+        const unsubSettings = onSnapshot(settingsDocRef, (docSnap) => {
+            if (docSnap.exists()) {
+                setFinancialSettings(docSnap.data() as FinancialSettings);
             } else {
                 const defaultSettings: FinancialSettings = { workingDaysPerMonth: 22, absenceDeductionPercentage: 100 };
-                setDoc(doc.ref, defaultSettings).catch(e => console.error("Error creating settings doc:", e));
+                setDoc(settingsDocRef, defaultSettings).catch(e => console.error("Error creating settings doc:", e));
             }
         }, (error) => {
             console.error(`Error fetching settings:`, error.message);
