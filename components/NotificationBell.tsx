@@ -24,6 +24,15 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ currentUser, notifi
     const relevantNotifications = useMemo(() => {
         return notifications
             .filter(n => {
+                // Check if notification has a target
+                if (!n.target) {
+                    // Handle public notifications (recipientId='all')
+                    if ((n as any).recipientId === 'all') {
+                        return true;
+                    }
+                    return false;
+                }
+
                 // Check if targeted
                 let isTarget = false;
                 if (n.target.type === 'teacher') {
@@ -31,15 +40,15 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ currentUser, notifi
                 } else if (n.target.type === 'group') {
                     isTarget = teacherGroups.includes(n.target.id);
                 }
-                
+
                 // Check if NOT deleted by current user
                 const isDeleted = n.deletedBy?.includes(currentUser.id);
-                
+
                 return isTarget && !isDeleted;
             })
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [notifications, currentUser.id, teacherGroups]);
-    
+
     const unreadNotifications = useMemo(() => {
         return relevantNotifications.filter(n => !n.readBy.includes(currentUser.id));
     }, [relevantNotifications, currentUser.id]);
@@ -48,7 +57,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ currentUser, notifi
     const toggleDropdown = () => {
         setIsOpen(prev => !prev);
     };
-    
+
     useEffect(() => {
         if (isOpen && unreadNotifications.length > 0) {
             const idsToMark = unreadNotifications.map(n => n.id);
@@ -74,7 +83,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ currentUser, notifi
         const readNotificationIds = relevantNotifications
             .filter(n => n.readBy.includes(currentUser.id))
             .map(n => n.id);
-            
+
         if (readNotificationIds.length > 0) {
             onDelete(readNotificationIds, currentUser.id);
         }
@@ -90,41 +99,50 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ currentUser, notifi
             </button>
             {isOpen && (
                 <div className="absolute left-0 mt-2 w-[90vw] max-w-sm bg-white rounded-lg shadow-xl z-50 overflow-hidden flex flex-col max-h-[80vh]">
-                   <div className="py-3 px-4 border-b font-bold text-gray-700 bg-gray-50">الإشعارات</div>
+                    <div className="py-3 px-4 border-b font-bold text-gray-700 bg-gray-50">الإشعارات</div>
                     <div className="overflow-y-auto flex-1">
                         {relevantNotifications.length > 0 ? (
-                            relevantNotifications.map(n => (
-                                <div key={n.id} className={`p-4 border-b text-sm ${!n.readBy.includes(currentUser.id) ? 'bg-blue-50' : 'bg-white'}`}>
-                                    <div className="mb-2">
-                                        <p className="text-gray-800">{n.content}</p>
-                                    </div>
-                                    
-                                    <div className="flex justify-between items-center mt-2">
-                                         <button 
-                                            onClick={(e) => { e.stopPropagation(); onDelete([n.id], currentUser.id); }}
-                                            className="p-1 text-gray-400 hover:text-red-600 transition-colors flex items-center gap-1"
-                                            title="حذف الإشعار"
-                                        >
-                                            <TrashIcon className="w-4 h-4" />
-                                            <span className="text-xs">حذف</span>
-                                        </button>
+                            relevantNotifications.map(n => {
+                                let targetLabel = 'إشعار عام';
+                                if (n.target) {
+                                    targetLabel = n.target.type === 'group' ? `موجه إلى: ${n.target.name}` : `رسالة خاصة`;
+                                } else if ((n as any).recipientId === 'all') {
+                                    targetLabel = 'إشعار عام للجميع';
+                                }
 
-                                        <div className="text-xs text-gray-500 flex flex-col items-end">
-                                            <span>
-                                                {n.target.type === 'group' ? `موجه إلى: ${n.target.name}` : `رسالة خاصة`}
-                                            </span>
-                                            <span>{new Date(n.date).toLocaleString('ar-EG-u-nu-latn', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</span>
+                                return (
+                                    <div key={n.id} className={`p-4 border-b text-sm ${!n.readBy.includes(currentUser.id) ? 'bg-blue-50' : 'bg-white'}`}>
+                                        <div className="mb-2">
+                                            <p className="text-gray-800">{n.content}</p>
+                                        </div>
+
+                                        <div className="flex justify-between items-center mt-2">
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); onDelete([n.id], currentUser.id); }}
+                                                className="p-1 text-gray-400 hover:text-red-600 transition-colors flex items-center gap-1"
+                                                title="حذف الإشعار"
+                                            >
+                                                <TrashIcon className="w-4 h-4" />
+                                                <span className="text-xs">حذف</span>
+                                            </button>
+
+                                            <div className="text-xs text-gray-500 flex flex-col items-end">
+                                                <span>
+                                                    {targetLabel}
+                                                </span>
+                                                <span>{new Date(n.date).toLocaleString('ar-EG-u-nu-latn', { day: 'numeric', month: 'short', hour: 'numeric', minute: '2-digit' })}</span>
+                                            </div>
                                         </div>
                                     </div>
-                                </div>
-                            ))
+                                );
+                            })
                         ) : (
                             <p className="p-8 text-sm text-center text-gray-500">لا توجد إشعارات.</p>
                         )}
                     </div>
-                     {relevantNotifications.some(n => n.readBy.includes(currentUser.id)) && (
+                    {relevantNotifications.some(n => n.readBy.includes(currentUser.id)) && (
                         <div className="p-2 bg-gray-50 border-t">
-                            <button 
+                            <button
                                 onClick={handleClearRead}
                                 className="w-full py-2 text-sm text-red-600 font-semibold hover:bg-red-50 rounded transition-colors"
                             >
