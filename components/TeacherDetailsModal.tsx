@@ -313,8 +313,6 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
                                     {employeeName}
                                 </h2>
                                 <p className="text-sm text-gray-500 flex items-center gap-2">
-                                    {employeePhone && <span>{employeePhone}</span>}
-                                    {employeePhone && <span>•</span>}
                                     <span className={`font-medium ${isSupervisor ? 'text-blue-600' : 'text-teal-600'}`}>
                                         {isSupervisor ? 'مشرف' : 'مدرس'}
                                     </span>
@@ -327,30 +325,7 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
                     </div>
 
                     <div className="overflow-y-auto p-4">
-                        {/* Attendance Buttons - حاضر/غائب */}
-                        <div className="mb-4">
-                            <h3 className="text-sm font-bold text-gray-700 mb-2">الحضور والغياب</h3>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => onSetTeacherAttendance(employeeId, today, TeacherAttendanceStatus.PRESENT)}
-                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${!todayAttendance || todayAttendance.status === TeacherAttendanceStatus.PRESENT
-                                        ? 'bg-green-600 text-white shadow'
-                                        : 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
-                                        }`}
-                                >
-                                    ✓ حاضر
-                                </button>
-                                <button
-                                    onClick={() => onSetTeacherAttendance(employeeId, today, TeacherAttendanceStatus.ABSENT)}
-                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.ABSENT
-                                        ? 'bg-red-600 text-white shadow'
-                                        : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
-                                        }`}
-                                >
-                                    ✗ غائب
-                                </button>
-                            </div>
-                        </div>
+
 
                         {/* Deduction Buttons - الخصومات */}
                         <div className="mb-4">
