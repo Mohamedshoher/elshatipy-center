@@ -601,6 +601,7 @@ const App: React.FC = () => {
             if (studentId) {
                 // When editing, preserve existing approval status
                 await updateDoc(doc(db, 'students', studentId), studentData);
+                alert('تم تحديث بيانات الطالب بنجاح!');
             } else {
                 // When adding a new student
                 const isTeacher = currentUser?.role === 'teacher';
@@ -617,6 +618,7 @@ const App: React.FC = () => {
                     ...(isTeacher ? { addedBy: currentUser.id } : {}),
                 };
 
+                console.log('Attempting to save student:', newStudentData);
                 await addDoc(collection(db, 'students'), newStudentData);
 
                 // Show appropriate message based on user role
@@ -626,7 +628,17 @@ const App: React.FC = () => {
                     alert('تم إضافة الطالب بنجاح!');
                 }
             }
-        } catch (error) { console.error("Error saving student: ", error); alert("حدث خطأ أثناء حفظ بيانات الطالب."); }
+        } catch (error: any) {
+            console.error("Error saving student: ", error);
+            console.error("Error code:", error?.code);
+            console.error("Error message:", error?.message);
+            const errorMessage = error?.code === 'permission-denied'
+                ? 'ليس لديك صلاحية لحفظ بيانات الطالب. يرجى التواصل مع المدير.'
+                : error?.message
+                    ? `حدث خطأ: ${error.message}`
+                    : 'حدث خطأ أثناء حفظ بيانات الطالب.';
+            alert(errorMessage);
+        }
         setStudentToEdit(null);
     };
 

@@ -24,16 +24,16 @@ if (typeof window !== 'undefined') {
     db = initializeFirestore(app, {
       localCache: persistentLocalCache({})
     });
-    console.log("Offline persistence enabled.");
+    console.log("✅ Offline persistence enabled.");
   } catch (err: any) {
     if (err.code == 'failed-precondition') {
-      console.warn("Multiple tabs open, persistence can only be enabled in one tab at a time. Falling back to in-memory cache.");
+      // Multiple tabs open - this is expected, use fallback
       db = getFirestore(app);
     } else if (err.code == 'unimplemented') {
-      console.warn("The current browser does not support all of the features required to enable persistence. Falling back to in-memory cache.");
+      console.warn("⚠️ Browser doesn't support persistence. Using in-memory cache.");
       db = getFirestore(app);
     } else {
-      console.error("Error enabling offline persistence: ", err);
+      console.error("❌ Error enabling offline persistence: ", err);
       // Fallback to in-memory cache
       db = getFirestore(app);
     }
@@ -44,3 +44,4 @@ if (typeof window !== 'undefined') {
 }
 
 export { db };
+
