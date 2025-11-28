@@ -614,7 +614,7 @@ const App: React.FC = () => {
                     progressPlanHistory: [],
                     // Teachers add students as pending, directors/supervisors add directly
                     isPending: isTeacher,
-                    addedBy: isTeacher ? currentUser.id : undefined,
+                    ...(isTeacher ? { addedBy: currentUser.id } : {}),
                 };
 
                 await addDoc(collection(db, 'students'), newStudentData);
