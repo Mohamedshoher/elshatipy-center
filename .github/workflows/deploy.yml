@@ -35,7 +35,7 @@ jobs:
       - name: Upload Artifact 📤
         uses: actions/upload-pages-artifact@v3
         with:
-          path: './build' # The folder where your build output is located
+          path: './dist' # The folder where your build output is located
 
       - name: Deploy to GitHub Pages 🚀
         id: deployment
