@@ -605,7 +605,9 @@ const App: React.FC = () => {
             } else {
                 // When adding a new student
                 const isTeacher = currentUser?.role === 'teacher';
-                const newStudentData = {
+
+                // Prepare the base student data
+                const baseStudentData = {
                     ...studentData,
                     attendance: [],
                     fees: [],
@@ -613,10 +615,13 @@ const App: React.FC = () => {
                     schedule: defaultSchedule(),
                     progressPlan: {},
                     progressPlanHistory: [],
-                    // Teachers add students as pending, directors/supervisors add directly
                     isPending: isTeacher,
-                    ...(isTeacher ? { addedBy: currentUser.id } : {}),
                 };
+
+                // Only add addedBy if it's a teacher and ID exists
+                const newStudentData = isTeacher && currentUser?.id
+                    ? { ...baseStudentData, addedBy: currentUser.id }
+                    : baseStudentData;
 
                 console.log('Attempting to save student:', newStudentData);
                 await addDoc(collection(db, 'students'), newStudentData);
