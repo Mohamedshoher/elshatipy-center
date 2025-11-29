@@ -1926,9 +1926,7 @@ const App: React.FC = () => {
                             }
                         </ErrorBoundary>
                     </main>
-                    <div className="lg:hidden">
-                        <BottomNavBar activeView={activeView} onSelectView={handleBottomNavSelect} />
-                    </div>
+                    <BottomNavBar activeView={activeView} onSelectView={handleBottomNavSelect} />
                 </div>
             </div>
 
