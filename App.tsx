@@ -619,9 +619,27 @@ const App: React.FC = () => {
                 };
 
                 // Only add addedBy if it's a teacher and ID exists
-                const newStudentData = isTeacher && currentUser?.id
-                    ? { ...baseStudentData, addedBy: currentUser.id }
-                    : baseStudentData;
+                let addedByValue: string | undefined;
+                if (isTeacher && currentUser?.id) {
+                    addedByValue = currentUser.id;
+                } else if (currentUser?.role === 'director') {
+                    addedByValue = 'director';
+                }
+
+                const newStudentData: any = {
+                    ...baseStudentData,
+                };
+
+                if (addedByValue) {
+                    newStudentData.addedBy = addedByValue;
+                }
+
+                // Sanitize object to remove any undefined values
+                Object.keys(newStudentData).forEach(key => {
+                    if (newStudentData[key] === undefined) {
+                        delete newStudentData[key];
+                    }
+                });
 
                 console.log('Attempting to save student:', newStudentData);
                 await addDoc(collection(db, 'students'), newStudentData);
@@ -1123,6 +1141,7 @@ const App: React.FC = () => {
     const handleAddTeacherCollection = useCallback(async (collectionData: Omit<TeacherCollectionRecord, 'id' | 'date'>) => {
         await addDoc(collection(db, "teacherCollections"), { date: new Date().toISOString().split('T')[0], ...collectionData });
     }, []);
+
 
     const handleDeleteTeacherCollection = useCallback(async (collectionId: string) => {
         if (window.confirm("هل أنت متأكد من رغبتك في حذف سجل التسليم هذا؟")) {
