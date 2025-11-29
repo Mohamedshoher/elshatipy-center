@@ -24,9 +24,8 @@ const NavItem: React.FC<{
   return (
     <button
       onClick={onClick}
-      className={`flex flex-col items-center justify-center w-full pt-2 pb-1 transition-colors duration-200 ${
-        isActive ? activeClass : inactiveClass
-      }`}
+      className={`flex flex-col items-center justify-center w-full pt-2 pb-1 transition-colors duration-200 ${isActive ? activeClass : inactiveClass
+        }`}
     >
       {icon}
       <span className={`text-xs font-semibold mt-1 ${isActive ? 'font-bold' : ''}`}>{label}</span>
@@ -36,38 +35,75 @@ const NavItem: React.FC<{
 
 const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeView, onSelectView }) => {
   return (
-    <nav className="fixed bottom-0 right-0 w-full bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)] flex justify-around z-40 border-t">
-      <NavItem
-        label="الطلاب"
-        icon={<UserIcon className="w-6 h-6" />}
-        isActive={activeView === 'students'}
-        onClick={() => onSelectView('students')}
-      />
-      <NavItem
-        label="المجموعات"
-        icon={<UsersIcon className="w-6 h-6" />}
-        isActive={activeView === 'groups'}
-        onClick={() => onSelectView('groups')}
-      />
-       <NavItem
-        label="المصروفات"
-        icon={<CurrencyDollarIcon className="w-6 h-6" />}
-        isActive={activeView === 'financial_report'}
-        onClick={() => onSelectView('financial_report')}
-      />
-      <NavItem
-        label="تقرير الحضور"
-        icon={<CalendarCheckIcon className="w-6 h-6" />}
-        isActive={activeView === 'attendance_report'}
-        onClick={() => onSelectView('attendance_report')}
-      />
-      <NavItem
-        label="تقرير الاختبارات"
-        icon={<ClipboardListIcon className="w-6 h-6" />}
-        isActive={activeView === 'tests_report'}
-        onClick={() => onSelectView('tests_report')}
-      />
-    </nav>
+    <>
+      {/* Desktop Sidebar - visible on lg screens and up */}
+      <nav className="hidden lg:flex fixed right-0 top-0 h-full w-20 bg-white shadow-lg flex-col justify-center items-center z-40 border-l">
+        <NavItem
+          label="الطلاب"
+          icon={<UserIcon className="w-6 h-6" />}
+          isActive={activeView === 'students'}
+          onClick={() => onSelectView('students')}
+        />
+        <NavItem
+          label="المجموعات"
+          icon={<UsersIcon className="w-6 h-6" />}
+          isActive={activeView === 'groups'}
+          onClick={() => onSelectView('groups')}
+        />
+        <NavItem
+          label="المصروفات"
+          icon={<CurrencyDollarIcon className="w-6 h-6" />}
+          isActive={activeView === 'financial_report'}
+          onClick={() => onSelectView('financial_report')}
+        />
+        <NavItem
+          label="تقرير الحضور"
+          icon={<CalendarCheckIcon className="w-6 h-6" />}
+          isActive={activeView === 'attendance_report'}
+          onClick={() => onSelectView('attendance_report')}
+        />
+        <NavItem
+          label="تقرير الاختبارات"
+          icon={<ClipboardListIcon className="w-6 h-6" />}
+          isActive={activeView === 'tests_report'}
+          onClick={() => onSelectView('tests_report')}
+        />
+      </nav>
+
+      {/* Mobile Bottom Bar - visible on screens smaller than lg */}
+      <nav className="lg:hidden fixed bottom-0 right-0 w-full bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)] flex justify-around z-40 border-t">
+        <NavItem
+          label="الطلاب"
+          icon={<UserIcon className="w-6 h-6" />}
+          isActive={activeView === 'students'}
+          onClick={() => onSelectView('students')}
+        />
+        <NavItem
+          label="المجموعات"
+          icon={<UsersIcon className="w-6 h-6" />}
+          isActive={activeView === 'groups'}
+          onClick={() => onSelectView('groups')}
+        />
+        <NavItem
+          label="المصروفات"
+          icon={<CurrencyDollarIcon className="w-6 h-6" />}
+          isActive={activeView === 'financial_report'}
+          onClick={() => onSelectView('financial_report')}
+        />
+        <NavItem
+          label="تقرير الحضور"
+          icon={<CalendarCheckIcon className="w-6 h-6" />}
+          isActive={activeView === 'attendance_report'}
+          onClick={() => onSelectView('attendance_report')}
+        />
+        <NavItem
+          label="تقرير الاختبارات"
+          icon={<ClipboardListIcon className="w-6 h-6" />}
+          isActive={activeView === 'tests_report'}
+          onClick={() => onSelectView('tests_report')}
+        />
+      </nav>
+    </>
   );
 };
 
