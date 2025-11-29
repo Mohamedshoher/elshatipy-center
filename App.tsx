@@ -634,15 +634,28 @@ const App: React.FC = () => {
                     newStudentData.addedBy = addedByValue;
                 }
 
-                // Sanitize object to remove any undefined values
-                Object.keys(newStudentData).forEach(key => {
-                    if (newStudentData[key] === undefined) {
-                        delete newStudentData[key];
-                    }
-                });
+                // Sanitize object to remove any undefined values (including nested)
+                const sanitizeObject = (obj: any): any => {
+                    if (obj === null || obj === undefined) return null;
+                    if (Array.isArray(obj)) return obj;
+                    if (typeof obj !== 'object') return obj;
 
-                console.log('Attempting to save student:', newStudentData);
-                await addDoc(collection(db, 'students'), newStudentData);
+                    const sanitized: any = {};
+                    Object.keys(obj).forEach(key => {
+                        const value = obj[key];
+                        if (value !== undefined) {
+                            sanitized[key] = typeof value === 'object' && !Array.isArray(value)
+                                ? sanitizeObject(value)
+                                : value;
+                        }
+                    });
+                    return sanitized;
+                };
+
+                const sanitizedData = sanitizeObject(newStudentData);
+
+                console.log('Attempting to save student:', sanitizedData);
+                await addDoc(collection(db, 'students'), sanitizedData);
 
                 // Show appropriate message based on user role
                 if (isTeacher) {
@@ -1159,19 +1172,27 @@ const App: React.FC = () => {
         if (window.confirm(`هل أنت متأكد من رغبتك في إلغاء دفع راتب المدرس "${teacherName}" لشهر ${month}؟ سيتم حذف المصروف من السجل المالي.`)) {
             const batch = writeBatch(db);
             try {
+                // Get all salary expenses and filter in memory
                 const expenseQuery = query(
                     collection(db, "expenses"),
-                    where("category", "in", [ExpenseCategory.TEACHER_SALARY, ExpenseCategory.SUPERVISOR_SALARY]),
-                    where("description", ">=", `راتب`)
+                    where("category", "in", [ExpenseCategory.TEACHER_SALARY, ExpenseCategory.SUPERVISOR_SALARY])
                 );
                 const expenseSnapshot = await getDocs(expenseQuery);
-                // Filter in memory because Firestore query limitations on multiple fields with string checks
-                const targetExpense = expenseSnapshot.docs.find(d => d.data().description.includes(teacherName) && d.data().description.includes(month));
+
+                // Filter in memory to find the exact expense
+                const targetExpense = expenseSnapshot.docs.find(d => {
+                    const data = d.data();
+                    return data.description.includes(teacherName) && data.description.includes(month);
+                });
 
                 if (targetExpense) {
                     batch.delete(targetExpense.ref);
+                    console.log('Found and deleting expense:', targetExpense.data());
+                } else {
+                    console.log('No expense found for teacher:', teacherName, 'month:', month);
                 }
 
+                // Update payroll adjustment to mark as unpaid
                 const payrollQuery = query(
                     collection(db, "teacherPayrollAdjustments"),
                     where("teacherId", "==", teacherId),
@@ -1180,8 +1201,13 @@ const App: React.FC = () => {
                 const payrollSnapshot = await getDocs(payrollQuery);
                 if (!payrollSnapshot.empty) {
                     batch.update(payrollSnapshot.docs[0].ref, { isPaid: false });
+                    console.log('Marking payroll as unpaid');
+                } else {
+                    console.log('No payroll adjustment found');
                 }
+
                 await batch.commit();
+                alert('تم إلغاء الدفع بنجاح.');
             } catch (error) {
                 console.error("Error resetting teacher payment:", error);
                 alert("حدث خطأ أثناء إلغاء دفع الراتب.");
