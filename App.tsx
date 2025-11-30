@@ -1028,7 +1028,29 @@ const App: React.FC = () => {
             }
         }
         try {
-            teacherId ? await updateDoc(doc(db, 'teachers', teacherId), teacherData) : await addDoc(collection(db, 'teachers'), teacherData);
+            // Clean up fields based on payment type
+            const cleanedData: any = { ...teacherData };
+
+            if (teacherData.paymentType === 'partnership') {
+                // If partnership, remove salary field from database
+                cleanedData.salary = deleteField();
+            } else {
+                // If salary, remove partnership percentage field from database
+                cleanedData.partnershipPercentage = deleteField();
+            }
+
+            if (teacherId) {
+                await updateDoc(doc(db, 'teachers', teacherId), cleanedData);
+            } else {
+                // For new teachers, don't include deleteField
+                const newTeacherData: any = { ...teacherData };
+                if (teacherData.paymentType === 'partnership') {
+                    delete newTeacherData.salary;
+                } else {
+                    delete newTeacherData.partnershipPercentage;
+                }
+                await addDoc(collection(db, 'teachers'), newTeacherData);
+            }
         } catch (e) { console.error("Error saving teacher:", e); }
     };
 
@@ -1664,7 +1686,7 @@ const App: React.FC = () => {
             if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={students} />;
             if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
             if (isFeeCollectionView) return <FeeCollectionPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={students} teacherCollections={collections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />;
-            if (viewingTeacherReportId) return <TeacherReportPage teacher={teachers.find(t => t.id === viewingTeacherReportId)!} groups={groups} students={students} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={handleBackToMain} />;
+            if (viewingTeacherReportId) return <TeacherReportPage teacher={teachers.find(t => t.id === viewingTeacherReportId)!} groups={groups} students={students} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={handleBackToMain} teacherCollections={collections} />;
             if (isTeacherManagerView) return <TeacherManagerPage
                 onBack={handleBackToMain}
                 teachers={teachers}
@@ -1690,7 +1712,6 @@ const App: React.FC = () => {
                 searchTerm={searchTerm}
                 isFilterVisible={isTeacherFilterVisible}
                 onToggleFilter={() => setIsTeacherFilterVisible(!isTeacherFilterVisible)}
-                teacherCollections={collections}
             />;
             if (isDirectorNotesView) return <DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} />;
             if (isFinanceView) return <FinancePage onBack={handleBackToMain} students={students} teachers={teachers} staff={[]} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={collections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={[]} onApplyDeductions={handleApplyDeductions} />;
@@ -1749,7 +1770,7 @@ const App: React.FC = () => {
             if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} />;
             if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
             if (isFeeCollectionView) return <FeeCollectionPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} teacherCollections={teacherCollections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />;
-            if (viewingTeacherReportId) return <TeacherReportPage teacher={teachers.find(t => t.id === viewingTeacherReportId)!} groups={groups} students={activeStudents} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={handleBackToMain} />;
+            if (viewingTeacherReportId) return <TeacherReportPage teacher={teachers.find(t => t.id === viewingTeacherReportId)!} groups={groups} students={activeStudents} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={handleBackToMain} teacherCollections={teacherCollections} />;
             if (isTeacherManagerView) return <TeacherManagerPage
                 onBack={handleBackToMain}
                 teachers={teachers}
@@ -1775,7 +1796,6 @@ const App: React.FC = () => {
                 searchTerm={searchTerm}
                 isFilterVisible={isTeacherFilterVisible}
                 onToggleFilter={() => setIsTeacherFilterVisible(!isTeacherFilterVisible)}
-                teacherCollections={teacherCollections}
             />;
             if (isDirectorNotesView) return <DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} />;
             if (isFinanceView) return <FinancePage onBack={handleBackToMain} students={activeStudents} teachers={teachers} staff={staff} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={teacherCollections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={supervisors} onApplyDeductions={handleApplyDeductions} />;
@@ -1916,7 +1936,7 @@ const App: React.FC = () => {
                         currentUserRole={currentUser.role}
                     />
                 )}
-                <div className="flex-1 flex flex-col w-full min-w-0 lg:h-screen">
+                <div className="flex-1 flex flex-col w-full min-w-0 lg:h-screen lg:pr-20">
                     {renderHeader()}
                     <main className="flex-1 overflow-y-auto pb-16 lg:pb-0">
                         <ErrorBoundary>
@@ -1980,6 +2000,7 @@ const App: React.FC = () => {
                         onLogExpense={handleLogExpense}
                         onViewTeacherReport={setViewingTeacherReportId}
                         onSendNotificationToAll={handleSendNotificationToAll}
+                        teacherCollections={teacherCollections}
                     />
                 </>
             )}

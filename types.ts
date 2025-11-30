@@ -114,12 +114,19 @@ export enum TeacherStatus {
   INACTIVE = 'inactive'
 }
 
+export enum PaymentType {
+  SALARY = 'salary',      // راتب ثابت
+  PARTNERSHIP = 'partnership'  // شراكة بنسبة مئوية
+}
+
 export interface Teacher {
   id: string;
   name: string;
   phone: string;
   status: TeacherStatus;
-  salary?: number;
+  paymentType?: PaymentType; // نوع المحاسبة (راتب أو شراكة)
+  salary?: number; // الراتب الثابت (إذا كان نوع المحاسبة راتب)
+  partnershipPercentage?: number; // نسبة الشراكة (إذا كان نوع المحاسبة شراكة)
   password?: string;
 }
 

@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Teacher, Group, TeacherAttendanceRecord, TeacherPayrollAdjustment, Expense, FinancialSettings, Student, Supervisor } from '../types';
-import { TeacherStatus, ExpenseCategory, TeacherAttendanceStatus } from '../types';
+import type { Teacher, Group, TeacherAttendanceRecord, TeacherPayrollAdjustment, Expense, FinancialSettings, Student, Supervisor, TeacherCollectionRecord } from '../types';
+import { TeacherStatus, ExpenseCategory, TeacherAttendanceStatus, PaymentType } from '../types';
 import PhoneIcon from './icons/PhoneIcon';
 import EditIcon from './icons/EditIcon';
 import TrashIcon from './icons/TrashIcon';
@@ -35,6 +35,7 @@ interface TeacherDetailsModalProps {
     onLogExpense: (expense: Omit<Expense, 'id'>) => void;
     onViewTeacherReport: (teacherId: string) => void;
     onSendNotificationToAll: (content: string) => void;
+    teacherCollections?: TeacherCollectionRecord[];
 }
 
 const getAbsenceValue = (status: TeacherAttendanceStatus): number => {
@@ -82,6 +83,7 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
     onLogExpense,
     onViewTeacherReport,
     onSendNotificationToAll,
+    teacherCollections = [],
 }) => {
     const [activeTab, setActiveTab] = useState<'payroll' | 'attendance' | 'groups'>('payroll');
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
@@ -173,21 +175,62 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
     }, [employeeId, teacherAttendance, selectedMonth]);
 
     const payrollData = useMemo(() => {
-        if (!employeeId) return { baseSalary: 0, adjustments: { bonus: 0, isPaid: false }, absenceDays: 0, bonusDays: 0, absenceDeduction: 0, attendanceBonus: 0, finalSalary: 0, isPaid: false };
+        if (!employeeId) return { baseSalary: 0, adjustments: { bonus: 0, isPaid: false }, absenceDays: 0, bonusDays: 0, absenceDeduction: 0, attendanceBonus: 0, finalSalary: 0, isPaid: false, isPartnership: false, partnershipAmount: 0, collectedAmount: 0, totalHandedOver: 0, remainingBalance: 0 };
 
-        const baseSalary = employeeSalary;
+        // Calculate collected amount for this teacher (if teacher)
+        let collectedAmount = 0;
+        if (!isSupervisor && teacher) {
+            const teacherGroups = groups.filter(g => g.teacherId === teacher.id);
+            const teacherStudents = students.filter(s => teacherGroups.some(g => g.id === s.groupId));
+            collectedAmount = teacherStudents
+                .flatMap(s => s.fees)
+                .filter(f => f.month === selectedMonth && f.paid && f.amountPaid)
+                .reduce((sum, f) => sum + (f.amountPaid || 0), 0);
+        }
+
+        const isPartnership = !isSupervisor && teacher?.paymentType === PaymentType.PARTNERSHIP;
+        const baseSalary = isPartnership ? 0 : employeeSalary;
+        const partnershipPercentage = isPartnership ? (teacher?.partnershipPercentage || 0) : 0;
+        const partnershipAmount = isPartnership ? (collectedAmount * partnershipPercentage / 100) : 0;
+
+        // Calculate handed over and remaining balance for partnership
+        const collectionsForMonth = teacherCollections.filter(c => c.teacherId === employeeId && c.month === selectedMonth);
+        const totalHandedOver = collectionsForMonth.reduce((sum, c) => sum + c.amount, 0);
+        const remainingBalance = collectedAmount - totalHandedOver;
+
         const adjustments = teacherPayrollAdjustments.find(p => p.teacherId === employeeId && p.month === selectedMonth) || { bonus: 0, isPaid: false };
 
         const absenceDays = attendanceForMonth.reduce((total, record) => total + getAbsenceValue(record.status), 0);
         const bonusDays = attendanceForMonth.reduce((total, record) => total + getBonusValue(record.status), 0);
 
-        const dailyRate = baseSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? baseSalary / financialSettings.workingDaysPerMonth : 0;
+        // Calculate effective salary for daily rate
+        const effectiveSalary = isPartnership ? partnershipAmount : baseSalary;
+
+        const dailyRate = effectiveSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? effectiveSalary / financialSettings.workingDaysPerMonth : 0;
         const absenceDeduction = dailyRate * absenceDays * (financialSettings.absenceDeductionPercentage / 100);
         const attendanceBonus = dailyRate * bonusDays;
 
-        const finalSalary = baseSalary + adjustments.bonus + attendanceBonus - absenceDeduction;
-        return { baseSalary, adjustments, absenceDays, bonusDays, absenceDeduction, attendanceBonus, finalSalary, isPaid: adjustments.isPaid };
-    }, [employeeId, employeeSalary, selectedMonth, teacherPayrollAdjustments, attendanceForMonth, financialSettings]);
+        const finalSalary = isPartnership
+            ? partnershipAmount + adjustments.bonus + attendanceBonus - absenceDeduction
+            : baseSalary + adjustments.bonus + attendanceBonus - absenceDeduction;
+
+        return {
+            baseSalary,
+            adjustments,
+            absenceDays,
+            bonusDays,
+            absenceDeduction,
+            attendanceBonus,
+            finalSalary,
+            isPaid: adjustments.isPaid,
+            isPartnership,
+            partnershipAmount,
+            collectedAmount,
+            totalHandedOver,
+            remainingBalance,
+            partnershipPercentage
+        };
+    }, [employeeId, employeeSalary, selectedMonth, teacherPayrollAdjustments, attendanceForMonth, financialSettings, teacherCollections, teacher, isSupervisor, groups, students]);
 
     const bonusRecordsWithReason = useMemo(() =>
         attendanceForMonth.filter(r => getBonusValue(r.status) > 0 && r.reason),
@@ -251,7 +294,19 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
         let message = `*تقرير الراتب - ${monthName}*\n`;
         message += `*${roleTitle}:* ${employeeName}\n\n`;
         message += `*--- تفاصيل الراتب ---*\n`;
-        message += `*الراتب الأساسي:* ${payrollData.baseSalary.toLocaleString()} EGP\n`;
+
+        if (payrollData.isPartnership) {
+            message += `*نوع المحاسبة:* شراكة (${payrollData.partnershipPercentage}%)\n`;
+            message += `*المبلغ المحصّل:* ${payrollData.collectedAmount.toLocaleString()} EGP\n`;
+            message += `*المبلغ المسلّم للإدارة:* ${payrollData.totalHandedOver.toLocaleString()} EGP\n`;
+            if (payrollData.remainingBalance > 0) {
+                message += `*المبلغ المتبقي (في ذمتك):* ${payrollData.remainingBalance.toLocaleString()} EGP\n`;
+            }
+            message += `*نصيبك من المحصل:* ${payrollData.partnershipAmount.toFixed(2)} EGP\n`;
+        } else {
+            message += `*الراتب الأساسي:* ${payrollData.baseSalary.toLocaleString()} EGP\n`;
+        }
+
         message += `*مكافأة حضور (${payrollData.bonusDays} يوم):* +${payrollData.attendanceBonus.toFixed(2)} EGP\n`;
 
         if (bonusRecordsWithReason.length > 0) {
@@ -437,7 +492,32 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
                                 {activeTab === 'payroll' && (
                                     <div className="space-y-4">
                                         <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-start p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-                                            <div><label className="text-xs text-gray-500 font-bold uppercase">الراتب الأساسي</label><p className="font-bold text-lg text-gray-800">{payrollData.baseSalary.toLocaleString()} EGP</p></div>
+                                            {payrollData.isPartnership ? (
+                                                <>
+                                                    <div className="col-span-1 sm:col-span-2 bg-green-50 p-3 rounded-lg border border-green-100 mb-2">
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="text-sm font-bold text-gray-700">نوع المحاسبة:</span>
+                                                            <span className="text-sm font-bold text-green-700">شراكة ({payrollData.partnershipPercentage}%)</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="text-sm text-gray-600">المبلغ المحصّل:</span>
+                                                            <span className="font-bold">{payrollData.collectedAmount.toLocaleString()} EGP</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center mb-1">
+                                                            <span className="text-sm text-gray-600">المبلغ المسلّم للإدارة:</span>
+                                                            <span className="font-bold text-blue-600">{payrollData.totalHandedOver.toLocaleString()} EGP</span>
+                                                        </div>
+                                                        <div className="flex justify-between items-center">
+                                                            <span className="text-sm text-gray-600">المتبقي (في ذمة المدرس):</span>
+                                                            <span className={`font-bold ${payrollData.remainingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>{payrollData.remainingBalance.toLocaleString()} EGP</span>
+                                                        </div>
+                                                    </div>
+                                                    <div><label className="text-xs text-gray-500 font-bold uppercase">نصيب الشراكة</label><p className="font-bold text-lg text-gray-800">{payrollData.partnershipAmount.toFixed(2)} EGP</p></div>
+                                                </>
+                                            ) : (
+                                                <div><label className="text-xs text-gray-500 font-bold uppercase">الراتب الأساسي</label><p className="font-bold text-lg text-gray-800">{payrollData.baseSalary.toLocaleString()} EGP</p></div>
+                                            )}
+
                                             <div><label className="text-xs text-gray-500 font-bold uppercase">خصم الغياب ({payrollData.absenceDays} يوم)</label><p className="font-bold text-lg text-red-500">{payrollData.absenceDeduction.toFixed(2)}</p></div>
                                             <div><label className="text-xs text-gray-500 font-bold uppercase">مكافأة حضور ({payrollData.bonusDays} يوم)</label><p className="font-bold text-lg text-green-500">{payrollData.attendanceBonus.toFixed(2)}</p></div>
                                             <div><label className="text-xs text-gray-500 font-bold uppercase">المكافآت الإضافية</label><p className="font-bold text-lg text-green-500">{payrollData.adjustments.bonus.toLocaleString()}</p></div>

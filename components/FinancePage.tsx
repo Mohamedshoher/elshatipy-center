@@ -2,9 +2,10 @@
 
 import React, { useState, useMemo } from 'react';
 import type { Student, Teacher, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Group, TeacherCollectionRecord, Supervisor, Notification } from '../types';
-import { ExpenseCategory, TeacherAttendanceStatus } from '../types';
+import { ExpenseCategory, TeacherAttendanceStatus, PaymentType } from '../types';
 import StaffManagerModal from './StaffManagerModal';
 import CogIcon from './icons/CogIcon';
+import TrashIcon from './icons/TrashIcon';
 import FinanceIncomeModal from './FinanceIncomeModal';
 import FinanceExpenseModal from './FinanceExpenseModal';
 import FinanceCollectionsModal from './FinanceCollectionsModal';
@@ -249,16 +250,34 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
                                 })
                                 .sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(entity => {
 
-                                    const baseSalary = entity.salary || 0;
+                                    // Calculate collected amount for this teacher (if teacher)
+                                    let collectedAmount = 0;
+                                    if (entity.type === 'teacher') {
+                                        const teacherGroups = groups.filter(g => g.teacherId === entity.id);
+                                        const teacherStudents = students.filter(s => teacherGroups.some(g => g.id === s.groupId));
+                                        collectedAmount = teacherStudents
+                                            .flatMap(s => s.fees)
+                                            .filter(f => f.month === selectedMonth && f.paid && f.amountPaid)
+                                            .reduce((sum, f) => sum + (f.amountPaid || 0), 0);
+                                    }
+
+                                    const isPartnership = entity.type === 'teacher' && (entity as Teacher).paymentType === PaymentType.PARTNERSHIP;
+                                    const baseSalary = isPartnership ? 0 : (entity.salary || 0);
+                                    const partnershipPercentage = isPartnership ? ((entity as Teacher).partnershipPercentage || 0) : 0;
+                                    const partnershipAmount = isPartnership ? (collectedAmount * partnershipPercentage / 100) : 0;
+
                                     const adjustments = teacherPayrollAdjustments.find(p => p.teacherId === entity.id && p.month === selectedMonth) || { bonus: 0, isPaid: false };
 
                                     const attendanceForMonth = teacherAttendance.filter(a => a.teacherId === entity.id && a.date.startsWith(selectedMonth));
+
+                                    // Calculate effective salary for daily rate
+                                    const effectiveSalary = isPartnership ? partnershipAmount : baseSalary;
 
                                     const deductionDetails = attendanceForMonth
                                         .filter(record => getAbsenceValue(record.status) > 0)
                                         .map(record => {
                                             const value = getAbsenceValue(record.status);
-                                            const dailyRate = baseSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? baseSalary / financialSettings.workingDaysPerMonth : 0;
+                                            const dailyRate = effectiveSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? effectiveSalary / financialSettings.workingDaysPerMonth : 0;
                                             const amount = dailyRate * value * (financialSettings.absenceDeductionPercentage / 100);
 
                                             let reason = 'خصم';
@@ -283,7 +302,7 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
 
                                     attendanceForMonth.filter(record => getBonusValue(record.status) > 0).forEach(record => {
                                         const value = getBonusValue(record.status);
-                                        const dailyRate = baseSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? baseSalary / financialSettings.workingDaysPerMonth : 0;
+                                        const dailyRate = effectiveSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? effectiveSalary / financialSettings.workingDaysPerMonth : 0;
                                         const amount = dailyRate * value;
 
                                         let reason = 'مكافأة';
@@ -297,23 +316,37 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
                                     });
 
                                     if (adjustments.bonus > 0) {
-                                        bonusDetails.push({ date: selectedMonth, reason: 'مكافأة إضافية', amount: adjustments.bonus });
+                                        bonusDetails.push({ date: selectedMonth, reason: 'مكافأة إضافية', amount: adjustments.bonus, isManual: true });
                                     }
 
                                     const totalBonusAmount = bonusDetails.reduce((sum, item) => sum + item.amount, 0);
 
-                                    const finalSalary = baseSalary + totalBonusAmount - totalDeductionAmount;
+                                    const finalSalary = isPartnership
+                                        ? partnershipAmount + totalBonusAmount - totalDeductionAmount
+                                        : baseSalary + totalBonusAmount - totalDeductionAmount;
 
                                     const entityTypeLabel = entity.type === 'teacher' ? 'مدرس' : 'مشرف';
                                     const isExpanded = expandedPayrollTeacherId === entity.id;
 
-                                    const whatsappMessage = `
+                                    // Update WhatsApp message to include partnership details
+                                    let whatsappMessage = `
 السلام عليكم ورحمة الله وبركاته
 تقرير الراتب لشهر: ${selectedMonth}
 الاسم: ${entity.name} (${entityTypeLabel})
-
+`;
+                                    if (isPartnership) {
+                                        whatsappMessage += `
+نوع المحاسبة: شراكة (${partnershipPercentage}%)
+المبلغ المحصّل: ${collectedAmount.toLocaleString()}
+نصيبك من المحصل: ${partnershipAmount.toFixed(2)}
+`;
+                                    } else {
+                                        whatsappMessage += `
 الراتب الأساسي: ${baseSalary.toLocaleString()}
+`;
+                                    }
 
+                                    whatsappMessage += `
 🔴 الخصومات: ${totalDeductionAmount.toLocaleString()}
 ${deductionDetails.length > 0 ? deductionDetails.map(d => `- ${d.date}: ${d.reason} (${d.amount.toFixed(0)})`).join('\n') : 'لا يوجد خصومات'}
 
@@ -323,7 +356,7 @@ ${bonusDetails.length > 0 ? bonusDetails.map(b => `- ${b.date}: ${b.reason} (${b
 💰 الراتب النهائي: ${finalSalary.toLocaleString()} جنيه
 
 مع تحيات الإدارة المالية
-                                `.trim();
+`.trim();
 
                                     return (
                                         <div key={entity.id} className="bg-white rounded-xl shadow-md overflow-hidden border border-gray-100 mb-4 transition-all duration-300">
@@ -361,9 +394,23 @@ ${bonusDetails.length > 0 ? bonusDetails.map(b => `- ${b.date}: ${b.reason} (${b
                                                             <div className="space-y-2 text-sm">
                                                                 {deductionDetails.length > 0 ? (
                                                                     deductionDetails.map((item, idx) => (
-                                                                        <div key={idx} className="flex justify-between text-gray-600 bg-red-50 p-2 rounded">
+                                                                        <div key={idx} className="flex justify-between items-center text-gray-600 bg-red-50 p-2 rounded group">
                                                                             <span>{item.reason} <span className="text-xs text-gray-400">({item.date})</span></span>
-                                                                            <span className="font-semibold">-{item.amount.toFixed(0)}</span>
+                                                                            <div className="flex items-center gap-2">
+                                                                                <span className="font-semibold">-{item.amount.toFixed(0)}</span>
+                                                                                <button
+                                                                                    onClick={(e) => {
+                                                                                        e.stopPropagation();
+                                                                                        if (window.confirm('هل أنت متأكد من إلغاء هذا الخصم؟')) {
+                                                                                            onSetTeacherAttendance(entity.id, item.date, TeacherAttendanceStatus.PRESENT);
+                                                                                        }
+                                                                                    }}
+                                                                                    className="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-100 transition-colors opacity-0 group-hover:opacity-100"
+                                                                                    title="إلغاء الخصم"
+                                                                                >
+                                                                                    <TrashIcon className="w-4 h-4" />
+                                                                                </button>
+                                                                            </div>
                                                                         </div>
                                                                     ))
                                                                 ) : (
@@ -381,9 +428,27 @@ ${bonusDetails.length > 0 ? bonusDetails.map(b => `- ${b.date}: ${b.reason} (${b
                                                             </div>
                                                             <div className="space-y-2 text-sm">
                                                                 {bonusDetails.map((item, idx) => (
-                                                                    <div key={idx} className="flex justify-between text-gray-600 bg-green-50 p-2 rounded">
+                                                                    <div key={idx} className="flex justify-between items-center text-gray-600 bg-green-50 p-2 rounded group">
                                                                         <span>{item.reason} <span className="text-xs text-gray-400">({item.date})</span></span>
-                                                                        <span className="font-semibold">+{item.amount.toFixed(0)}</span>
+                                                                        <div className="flex items-center gap-2">
+                                                                            <span className="font-semibold">+{item.amount.toFixed(0)}</span>
+                                                                            <button
+                                                                                onClick={(e) => {
+                                                                                    e.stopPropagation();
+                                                                                    if (window.confirm('هل أنت متأكد من إلغاء هذه المكافأة؟')) {
+                                                                                        if ((item as any).isManual) {
+                                                                                            onUpdatePayrollAdjustments({ ...adjustments, teacherId: entity.id, month: selectedMonth, bonus: 0 });
+                                                                                        } else {
+                                                                                            onSetTeacherAttendance(entity.id, item.date, TeacherAttendanceStatus.PRESENT);
+                                                                                        }
+                                                                                    }
+                                                                                }}
+                                                                                className="text-red-400 hover:text-red-600 p-1 rounded-full hover:bg-red-100 transition-colors opacity-0 group-hover:opacity-100"
+                                                                                title="إلغاء المكافأة"
+                                                                            >
+                                                                                <TrashIcon className="w-4 h-4" />
+                                                                            </button>
+                                                                        </div>
                                                                     </div>
                                                                 ))}
                                                                 <div className="flex items-center gap-2 mt-2 pt-2 border-t border-gray-100">
@@ -403,8 +468,17 @@ ${bonusDetails.length > 0 ? bonusDetails.map(b => `- ${b.date}: ${b.reason} (${b
                                                     <div className="bg-gray-50 px-6 py-4 border-t border-gray-200 flex flex-col sm:flex-row justify-between items-center gap-4">
                                                         <div className="flex items-center gap-4">
                                                             <div className="text-center sm:text-right">
-                                                                <p className="text-sm text-gray-500">الراتب الأساسي</p>
-                                                                <p className="text-lg font-bold text-gray-800">{baseSalary.toLocaleString()} EGP</p>
+                                                                {isPartnership ? (
+                                                                    <>
+                                                                        <p className="text-sm text-gray-500">نصيب الشراكة ({partnershipPercentage}%)</p>
+                                                                        <p className="text-lg font-bold text-gray-800">{partnershipAmount.toFixed(2)} EGP</p>
+                                                                    </>
+                                                                ) : (
+                                                                    <>
+                                                                        <p className="text-sm text-gray-500">الراتب الأساسي</p>
+                                                                        <p className="text-lg font-bold text-gray-800">{baseSalary.toLocaleString()} EGP</p>
+                                                                    </>
+                                                                )}
                                                             </div>
                                                             <div className="text-center sm:text-right border-r pr-4 mr-4 border-gray-300">
                                                                 <p className="text-sm text-gray-500">الراتب النهائي المستحق</p>

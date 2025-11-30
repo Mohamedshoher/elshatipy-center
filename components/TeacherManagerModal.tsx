@@ -1,7 +1,7 @@
 
 import React, { useState, useEffect } from 'react';
 import type { Teacher, Supervisor, GroupType } from '../types';
-import { TeacherStatus } from '../types';
+import { TeacherStatus, PaymentType } from '../types';
 import UserIcon from './icons/UserIcon';
 import BriefcaseIcon from './icons/BriefcaseIcon';
 import PhoneIcon from './icons/PhoneIcon';
@@ -36,6 +36,10 @@ const TeacherManagerModal: React.FC<TeacherManagerModalProps> = ({
     const [phone, setPhone] = useState('');
     const [status, setStatus] = useState<TeacherStatus>(TeacherStatus.ACTIVE);
 
+    // Teacher Payment Type
+    const [paymentType, setPaymentType] = useState<PaymentType>(PaymentType.SALARY);
+    const [partnershipPercentage, setPartnershipPercentage] = useState('');
+
     // Supervisor Specific
     const [selectedSections, setSelectedSections] = useState<GroupType[]>(['قرآن']);
 
@@ -60,6 +64,8 @@ const TeacherManagerModal: React.FC<TeacherManagerModalProps> = ({
                 setSalary(teacherToEdit.salary?.toString() || '');
                 setStatus(teacherToEdit.status);
                 setPassword('');
+                setPaymentType(teacherToEdit.paymentType || PaymentType.SALARY);
+                setPartnershipPercentage(teacherToEdit.partnershipPercentage?.toString() || '');
             } else {
                 // New Entry Defaults
                 // Note: We don't reset role here to persist user selection if they closed and reopened, 
@@ -70,6 +76,8 @@ const TeacherManagerModal: React.FC<TeacherManagerModalProps> = ({
                 setStatus(TeacherStatus.ACTIVE);
                 setPassword('');
                 setSelectedSections(['قرآن']);
+                setPaymentType(PaymentType.SALARY);
+                setPartnershipPercentage('');
             }
         }
     }, [isOpen, teacherToEdit, supervisorToEdit]);
@@ -87,12 +95,29 @@ const TeacherManagerModal: React.FC<TeacherManagerModalProps> = ({
 
         if (role === 'teacher') {
             if (name.trim() && phone.trim()) {
+                // Validate payment type specific fields
+                if (paymentType === PaymentType.PARTNERSHIP) {
+                    const percentage = parseFloat(partnershipPercentage);
+                    if (!partnershipPercentage || percentage <= 0 || percentage > 100) {
+                        alert("يرجى إدخال نسبة شراكة صحيحة (من 1 إلى 100)");
+                        return;
+                    }
+                }
+
                 const dataToSave: Omit<Teacher, 'id'> & { password?: string } = {
                     name: name.trim(),
                     phone: phone.trim(),
-                    salary: parseFloat(salary) || 0,
                     status: status,
+                    paymentType: paymentType,
                 };
+
+                // Add salary or partnership percentage based on payment type
+                if (paymentType === PaymentType.SALARY) {
+                    dataToSave.salary = parseFloat(salary) || 0;
+                } else {
+                    dataToSave.partnershipPercentage = parseFloat(partnershipPercentage);
+                }
+
                 if (password.trim()) {
                     dataToSave.password = password.trim();
                 }
@@ -180,17 +205,87 @@ const TeacherManagerModal: React.FC<TeacherManagerModalProps> = ({
                             </div>
                         </div>
 
-                        {/* Financial & Auth Group */}
-                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                            <div>
-                                <label className="block text-xs font-bold text-gray-500 uppercase mb-1">الراتب الأساسي</label>
-                                <div className="relative">
-                                    <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
-                                        <CurrencyDollarIcon className="h-4 w-4 text-gray-400" />
-                                    </div>
-                                    <input type="number" value={salary} onChange={(e) => setSalary(e.target.value)} className="w-full pr-10 pl-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" placeholder="0.00" />
+                        {/* Payment Type Selection - Only for Teachers */}
+                        {role === 'teacher' && (
+                            <div className="bg-gradient-to-r from-teal-50 to-green-50 p-4 rounded-xl border border-teal-100">
+                                <label className="block text-sm font-bold text-teal-800 mb-3">نوع المحاسبة:</label>
+                                <div className="flex gap-3">
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentType(PaymentType.SALARY)}
+                                        className={`flex-1 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 border ${paymentType === PaymentType.SALARY
+                                                ? 'bg-teal-600 text-white border-teal-600 shadow-md transform scale-105'
+                                                : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:bg-teal-50'
+                                            }`}
+                                    >
+                                        💰 راتب ثابت
+                                    </button>
+                                    <button
+                                        type="button"
+                                        onClick={() => setPaymentType(PaymentType.PARTNERSHIP)}
+                                        className={`flex-1 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 border ${paymentType === PaymentType.PARTNERSHIP
+                                                ? 'bg-green-600 text-white border-green-600 shadow-md transform scale-105'
+                                                : 'bg-white text-gray-600 border-gray-200 hover:border-green-300 hover:bg-green-50'
+                                            }`}
+                                    >
+                                        🤝 شراكة
+                                    </button>
                                 </div>
                             </div>
+                        )}
+
+                        {/* Financial & Auth Group */}
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                            {/* Salary or Partnership Percentage based on payment type */}
+                            {role === 'teacher' ? (
+                                paymentType === PaymentType.SALARY ? (
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">الراتب الأساسي</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                                <CurrencyDollarIcon className="h-4 w-4 text-gray-400" />
+                                            </div>
+                                            <input
+                                                type="number"
+                                                value={salary}
+                                                onChange={(e) => setSalary(e.target.value)}
+                                                className="w-full pr-10 pl-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-teal-500 transition-shadow"
+                                                placeholder="0.00"
+                                            />
+                                        </div>
+                                    </div>
+                                ) : (
+                                    <div>
+                                        <label className="block text-xs font-bold text-gray-500 uppercase mb-1">نسبة الشراكة (%)</label>
+                                        <div className="relative">
+                                            <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                                <span className="text-gray-400 font-bold">%</span>
+                                            </div>
+                                            <input
+                                                type="number"
+                                                value={partnershipPercentage}
+                                                onChange={(e) => setPartnershipPercentage(e.target.value)}
+                                                className="w-full pr-10 pl-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500 transition-shadow"
+                                                placeholder="مثال: 30"
+                                                min="1"
+                                                max="100"
+                                                step="0.1"
+                                            />
+                                        </div>
+                                        <p className="text-xs text-gray-500 mt-1">أدخل النسبة المئوية من المحصل (من 1 إلى 100)</p>
+                                    </div>
+                                )
+                            ) : (
+                                <div>
+                                    <label className="block text-xs font-bold text-gray-500 uppercase mb-1">الراتب الأساسي</label>
+                                    <div className="relative">
+                                        <div className="absolute inset-y-0 right-0 pr-3 flex items-center pointer-events-none">
+                                            <CurrencyDollarIcon className="h-4 w-4 text-gray-400" />
+                                        </div>
+                                        <input type="number" value={salary} onChange={(e) => setSalary(e.target.value)} className="w-full pr-10 pl-3 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 transition-shadow" placeholder="0.00" />
+                                    </div>
+                                </div>
+                            )}
                             <div>
                                 <label className="block text-xs font-bold text-gray-500 uppercase mb-1">كلمة المرور</label>
                                 <input
@@ -225,8 +320,8 @@ const TeacherManagerModal: React.FC<TeacherManagerModalProps> = ({
                                                 type="button"
                                                 onClick={() => handleSectionChange(sec)}
                                                 className={`px-4 py-2 rounded-full text-sm font-semibold transition-all duration-200 border ${isSelected
-                                                        ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105'
-                                                        : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
+                                                    ? 'bg-blue-600 text-white border-blue-600 shadow-md transform scale-105'
+                                                    : 'bg-white text-gray-600 border-gray-200 hover:border-blue-300 hover:bg-blue-50'
                                                     }`}
                                             >
                                                 {sec}
