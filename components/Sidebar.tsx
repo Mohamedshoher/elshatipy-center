@@ -25,12 +25,13 @@ interface SidebarProps {
   onShowNotes: () => void;
   onShowTeacherManager: () => void;
   onShowArchive: () => void;
+  onShowDebtors: () => void; // Add onShowDebtors
   onShowSupervisorManager?: () => void;
   onLogout: () => void;
   currentUserRole?: string;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, onShowFinance, onShowFeeCollection, onShowNotifications, onShowNotes, onShowTeacherManager, onShowArchive, onShowSupervisorManager, onLogout, currentUserRole }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, onShowFinance, onShowFeeCollection, onShowNotifications, onShowNotes, onShowTeacherManager, onShowArchive, onShowDebtors, onShowSupervisorManager, onLogout, currentUserRole }) => {
 
   const handleAction = (action: () => void) => {
     action();
@@ -102,6 +103,15 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, o
               <button onClick={() => handleAction(onShowArchive)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-orange-100 hover:text-orange-800 transition-colors">
                 <ArchiveIcon className="w-6 h-6 ml-4 text-orange-600" />
                 <span className="font-semibold">الأرشيف</span>
+              </button>
+            </li>
+          )}
+
+          {(isDirector || isSupervisor) && (
+            <li>
+              <button onClick={() => handleAction(onShowDebtors)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-red-100 hover:text-red-800 transition-colors">
+                <CreditCardOffIcon className="w-6 h-6 ml-4 text-red-600" />
+                <span className="font-semibold">المدينون</span>
               </button>
             </li>
           )}

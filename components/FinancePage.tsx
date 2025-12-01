@@ -85,6 +85,7 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
     const [isCollectionsModalOpen, setIsCollectionsModalOpen] = useState(false);
     const [isAttendanceCheckModalOpen, setIsAttendanceCheckModalOpen] = useState(false);
     const [activePayrollTab, setActivePayrollTab] = useState<'all' | 'قرآن' | 'نور بيان' | 'تلقين'>('all');
+    const [activeStatusFilter, setActiveStatusFilter] = useState<'active' | 'inactive'>('active');
     const [expandedPayrollTeacherId, setExpandedPayrollTeacherId] = useState<string | null>(null);
 
 
@@ -210,34 +211,42 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
                     {activeTab === 'teacher_payroll' && (
                         <div className="space-y-6">
                             <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-4">
-                                <div className="flex p-1 bg-gray-100 rounded-lg w-full sm:w-auto overflow-x-auto">
-                                    {(['all', 'تلقين', 'نور بيان', 'قرآن'] as const).map((tab) => (
-                                        <button
-                                            key={tab}
-                                            onClick={() => setActivePayrollTab(tab)}
-                                            className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${activePayrollTab === tab
-                                                ? 'bg-white text-green-700 shadow-sm'
-                                                : 'text-gray-500 hover:text-gray-700'
-                                                }`}
-                                        >
-                                            {tab === 'all' ? 'الكل' : tab}
-                                        </button>
-                                    ))}
+                                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto">
+                                    <div className="flex p-1 bg-gray-100 rounded-lg overflow-x-auto">
+                                        {(['all', 'تلقين', 'نور بيان', 'قرآن'] as const).map((tab) => (
+                                            <button
+                                                key={tab}
+                                                onClick={() => setActivePayrollTab(tab)}
+                                                className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${activePayrollTab === tab
+                                                    ? 'bg-white text-green-700 shadow-sm'
+                                                    : 'text-gray-500 hover:text-gray-700'
+                                                    }`}
+                                            >
+                                                {tab === 'all' ? 'الكل' : tab}
+                                            </button>
+                                        ))}
+                                    </div>
+                                    <div className="flex p-1 bg-gray-100 rounded-lg overflow-x-auto">
+                                        {(['active', 'inactive'] as const).map((status) => (
+                                            <button
+                                                key={status}
+                                                onClick={() => setActiveStatusFilter(status)}
+                                                className={`flex-1 sm:flex-none px-4 py-2 rounded-md text-sm font-medium transition-all whitespace-nowrap ${activeStatusFilter === status
+                                                    ? 'bg-white text-blue-700 shadow-sm'
+                                                    : 'text-gray-500 hover:text-gray-700'
+                                                    }`}
+                                            >
+                                                {status === 'active' ? 'نشط' : 'غير نشط'}
+                                            </button>
+                                        ))}
+                                    </div>
                                 </div>
-                                <button
-                                    onClick={() => setIsAttendanceCheckModalOpen(true)}
-                                    className="w-full sm:w-auto px-4 py-2 bg-red-100 text-red-700 font-bold rounded-lg hover:bg-red-200 transition-colors flex items-center justify-center gap-2"
-                                >
-                                    <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M9 5H7a2 2 0 00-2 2v12a2 2 0 002 2h10a2 2 0 002-2V7a2 2 0 00-2-2h-2M9 5a2 2 0 002 2h2a2 2 0 002-2M9 5a2 2 0 012-2h2a2 2 0 012 2m-6 9l2 2 4-4" />
-                                    </svg>
-                                    فحص التقارير اليومية
-                                </button>
                             </div>
 
+
                             {[
-                                ...teachers.filter(t => t.status === 'active').map(t => ({ ...t, type: 'teacher' as const })),
-                                ...supervisors.map(s => ({ ...s, type: 'supervisor' as const, status: 'active', phone: '' }))
+                                ...teachers.filter(t => t.status === activeStatusFilter).map(t => ({ ...t, type: 'teacher' as const })),
+                                ...(activeStatusFilter === 'active' ? supervisors.map(s => ({ ...s, type: 'supervisor' as const, status: 'active' as const, phone: '' })) : [])
                             ]
                                 .filter(entity => {
                                     if (activePayrollTab === 'all') return true;

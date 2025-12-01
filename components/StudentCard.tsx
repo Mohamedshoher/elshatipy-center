@@ -43,9 +43,14 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
         <div className="flex flex-col gap-4">
 
           <div className="w-full flex items-center justify-between gap-3 mb-3">
-            <div className="flex items-center gap-3 min-w-0">
+            <div className="flex items-center gap-3 min-w-0 flex-1">
               <UserIcon className="w-8 h-8 text-blue-500 flex-shrink-0" />
-              <h3 className="text-xl font-bold text-gray-800 truncate">{student.name}</h3>
+              <div className="flex items-baseline gap-3 min-w-0 flex-1">
+                <h3 className="text-xl font-bold text-gray-800 truncate">{student.name}</h3>
+                {groupName && (
+                  <span className="text-xs text-gray-500 whitespace-nowrap mr-auto">{groupName}</span>
+                )}
+              </div>
             </div>
           </div>
 

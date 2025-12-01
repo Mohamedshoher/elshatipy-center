@@ -159,7 +159,7 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
               <label className="block text-xs text-gray-500 mb-1">حسب المجموعة</label>
               <select value={mostTestedGroupFilter} onChange={(e) => setMostTestedGroupFilter(e.target.value)} className="w-full p-2 border rounded-md text-sm bg-white">
                 <option value="all">كل المجموعات</option>
-                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                {[...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </div>
             <div>
@@ -220,7 +220,7 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
               <label className="block text-xs text-gray-500 mb-1">حسب المجموعة</label>
               <select value={notTestedGroupFilter} onChange={(e) => setNotTestedGroupFilter(e.target.value)} className="w-full p-2 border rounded-md text-sm bg-white">
                 <option value="all">كل المجموعات</option>
-                {groups.map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+                {[...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
               </select>
             </div>
             <div>

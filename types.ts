@@ -107,6 +107,8 @@ export interface Student {
   approvedBy?: string; // 'director' or supervisor's id
   approvalDate?: string; // YYYY-MM-DD
   addedBy?: string; // teacher's id who added the student
+  hasDebt?: boolean; // true if student has unpaid fees and attended 10+ sessions
+  debtMonths?: string[]; // Array of months (YYYY-MM) with unpaid fees
 }
 
 export enum TeacherStatus {

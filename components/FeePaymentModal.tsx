@@ -26,12 +26,20 @@ const FeePaymentModal: React.FC<FeePaymentModalProps> = ({ isOpen, onClose, onSa
       alert("يرجى إدخال مبلغ صحيح.");
       return;
     }
-    onSave({
+
+    // Close modal immediately for faster UX
+    const paymentData = {
       studentId: paymentDetails.studentId,
       month: paymentDetails.month,
       amountPaid: parseFloat(amountPaid),
       receiptNumber: receiptNumber.trim(),
-    });
+    };
+
+    // Close modal first
+    onClose();
+
+    // Then save in background
+    onSave(paymentData);
   };
 
   const monthName = new Date(paymentDetails.month + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' });

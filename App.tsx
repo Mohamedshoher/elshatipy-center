@@ -23,6 +23,7 @@ import GroupsPage from './components/GroupsPage';
 import AttendanceReportPage from './components/AttendanceReportPage';
 import TestsReportPage from './components/TestsReportPage';
 import FinancialReportPage from './components/FinancialReportPage';
+import DebtorsPage from './components/DebtorsPage';
 import NotificationBell from './components/NotificationBell';
 import DirectorNotificationBell from './components/DirectorNotificationBell';
 import Sidebar from './components/Sidebar';
@@ -113,6 +114,7 @@ const App: React.FC = () => {
     const [isFeeCollectionView, setIsFeeCollectionView] = useState(false);
     const [isTeacherManagerView, setIsTeacherManagerView] = useState(false);
     const [isArchiveView, setIsArchiveView] = useState(false);
+    const [isDebtorsView, setIsDebtorsView] = useState(false); // Add isDebtorsView state
     const [viewingTeacherReportId, setViewingTeacherReportId] = useState<string | null>(null);
 
     const [isTeacherFilterVisible, setIsTeacherFilterVisible] = useState(false);
@@ -706,7 +708,7 @@ const App: React.FC = () => {
                 approvedBy: currentUser.role === 'director' ? 'director' : currentUser.id,
                 approvalDate: new Date().toISOString().split('T')[0]
             });
-            alert('تم قبول الطالب بنجاح!');
+            // Alert removed as per user request
         } catch (error) {
             console.error("Error approving student: ", error);
             alert("حدث خطأ أثناء قبول الطالب.");
@@ -883,23 +885,75 @@ const App: React.FC = () => {
     const handleArchiveStudent = (studentId: string) => {
         const student = students.find(s => s.id === studentId);
         if (!student) return;
-        student.isArchived ? setStudentToUnarchiveId(studentId) : setStudentToArchive(student);
+        if (student.isArchived) {
+            if (student.hasDebt) {
+                alert("لا يمكن استعادة هذا الطالب لوجود مصروفات مستحقة عليه. يرجى سداد الديون أولاً من صفحة المدينين.");
+                return;
+            }
+            setStudentToUnarchiveId(studentId);
+        } else {
+            setStudentToArchive(student);
+        }
     };
 
     const confirmArchiveStudent = async () => {
         if (!studentToArchive) return;
-        try {
-            await updateDoc(doc(db, 'students', studentToArchive.id), {
-                isArchived: true,
-                archivedBy: currentUser?.role === 'director' ? 'director' : (currentUser?.role === 'supervisor' ? `supervisor:${currentUser.id}` : currentUser?.id),
-                archiveDate: new Date().toISOString().split('T')[0]
-            });
-        } catch (error) { console.error("Error archiving student: ", error); }
+
+        // Store the data we need before closing the modal
+        const studentId = studentToArchive.id;
+        const archivedByValue = currentUser?.role === 'director' ? 'director' : (currentUser?.role === 'supervisor' ? `supervisor:${currentUser.id}` : currentUser?.id);
+
+        // Check for unpaid fees with 10+ attendance
+        const debtMonths: string[] = [];
+        const attendance = studentToArchive.attendance;
+
+        // Group attendance by month
+        const attendanceByMonth: { [month: string]: number } = {};
+        attendance.forEach(record => {
+            if (record.status === 'present') {
+                const month = record.date.substring(0, 7); // YYYY-MM
+                attendanceByMonth[month] = (attendanceByMonth[month] || 0) + 1;
+            }
+        });
+
+        // Check each month for unpaid fees with 10+ attendance
+        Object.entries(attendanceByMonth).forEach(([month, count]) => {
+            if (count >= 10) {
+                const feeRecord = studentToArchive.fees.find(f => f.month === month);
+                if (!feeRecord || !feeRecord.paid) {
+                    debtMonths.push(month);
+                }
+            }
+        });
+
+        const hasDebt = debtMonths.length > 0;
+
+        // Close modal immediately for faster UX
         setStudentToArchive(null);
+
+        // Then archive in background
+        try {
+            const updateData: any = {
+                isArchived: true,
+                archivedBy: archivedByValue,
+                archiveDate: new Date().toISOString().split('T')[0],
+                hasDebt: hasDebt,
+            };
+
+            if (hasDebt) {
+                updateData.debtMonths = debtMonths;
+            }
+
+            await updateDoc(doc(db, 'students', studentId), updateData);
+        } catch (error) { console.error("Error archiving student: ", error); }
     };
 
     const handleConfirmUnarchive = async (newGroupId: string) => {
         if (!studentToUnarchiveId) return;
+
+        // Store the ID before the modal closes
+        const studentId = studentToUnarchiveId;
+
         try {
             const isTeacher = currentUser?.role === 'teacher';
 
@@ -924,16 +978,16 @@ const App: React.FC = () => {
                 updateData.approvalDate = new Date().toISOString().split('T')[0];
             }
 
-            await updateDoc(doc(db, 'students', studentToUnarchiveId), updateData);
+            await updateDoc(doc(db, 'students', studentId), updateData);
 
+            // Alerts removed as per user request
             if (isTeacher) {
-                alert('تم استعادة الطالب من الأرشيف، ولكنه بانتظار موافقة المشرف أو المدير.');
-            } else {
-                alert('تم استعادة الطالب بنجاح.');
+                // Optional: You might want a toast notification here instead, or nothing.
+                // For now, removing the alert as requested.
             }
 
         } catch (error) { console.error("Error unarchiving student: ", error); }
-        setStudentToUnarchiveId(null);
+        // Modal is now closed before this function is called, so no need to close it here
     };
 
     const handleDeleteStudentPermanently = async (studentId: string) => {
@@ -970,7 +1024,7 @@ const App: React.FC = () => {
             feeIndex > -1 ? (fees[feeIndex] = { ...fees[feeIndex], ...paymentData }) : fees.push({ month: details.month, amount: studentData.monthlyFee, ...paymentData });
             await updateDoc(doc(db, 'students', details.studentId), { fees });
         } catch (error) { console.error("Error saving fee payment: ", error); }
-        setIsFeeModalOpen(false); setPaymentDetails(null);
+        // Modal is now closed before this function is called, so no need to close it here
     };
 
     const handleCancelFeePayment = async (studentId: string, month: string) => {
@@ -999,6 +1053,50 @@ const App: React.FC = () => {
         } catch (error) {
             console.error("Error cancelling fee payment: ", error);
             alert("حدث خطأ أثناء إلغاء الدفعة.");
+        }
+    };
+
+    const handlePayDebt = async (studentId: string, month: string, amount: number) => {
+        try {
+            const studentRef = doc(db, 'students', studentId);
+            const studentDoc = await getDoc(studentRef);
+            if (!studentDoc.exists()) return;
+
+            const studentData = studentDoc.data() as Student;
+
+            // 1. Update Fees
+            const fees = [...studentData.fees];
+            const feeIndex = fees.findIndex(f => f.month === month);
+            const paymentData = {
+                paid: true,
+                paymentDate: new Date().toISOString(),
+                amountPaid: amount,
+                receiptNumber: 'DEBT_PAYMENT'
+            };
+
+            if (feeIndex > -1) {
+                fees[feeIndex] = { ...fees[feeIndex], ...paymentData };
+            } else {
+                fees.push({ month: month, amount: studentData.monthlyFee, ...paymentData });
+            }
+
+            // 2. Update Debt Months
+            const updatedDebtMonths = studentData.debtMonths?.filter(m => m !== month) || [];
+            const hasRemainingDebt = updatedDebtMonths.length > 0;
+
+            // 3. Save Updates
+            const updateData: any = {
+                fees,
+                debtMonths: updatedDebtMonths,
+                hasDebt: hasRemainingDebt
+            };
+
+            await updateDoc(studentRef, updateData);
+            // Alert removed as per user request
+
+        } catch (error) {
+            console.error("Error paying debt: ", error);
+            alert("حدث خطأ أثناء دفع الدين.");
         }
     };
 
@@ -1362,6 +1460,7 @@ const App: React.FC = () => {
         setViewingGroup(null); setIsDirectorReportView(false); setIsDirectorNotesView(false); setIsFinanceView(false);
         setIsFeeCollectionView(false); setIsTeacherManagerView(false); setIsDirectorNotificationsView(false);
         setViewingTeacherReportId(null); setIsUnpaidStudentsView(false); setIsArchiveView(false); setIsGeneralView(false);
+        setIsDebtorsView(false); // Reset Debtors View
         setIsTeacherFilterVisible(false); // Reset filter visibility
         if (isSearchVisible) { setIsSearchVisible(false); setSearchTerm(''); }
     };
@@ -1393,12 +1492,20 @@ const App: React.FC = () => {
     };
 
     const renderArchiveList = () => {
-        const studentsToDisplay = (currentUser?.role === 'director'
-            ? archivedStudents
-            : currentUser?.role === 'supervisor'
-                ? (supervisorFilteredData?.students.filter(s => s.isArchived) || [])
-                : archivedStudents.filter(s => currentUser?.role === 'teacher' && s.archivedBy === currentUser.id))
-            .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+        let studentsToDisplay = students.filter(s => s.isArchived);
+        if (searchTerm) {
+            studentsToDisplay = studentsToDisplay.filter(s => s.name.includes(searchTerm));
+        }
+        studentsToDisplay = studentsToDisplay.filter(s => {
+            if (currentUser?.role === 'director') return true;
+            if (currentUser?.role === 'supervisor') {
+                return supervisorFilteredData?.students.some(sf => sf.id === s.id) || false;
+            }
+            if (currentUser?.role === 'teacher') {
+                return s.archivedBy === currentUser.id;
+            }
+            return false;
+        }).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
 
         return (
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -1461,12 +1568,13 @@ const App: React.FC = () => {
     const renderHeader = () => {
         const backButton = (<button onClick={handleBackToMain} className="p-2 rounded-lg bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition-all" aria-label="العودة"> <ArrowRightIcon className="w-6 h-6" /> </button>);
 
-        const isSubView = viewingGroup || isGeneralView || isDirectorReportView || isDirectorNotesView || isFinanceView || isFeeCollectionView || isTeacherManagerView || isDirectorNotificationsView || viewingTeacherReportId || isUnpaidStudentsView || isArchiveView;
+        const isSubView = viewingGroup || isGeneralView || isDirectorReportView || isDirectorNotesView || isFinanceView || isFeeCollectionView || isTeacherManagerView || isDirectorNotificationsView || viewingTeacherReportId || isUnpaidStudentsView || isArchiveView || isDebtorsView;
 
         let title = 'مركز الشاطبي';
         if (currentUser.role === 'supervisor') title = `مركز الشاطبي - المشرف: ${currentUser.name}`;
 
         if (isArchiveView) { title = 'الأرشيف'; }
+        else if (isDebtorsView) { title = 'المدينون'; }
         else if (viewingGroup) { title = `تقرير: ${viewingGroup.name}`; }
         else if (isGeneralView) { title = 'نظرة عامة'; }
         else if (isDirectorReportView) { title = 'التقارير العامة'; }
@@ -1520,7 +1628,7 @@ const App: React.FC = () => {
                             </div>
                         </div>
                     );
-                } else if (isTeacherManagerView) {
+                } else if (isTeacherManagerView || isArchiveView || isDebtorsView) {
                     centerContent = (
                         <div className="flex items-center gap-2">
                             <button onClick={toggleSearch} className="p-1 rounded-full text-gray-500 hover:bg-gray-100 transition-colors" aria-label="بحث">
@@ -1596,8 +1704,8 @@ const App: React.FC = () => {
                     }
                     rightContent = (
                         <div className="flex items-center gap-2">
-                            {directorBell}
                             {actionButton}
+                            {directorBell}
                         </div>
                     );
                 }
@@ -1682,6 +1790,7 @@ const App: React.FC = () => {
 
         const subViewContent = (() => {
             if (isArchiveView) return renderArchiveList();
+            if (isDebtorsView) return <DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser.role} searchTerm={searchTerm} />;
             if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
             if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={students} />;
             if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
@@ -1766,6 +1875,7 @@ const App: React.FC = () => {
     const renderDirectorContent = () => {
         const subViewContent = (() => {
             if (isArchiveView) return renderArchiveList();
+            if (isDebtorsView) return <DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser.role} searchTerm={searchTerm} />;
             if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
             if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} />;
             if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
@@ -1932,6 +2042,7 @@ const App: React.FC = () => {
                         onShowNotes={() => openDirectorView(setIsDirectorNotesView)}
                         onShowTeacherManager={() => openDirectorView(setIsTeacherManagerView)}
                         onShowArchive={() => openDirectorView(setIsArchiveView)}
+                        onShowDebtors={() => openDirectorView(setIsDebtorsView)}
                         onLogout={handleLogout}
                         currentUserRole={currentUser.role}
                     />
@@ -2005,7 +2116,7 @@ const App: React.FC = () => {
                 </>
             )}
 
-            <FeePaymentModal isOpen={isFeeModalOpen} onClose={() => setIsFeeModalOpen(false)} onSave={handleSaveFeePayment} paymentDetails={paymentDetails} />
+            <FeePaymentModal isOpen={isFeeModalOpen} onClose={() => { setIsFeeModalOpen(false); setPaymentDetails(null); }} onSave={handleSaveFeePayment} paymentDetails={paymentDetails} />
             <UnarchiveModal isOpen={!!studentToUnarchiveId} onClose={() => setStudentToUnarchiveId(null)} onConfirm={handleConfirmUnarchive} groups={groupsForUnarchiveModal} studentName={students.find(s => s.id === studentToUnarchiveId)?.name || ''} />
             {studentToArchive && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">

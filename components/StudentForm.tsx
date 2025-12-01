@@ -18,19 +18,19 @@ const StudentForm: React.FC<StudentFormProps> = ({ isOpen, onClose, onSave, stud
 
   useEffect(() => {
     if (isOpen) {
-        if (studentToEdit) {
-            setName(studentToEdit.name);
-            setPhone(studentToEdit.phone);
-            setMonthlyFee(studentToEdit.monthlyFee.toString());
-            setJoiningDate(studentToEdit.joiningDate);
-            setGroupId(studentToEdit.groupId);
-        } else {
-            setName('');
-            setPhone('');
-            setMonthlyFee('');
-            setJoiningDate(new Date().toISOString().split('T')[0]);
-            setGroupId(groups[0]?.id || '');
-        }
+      if (studentToEdit) {
+        setName(studentToEdit.name);
+        setPhone(studentToEdit.phone);
+        setMonthlyFee(studentToEdit.monthlyFee.toString());
+        setJoiningDate(studentToEdit.joiningDate);
+        setGroupId(studentToEdit.groupId);
+      } else {
+        setName('');
+        setPhone('');
+        setMonthlyFee('');
+        setJoiningDate(new Date().toISOString().split('T')[0]);
+        setGroupId(groups[0]?.id || '');
+      }
     }
   }, [studentToEdit, isOpen, groups]);
 
@@ -78,11 +78,11 @@ const StudentForm: React.FC<StudentFormProps> = ({ isOpen, onClose, onSave, stud
           <div className="mb-4">
             <label htmlFor="group" className="block text-gray-600 mb-2">المجموعة</label>
             <select id="group" value={groupId} onChange={(e) => setGroupId(e.target.value)} className="w-full px-4 py-2 border rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 bg-white" required disabled={groups.length === 0}>
-                {groups.length === 0 ? (
-                    <option>يرجى إنشاء مجموعة أولاً</option>
-                ) : (
-                    groups.map(group => <option key={group.id} value={group.id}>{group.name}</option>)
-                )}
+              {groups.length === 0 ? (
+                <option>يرجى إنشاء مجموعة أولاً</option>
+              ) : (
+                [...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(group => <option key={group.id} value={group.id}>{group.name}</option>)
+              )}
             </select>
           </div>
           <div className="mb-6">

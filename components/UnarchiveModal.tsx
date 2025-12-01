@@ -28,6 +28,11 @@ const UnarchiveModal: React.FC<UnarchiveModalProps> = ({ isOpen, onClose, onConf
       alert("يرجى اختيار مجموعة لإعادة الطالب إليها.");
       return;
     }
+
+    // Close modal immediately for faster UX
+    onClose();
+
+    // Then confirm unarchive in background
     onConfirm(selectedGroupId);
   };
 
@@ -49,7 +54,7 @@ const UnarchiveModal: React.FC<UnarchiveModalProps> = ({ isOpen, onClose, onConf
               {groups.length === 0 ? (
                 <option disabled>لا توجد مجموعات متاحة</option>
               ) : (
-                groups.map(group => (
+                [...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(group => (
                   <option key={group.id} value={group.id}>{group.name}</option>
                 ))
               )}

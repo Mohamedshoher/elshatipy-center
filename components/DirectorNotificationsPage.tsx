@@ -133,7 +133,7 @@ const DirectorNotificationsPage: React.FC<DirectorNotificationsPageProps> = ({ o
                   </button>
                 </div>
                 <div className="max-h-32 overflow-y-auto border rounded-lg p-2 space-y-1 bg-gray-50">
-                  {groups.map(group => (
+                  {[...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(group => (
                     <label key={group.id} className="flex items-center p-1 rounded hover:bg-indigo-100 cursor-pointer">
                       <input
                         type="checkbox"
@@ -196,7 +196,7 @@ const DirectorNotificationsPage: React.FC<DirectorNotificationsPageProps> = ({ o
                       ))}
                     </optgroup>
                     <optgroup label="المجموعات">
-                      {groups.map(g => (
+                      {[...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(g => (
                         <option key={g.id} value={g.id}>{g.name}</option>
                       ))}
                     </optgroup>
