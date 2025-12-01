@@ -1002,7 +1002,7 @@ const App: React.FC = () => {
                 const batch = writeBatch(db);
                 notesSnapshot.forEach(doc => batch.delete(doc.ref));
                 await batch.commit();
-                alert("تم حذف الطالب وجميع سجلاته بنجاح.");
+                // Alert removed as per user request
             } catch (error) {
                 console.error("Error permanently deleting student: ", error);
                 alert("حدث خطأ أثناء حذف الطالب.");
