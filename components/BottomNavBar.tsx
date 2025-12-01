@@ -37,7 +37,7 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeView, onSelectView })
   return (
     <>
       {/* Bottom Bar - visible on all screens */}
-      <nav className="fixed bottom-0 right-0 w-full bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)] flex justify-around z-40 border-t pr-56">
+      <nav className="fixed bottom-0 right-0 w-full bg-white shadow-[0_-2px_10px_rgba(0,0,0,0.05)] flex justify-around z-40 border-t lg:pr-56">
         <NavItem
           label="الطلاب"
           icon={<UserIcon className="w-6 h-6" />}
