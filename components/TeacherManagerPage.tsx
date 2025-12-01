@@ -195,18 +195,18 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
             <div className="flex flex-col items-center justify-center mb-6 gap-4">
                 <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto justify-center items-center">
                     {/* Type Tabs */}
-                    <div className="bg-white p-1 rounded-lg shadow-md inline-flex flex-wrap justify-center gap-1">
-                        <button onClick={() => setActiveTab('all')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'all' ? 'bg-gray-800 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>الكل</button>
-                        <button onClick={() => setActiveTab('تلقين')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'تلقين' ? 'bg-purple-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>تلقين</button>
-                        <button onClick={() => setActiveTab('نور بيان')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'نور بيان' ? 'bg-orange-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>نور بيان</button>
-                        <button onClick={() => setActiveTab('قرآن')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'قرآن' ? 'bg-green-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>قرآن</button>
-                        <button onClick={() => setActiveTab('الإشراف')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'الإشراف' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>الإشراف</button>
+                    <div className="bg-white p-1 rounded-lg shadow-md inline-flex flex-nowrap overflow-x-auto max-w-full justify-start sm:justify-center gap-1">
+                        <button onClick={() => setActiveTab('all')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'all' ? 'bg-gray-800 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>الكل</button>
+                        <button onClick={() => setActiveTab('تلقين')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'تلقين' ? 'bg-purple-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>تلقين</button>
+                        <button onClick={() => setActiveTab('نور بيان')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'نور بيان' ? 'bg-orange-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>نور بيان</button>
+                        <button onClick={() => setActiveTab('قرآن')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'قرآن' ? 'bg-green-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>قرآن</button>
+                        <button onClick={() => setActiveTab('الإشراف')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'الإشراف' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>الإشراف</button>
                     </div>
 
                     {/* Status Tabs */}
-                    <div className="bg-white p-1 rounded-lg shadow-md inline-flex flex-wrap justify-center gap-1">
-                        <button onClick={() => setActiveStatusFilter('active')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeStatusFilter === 'active' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>نشط</button>
-                        <button onClick={() => setActiveStatusFilter('inactive')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeStatusFilter === 'inactive' ? 'bg-red-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>غير نشط</button>
+                    <div className="bg-white p-1 rounded-lg shadow-md inline-flex flex-nowrap overflow-x-auto max-w-full justify-start sm:justify-center gap-1">
+                        <button onClick={() => setActiveStatusFilter('active')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeStatusFilter === 'active' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>نشط</button>
+                        <button onClick={() => setActiveStatusFilter('inactive')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeStatusFilter === 'inactive' ? 'bg-red-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>غير نشط</button>
                     </div>
                 </div>
             </div>

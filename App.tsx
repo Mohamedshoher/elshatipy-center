@@ -1643,13 +1643,6 @@ const App: React.FC = () => {
                     rightContent = (
                         <div className="flex items-center gap-2">
                             {directorBell}
-                            <button
-                                onClick={() => setIsTeacherFilterVisible(!isTeacherFilterVisible)}
-                                className={`p-2 rounded-lg transition-colors ${isTeacherFilterVisible ? 'bg-blue-100 text-blue-600' : 'text-gray-500 hover:bg-gray-100'}`}
-                                title="تصفية"
-                            >
-                                <FilterIcon className="w-6 h-6" />
-                            </button>
                             <button onClick={handleOpenAddTeacherForm} className="p-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700 transition-all" aria-label="إضافة موظف جديد">
                                 <UserPlusIcon className="w-6 h-6" />
                             </button>
