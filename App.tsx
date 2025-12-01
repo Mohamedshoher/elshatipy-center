@@ -2047,9 +2047,9 @@ const App: React.FC = () => {
                         currentUserRole={currentUser.role}
                     />
                 )}
-                <div className="flex-1 flex flex-col w-full min-w-0 lg:h-screen lg:pr-20">
+                <div className="flex-1 flex flex-col w-full min-w-0">
                     {renderHeader()}
-                    <main className="flex-1 overflow-y-auto pb-16 lg:pb-0">
+                    <main className="flex-1 overflow-y-auto pb-20">
                         <ErrorBoundary>
                             {currentUser.role === 'director'
                                 ? renderDirectorContent()
