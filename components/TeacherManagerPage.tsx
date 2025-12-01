@@ -44,7 +44,8 @@ interface TeacherManagerPageProps {
 const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
     const { teachers, supervisors, groups, onViewTeacherDetails, onViewSupervisorDetails, isFilterVisible, searchTerm } = props;
 
-    const [activeTab, setActiveTab] = useState<GroupType | 'الإشراف'>('تلقين');
+    const [activeTab, setActiveTab] = useState<GroupType | 'الإشراف' | 'all'>('all');
+    const [activeStatusFilter, setActiveStatusFilter] = useState<'active' | 'inactive'>('active');
     const [isDeductionModalOpen, setIsDeductionModalOpen] = useState(false);
     const [deductionDetails, setDeductionDetails] = useState<{ teacherId: string; status: TeacherAttendanceStatus.HALF_DAY | TeacherAttendanceStatus.QUARTER_DAY; isSupervisor?: boolean } | null>(null);
 
@@ -52,7 +53,7 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
     const [filterStatus, setFilterStatus] = useState<TeacherStatus | 'all'>('all');
 
     // Get teachers for current tab
-    const getTeachersForTab = (tab: GroupType | 'الإشراف') => {
+    const getTeachersForTab = (tab: GroupType | 'الإشراف' | 'all') => {
         const sortBySearchRelevance = (items: any[]) => {
             if (!searchTerm) return items;
 
@@ -88,16 +89,26 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
             const filtered = supervisors
                 .filter(s => {
                     const matchesSearch = searchTerm ? s.name.toLowerCase().includes(searchTerm.toLowerCase()) : true;
-                    const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
+                    // For supervisors, assume active if status matches filter or if no status property (backward compatibility)
+                    const matchesStatus = activeStatusFilter === 'active' ? (s.status === 'active' || !s.status) : s.status === 'inactive';
+                    return matchesSearch && matchesStatus;
+                });
+            return sortBySearchRelevance(filtered);
+        } else if (tab === 'all') {
+            // Show all teachers filtered by status
+            const filtered = teachers
+                .filter(teacher => {
+                    const matchesSearch = searchTerm ? teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) : true;
+                    const matchesStatus = teacher.status === activeStatusFilter;
                     return matchesSearch && matchesStatus;
                 });
             return sortBySearchRelevance(filtered);
         } else {
-            // Filter teachers by section
+            // Filter teachers by section and status
             const filtered = teachers
                 .filter(teacher => {
                     const matchesSearch = searchTerm ? teacher.name.toLowerCase().includes(searchTerm.toLowerCase()) : true;
-                    const matchesStatus = filterStatus === 'all' || teacher.status === filterStatus;
+                    const matchesStatus = teacher.status === activeStatusFilter;
 
                     // If searching, show all matching teachers regardless of section
                     if (searchTerm) {
@@ -131,13 +142,13 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
 
         const allTeachers = teachers.filter(teacher => {
             const matchesSearch = teacher.name.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesStatus = filterStatus === 'all' || teacher.status === filterStatus;
+            const matchesStatus = teacher.status === activeStatusFilter;
             return matchesSearch && matchesStatus;
         });
 
         const allSupervisors = supervisors.filter(s => {
             const matchesSearch = s.name.toLowerCase().includes(searchTerm.toLowerCase());
-            const matchesStatus = filterStatus === 'all' || s.status === filterStatus;
+            const matchesStatus = activeStatusFilter === 'active' ? (s.status === 'active' || !s.status) : s.status === 'inactive';
             return matchesSearch && matchesStatus;
         });
 
@@ -152,7 +163,7 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
             return getAllItems();
         }
         return getTeachersForTab(activeTab);
-    }, [activeTab, teachers, supervisors, searchTerm, filterStatus, groups]);
+    }, [activeTab, teachers, supervisors, searchTerm, filterStatus, groups, activeStatusFilter]);
 
     const handleDeductionClick = (teacherId: string, status: TeacherAttendanceStatus.HALF_DAY | TeacherAttendanceStatus.QUARTER_DAY, isSupervisor = false) => {
         setDeductionDetails({ teacherId, status, isSupervisor });
@@ -182,12 +193,21 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Controls Header: Tabs */}
             <div className="flex flex-col items-center justify-center mb-6 gap-4">
-                {/* Tabs */}
-                <div className="bg-white p-1 rounded-lg shadow-md inline-flex flex-wrap justify-center gap-1">
-                    <button onClick={() => setActiveTab('تلقين')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'تلقين' ? 'bg-purple-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>تلقين</button>
-                    <button onClick={() => setActiveTab('نور بيان')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'نور بيان' ? 'bg-orange-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>نور بيان</button>
-                    <button onClick={() => setActiveTab('قرآن')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'قرآن' ? 'bg-green-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>قرآن</button>
-                    <button onClick={() => setActiveTab('الإشراف')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'الإشراف' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>الإشراف</button>
+                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto justify-center items-center">
+                    {/* Type Tabs */}
+                    <div className="bg-white p-1 rounded-lg shadow-md inline-flex flex-wrap justify-center gap-1">
+                        <button onClick={() => setActiveTab('all')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'all' ? 'bg-gray-800 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>الكل</button>
+                        <button onClick={() => setActiveTab('تلقين')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'تلقين' ? 'bg-purple-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>تلقين</button>
+                        <button onClick={() => setActiveTab('نور بيان')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'نور بيان' ? 'bg-orange-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>نور بيان</button>
+                        <button onClick={() => setActiveTab('قرآن')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'قرآن' ? 'bg-green-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>قرآن</button>
+                        <button onClick={() => setActiveTab('الإشراف')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeTab === 'الإشراف' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>الإشراف</button>
+                    </div>
+
+                    {/* Status Tabs */}
+                    <div className="bg-white p-1 rounded-lg shadow-md inline-flex flex-wrap justify-center gap-1">
+                        <button onClick={() => setActiveStatusFilter('active')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeStatusFilter === 'active' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>نشط</button>
+                        <button onClick={() => setActiveStatusFilter('inactive')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all ${activeStatusFilter === 'inactive' ? 'bg-red-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>غير نشط</button>
+                    </div>
                 </div>
             </div>
 
