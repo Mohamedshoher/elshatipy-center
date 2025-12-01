@@ -139,7 +139,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, o
       <div
         className={`
           fixed top-0 right-0 h-full w-80 bg-white shadow-2xl z-50 transition-transform duration-300 ease-in-out flex flex-col
-          lg:static lg:w-64 lg:h-auto lg:shadow-none lg:translate-x-0
+          lg:sticky lg:top-0 lg:h-screen lg:w-64 lg:shadow-none lg:translate-x-0 lg:border-l
           ${isOpen ? 'translate-x-0' : 'translate-x-full'}
         `}
       >
