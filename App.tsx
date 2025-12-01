@@ -603,7 +603,7 @@ const App: React.FC = () => {
             if (studentId) {
                 // When editing, preserve existing approval status
                 await updateDoc(doc(db, 'students', studentId), studentData);
-                alert('تم تحديث بيانات الطالب بنجاح!');
+                // Alert removed as per user request
             } else {
                 // When adding a new student
                 const isTeacher = currentUser?.role === 'teacher';
