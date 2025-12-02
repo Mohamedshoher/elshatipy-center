@@ -1,6 +1,7 @@
 import React, { useState, useMemo } from 'react';
 import type { Student, Group } from '../types';
 import UserIcon from './icons/UserIcon';
+import WhatsAppIcon from './icons/WhatsAppIcon';
 
 interface AbsentStudentsModalProps {
   isOpen: boolean;
@@ -12,6 +13,35 @@ interface AbsentStudentsModalProps {
 
 const AbsentStudentsModal: React.FC<AbsentStudentsModalProps> = ({ isOpen, onClose, absentStudents, groups, onStudentClick }) => {
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
+
+  const handleSendWhatsAppMessage = (student: Student, e: React.MouseEvent) => {
+    e.stopPropagation(); // منع فتح تفاصيل الطالب عند الضغط على زر واتساب
+
+    const today = new Date().toLocaleDateString('ar-EG', {
+      weekday: 'long',
+      year: 'numeric',
+      month: 'long',
+      day: 'numeric'
+    });
+
+    const message = `*السلام عليكم ورحمة الله وبركاته*\n\n` +
+      `عزيزي ولي أمر الطالب/ة: *${student.name}*\n\n` +
+      `نود إعلامكم بأن الطالب/ة *غاب/ت اليوم* (${today}) عن حضور الحلقة.\n\n` +
+      `⚠️ *تحذير هام:*\n` +
+      `الغياب المتكرر يؤثر سلباً على مستوى الطالب/ة الدراسي والحفظ، ` +
+      `لذا نرجو منكم الاهتمام بمتابعة حضور الطالب/ة بانتظام للحفاظ على تقدمه/ها في الحفظ والمراجعة.\n\n` +
+      `نشكر لكم تعاونكم ونسأل الله أن يوفق الجميع.\n\n` +
+      `*مع تحيات إدارة مركز الشاطبي لتحفيظ القرآن الكريم* 🌙`;
+
+    const phone = student.phone.replace(/[^0-9]/g, '');
+    if (!phone) {
+      alert('لا يوجد رقم هاتف مسجل لولي أمر هذا الطالب.');
+      return;
+    }
+
+    const encodedMessage = encodeURIComponent(message);
+    window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
+  };
 
   const studentsByGroup = useMemo(() => {
     const grouped: Record<string, Student[]> = {};
@@ -49,20 +79,27 @@ const AbsentStudentsModal: React.FC<AbsentStudentsModalProps> = ({ isOpen, onClo
                 <h3 className="font-semibold text-gray-800">{groupName}</h3>
                 <div className="flex items-center gap-2">
                   <span className="font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full text-sm">{count} غائب</span>
-                   <svg className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${expandedGroupId === groupId ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
+                  <svg className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${expandedGroupId === groupId ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth="2" d="M19 9l-7 7-7-7" /></svg>
                 </div>
               </div>
               {expandedGroupId === groupId && (
                 <div className="border-t border-gray-200 p-3">
                   <ul className="space-y-2">
-                    {students.sort((a,b) => a.name.localeCompare(b.name, 'ar')).map(student => (
-                      <li key={student.id}>
-                        <button 
+                    {students.sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(student => (
+                      <li key={student.id} className="flex items-center justify-between gap-2 p-2 rounded-md hover:bg-blue-50 transition-colors">
+                        <button
                           onClick={() => onStudentClick(student.id)}
-                          className="w-full text-right flex items-center p-2 rounded-md hover:bg-blue-100 text-gray-700 hover:text-blue-700 transition-colors"
+                          className="flex-1 text-right flex items-center text-gray-700 hover:text-blue-700"
                         >
                           <UserIcon className="w-5 h-5 ml-2" />
                           {student.name}
+                        </button>
+                        <button
+                          onClick={(e) => handleSendWhatsAppMessage(student, e)}
+                          className="flex items-center justify-center bg-green-500 hover:bg-green-600 text-white p-2 rounded-full shadow-sm transition-all"
+                          title="إرسال رسالة لولي الأمر"
+                        >
+                          <WhatsAppIcon className="w-5 h-5" />
                         </button>
                       </li>
                     ))}

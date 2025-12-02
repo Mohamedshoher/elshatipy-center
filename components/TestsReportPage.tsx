@@ -193,7 +193,7 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
                 <div className="flex items-center gap-3">
                   <span className="font-bold text-blue-600 bg-blue-100 px-2 py-1 rounded-full text-sm">{count} اختبار</span>
                   <a
-                    href={`https://wa.me/2${student.phone.startsWith('0') ? student.phone.substring(1) : student.phone}?text=${encodeURIComponent(
+                    href={`https://wa.me/${student.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
                       `السلام عليكم ورحمة الله وبركاته\nولي أمر الطالب/ة: ${student.name}\n\nيسرنا إبلاغكم بأن ابنكم/ابنتكم قد أتم ${count} اختبارات خلال هذا الشهر بتفوق وتميز.\nنقدر حرصكم ومتابعتكم، ونشجعكم على الاستمرار في هذا المستوى الرائع.\n\nحفظه الله ورعاه وجعله من أهل القرآن.\n\nإدارة المركز`
                     )}`}
                     target="_blank"
@@ -245,7 +245,7 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
                 </div>
                 <div className="flex items-center gap-3">
                   <a
-                    href={`https://wa.me/2${student.phone.startsWith('0') ? student.phone.substring(1) : student.phone}?text=${encodeURIComponent(
+                    href={`https://wa.me/${student.phone.replace(/[^0-9]/g, '')}?text=${encodeURIComponent(
                       `السلام عليكم ورحمة الله وبركاته\nولي أمر الطالب/ة: ${student.name}\n\nنود إفادتكم بأن الطالب لم يقم بإجراء اختبار (${testTypeLabels[notTestedTypeFilter]}) خلال هذا الشهر.\nنرجو منكم مزيداً من العناية والاهتمام، والتفضل بمراجعة المركز لمتابعة مستوى الطالب.\n\nشاكرين حسن تعاونكم.\n\nإدارة المركز`
                     )}`}
                     target="_blank"
