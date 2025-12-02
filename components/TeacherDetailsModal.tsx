@@ -36,6 +36,7 @@ interface TeacherDetailsModalProps {
     onViewTeacherReport: (teacherId: string) => void;
     onSendNotificationToAll: (content: string) => void;
     teacherCollections?: TeacherCollectionRecord[];
+    currentUserRole?: 'director' | 'teacher' | 'supervisor';
 }
 
 const getAbsenceValue = (status: TeacherAttendanceStatus): number => {
@@ -84,6 +85,7 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
     onViewTeacherReport,
     onSendNotificationToAll,
     teacherCollections = [],
+    currentUserRole,
 }) => {
     const [activeTab, setActiveTab] = useState<'payroll' | 'attendance' | 'groups'>('payroll');
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
@@ -446,9 +448,11 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
 
                         <div className="border-t pt-3 flex justify-between items-center mb-4">
                             <div className="flex items-center gap-2">
-                                <a href={`https://wa.me/${employeePhone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors" title={`واتساب ${employeeName}`}>
-                                    <WhatsAppIcon className="w-5 h-5" />
-                                </a>
+                                {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
+                                    <a href={`https://wa.me/${employeePhone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors" title={`واتساب ${employeeName}`}>
+                                        <WhatsAppIcon className="w-5 h-5" />
+                                    </a>
+                                )}
                                 <a href={`tel:${employeePhone.replace(/[^0-9]/g, '')}`} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors" title={`اتصال ${employeeName}`}>
                                     <PhoneIcon className="w-5 h-5" />
                                 </a>
@@ -555,10 +559,12 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
                                         )}
 
                                         <div className="flex justify-end items-center gap-3">
-                                            <button onClick={handleSendWhatsAppReport} className="flex items-center gap-2 bg-blue-100 text-blue-700 font-bold py-3 px-4 rounded-lg hover:bg-blue-200 transition-all text-sm" title="إرسال التقرير عبر واتساب">
-                                                <WhatsAppIcon className="w-5 h-5" />
-                                                <span className="hidden sm:inline">إرسال تقرير</span>
-                                            </button>
+                                            {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
+                                                <button onClick={handleSendWhatsAppReport} className="flex items-center gap-2 bg-blue-100 text-blue-700 font-bold py-3 px-4 rounded-lg hover:bg-blue-200 transition-all text-sm" title="إرسال التقرير عبر واتساب">
+                                                    <WhatsAppIcon className="w-5 h-5" />
+                                                    <span className="hidden sm:inline">إرسال تقرير</span>
+                                                </button>
+                                            )}
                                             {payrollData.isPaid ? (
                                                 <span className="inline-block flex-grow text-center py-3 px-4 rounded-lg bg-green-100 text-green-800 font-bold border border-green-200">
                                                     ✅ تم دفع الراتب

@@ -8,9 +8,10 @@ interface FinancialReportPageProps {
   students: Student[]; // Should be pre-filtered for the current user
   groups: Group[];   // Should be pre-filtered for the current user
   onViewStudent: (studentId: string) => void;
+  currentUserRole?: 'director' | 'teacher' | 'supervisor';
 }
 
-const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, groups, onViewStudent }) => {
+const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, groups, onViewStudent, currentUserRole }) => {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
   const [expandedPaid, setExpandedPaid] = useState<Set<string>>(new Set());
   const [expandedUnpaid, setExpandedUnpaid] = useState<Set<string>>(new Set());
@@ -52,7 +53,7 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
   const handleIndividualWhatsAppReminder = (student: Student) => {
     const monthName = new Date(selectedMonth + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' });
     const message = `تذكير من مركز الشاطبي،\nمرحباً ولي أمر الطالب/ة: *${student.name}*.\nنود تذكيركم بأن مصروفات شهر *${monthName}* لم تسدد بعد.\n\nيرجى سرعة السداد لتجنب الإجراءات الإدارية.\nإذا كنتم قد سددتم الرسوم بالفعل، يرجى مراجعة الإدارة مع إحضار وصل الدفع.\n\nشكراً لتعاونكم.`;
-    
+
     const phone = student.phone.replace(/[^0-9]/g, '');
     if (!phone) {
       alert('لا يوجد رقم هاتف مسجل لهذا الطالب.');
@@ -82,13 +83,14 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
     onToggle: (groupId: string) => void;
     isUnpaidSection?: boolean;
     onSendWhatsApp?: (student: Student) => void;
-  }> = ({ title, studentsByGroup, expandedSet, onToggle, isUnpaidSection, onSendWhatsApp }) => (
+    currentUserRole?: 'director' | 'teacher' | 'supervisor';
+  }> = ({ title, studentsByGroup, expandedSet, onToggle, isUnpaidSection, onSendWhatsApp, currentUserRole }) => (
     <div className="bg-white rounded-xl shadow-lg p-6">
       <h2 className="text-xl font-bold text-gray-800 mb-4">{title}</h2>
       <div className="space-y-3">
         {groups
           .filter(group => studentsByGroup[group.id] && studentsByGroup[group.id].length > 0)
-          .sort((a,b) => a.name.localeCompare(b.name, 'ar'))
+          .sort((a, b) => a.name.localeCompare(b.name, 'ar'))
           .map(group => {
             const studentsInGroup = studentsByGroup[group.id] || [];
             const isExpanded = expandedSet.has(group.id);
@@ -120,17 +122,17 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
                               <UserIcon className="w-5 h-5 ml-2 text-gray-400" />
                               {student.name}
                             </button>
-                            {isUnpaidSection && onSendWhatsApp && (
-                                <button
-                                    onClick={(e) => {
-                                      e.stopPropagation();
-                                      onSendWhatsApp(student);
-                                    }}
-                                    className="p-1 text-green-500 hover:bg-green-100 rounded-full transition-colors flex-shrink-0"
-                                    title={`إرسال تذكير واتساب لولي أمر ${student.name}`}
-                                >
-                                    <WhatsAppIcon className="w-5 h-5" />
-                                </button>
+                            {isUnpaidSection && onSendWhatsApp && (currentUserRole === 'director' || currentUserRole === 'supervisor') && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  onSendWhatsApp(student);
+                                }}
+                                className="p-1 text-green-500 hover:bg-green-100 rounded-full transition-colors flex-shrink-0"
+                                title={`إرسال تذكير واتساب لولي أمر ${student.name}`}
+                              >
+                                <WhatsAppIcon className="w-5 h-5" />
+                              </button>
                             )}
                           </li>
                         ))}
@@ -194,6 +196,7 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
           onToggle={(groupId) => toggleExpansion(groupId, 'unpaid')}
           isUnpaidSection={true}
           onSendWhatsApp={handleIndividualWhatsAppReminder}
+          currentUserRole={currentUserRole}
         />
       </div>
     </main>

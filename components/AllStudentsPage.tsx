@@ -37,7 +37,7 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
 
   const filteredAndSortedStudents = useMemo(() => {
     let filtered = students
-      .filter(s => 
+      .filter(s =>
         s.name.toLowerCase().includes(searchTerm.toLowerCase())
       )
       .filter(s => {
@@ -51,8 +51,21 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
         return groupType === typeFilter;
       });
 
-    // Default sort by name, ascending
-    filtered.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    // Sort by relevance to search term, then by name
+    filtered.sort((a, b) => {
+      if (searchTerm) {
+        const searchLower = searchTerm.toLowerCase();
+        const aName = a.name.toLowerCase();
+        const bName = b.name.toLowerCase();
+
+        const aStartsWith = aName.startsWith(searchLower);
+        const bStartsWith = bName.startsWith(searchLower);
+
+        if (aStartsWith && !bStartsWith) return -1;
+        if (!aStartsWith && bStartsWith) return 1;
+      }
+      return a.name.localeCompare(b.name, 'ar');
+    });
 
     return filtered;
   }, [students, searchTerm, groups, groupFilter, typeFilter]);
@@ -66,10 +79,10 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {currentUserRole === 'director' && (
         <div className="flex flex-wrap items-center gap-2 mb-6 bg-white p-3 rounded-xl shadow-sm">
-            <button onClick={() => { onTypeFilterChange('all'); setGroupFilter('all'); }} className={getFilterButtonClass('all')}>الكل</button>
-            <button onClick={() => { onTypeFilterChange('قرآن'); setGroupFilter('all'); }} className={getFilterButtonClass('قرآن')}>قرآن</button>
-            <button onClick={() => { onTypeFilterChange('نور بيان'); setGroupFilter('all'); }} className={getFilterButtonClass('نور بيان')}>نور بيان</button>
-            <button onClick={() => { onTypeFilterChange('تلقين'); setGroupFilter('all'); }} className={getFilterButtonClass('تلقين')}>تلقين</button>
+          <button onClick={() => { onTypeFilterChange('all'); setGroupFilter('all'); }} className={getFilterButtonClass('all')}>الكل</button>
+          <button onClick={() => { onTypeFilterChange('قرآن'); setGroupFilter('all'); }} className={getFilterButtonClass('قرآن')}>قرآن</button>
+          <button onClick={() => { onTypeFilterChange('نور بيان'); setGroupFilter('all'); }} className={getFilterButtonClass('نور بيان')}>نور بيان</button>
+          <button onClick={() => { onTypeFilterChange('تلقين'); setGroupFilter('all'); }} className={getFilterButtonClass('تلقين')}>تلقين</button>
         </div>
       )}
 

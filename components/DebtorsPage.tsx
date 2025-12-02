@@ -20,7 +20,18 @@ const DebtorsPage: React.FC<DebtorsPageProps> = ({ students, groups, onPayDebt, 
                 const matchesSearch = !searchTerm || s.name.includes(searchTerm);
                 return isDebtor && matchesSearch;
             })
-            .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+            .sort((a, b) => {
+                if (searchTerm) {
+                    const searchLower = searchTerm.toLowerCase();
+                    const aName = a.name.toLowerCase();
+                    const bName = b.name.toLowerCase();
+                    const aStartsWith = aName.startsWith(searchLower);
+                    const bStartsWith = bName.startsWith(searchLower);
+                    if (aStartsWith && !bStartsWith) return -1;
+                    if (!aStartsWith && bStartsWith) return 1;
+                }
+                return a.name.localeCompare(b.name, 'ar');
+            });
     }, [students, searchTerm]);
 
     const getTotalDebt = (student: Student): number => {

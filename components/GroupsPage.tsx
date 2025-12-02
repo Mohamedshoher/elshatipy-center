@@ -50,7 +50,17 @@ const GroupsPage: React.FC<GroupsPageProps> = (props) => {
         const typeMatch = typeFilter === 'all' || groupType === typeFilter;
         return nameMatch && typeMatch;
       })
-      .sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+      .sort((a, b) => {
+        if (searchTerm) {
+          const aName = a.name.toLowerCase();
+          const bName = b.name.toLowerCase();
+          const aStartsWith = aName.startsWith(searchTermLower);
+          const bStartsWith = bName.startsWith(searchTermLower);
+          if (aStartsWith && !bStartsWith) return -1;
+          if (!aStartsWith && bStartsWith) return 1;
+        }
+        return a.name.localeCompare(b.name, 'ar');
+      });
   }, [groups, searchTerm, typeFilter]);
 
   const getFilterButtonClass = (filter: GroupType) => {

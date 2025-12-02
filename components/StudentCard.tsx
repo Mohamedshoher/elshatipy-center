@@ -80,9 +80,11 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
             </div>
 
             <div className="flex items-center gap-x-2">
-              <a href={`https://wa.me/${student.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 text-green-500 hover:text-green-600 transition-colors" aria-label={`واتساب ${student.name}`}>
-                <WhatsAppIcon className="w-5 h-5" />
-              </a>
+              {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
+                <a href={`https://wa.me/${student.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 text-green-500 hover:text-green-600 transition-colors" aria-label={`واتساب ${student.name}`}>
+                  <WhatsAppIcon className="w-5 h-5" />
+                </a>
+              )}
               <button onClick={(e) => { e.stopPropagation(); onViewDetails(student, 'fees'); }} className="p-1 text-gray-400 hover:text-yellow-500 transition-colors" aria-label={`مصروفات ${student.name}`}>
                 <CurrencyDollarIcon className="w-5 h-5" />
               </button>

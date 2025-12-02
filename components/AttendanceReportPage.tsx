@@ -10,9 +10,10 @@ interface AttendanceReportPageProps {
   students: Student[];
   groups: Group[];
   onViewStudent: (studentId: string) => void;
+  currentUserRole?: 'director' | 'teacher' | 'supervisor';
 }
 
-const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, groups, onViewStudent }) => {
+const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, groups, onViewStudent, currentUserRole }) => {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
   const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
   const [selectedDailyDate, setSelectedDailyDate] = useState(() => new Date().toISOString().split('T')[0]);
@@ -38,7 +39,7 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
       } else {
         // Only consider them absent if the selected date is on or after their joining date
         if (new Date(selectedDailyDate) >= new Date(student.joiningDate)) {
-           absentStudents.push(student);
+          absentStudents.push(student);
         }
       }
     });
@@ -63,7 +64,7 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
     setIsAbsentModalOpen(false);
     onViewStudent(studentId);
   };
-  
+
   const handleWhatsAppWarning = (student: Student, absentDays: number) => {
     const message = `مرحباً ولي أمر الطالب/ة: *${student.name}*،\n\nنود إعلامكم بتجاوز الطالب/ة الحد المسموح به من الغياب خلال هذا الشهر، حيث بلغ عدد أيام غيابه/ا *${absentDays}* يوم.\n\nيرجى العلم بأنه في حال استمرار الغياب قد يؤدي ذلك إلى فصل الطالب/ة من المركز.\n\nمع تحيات إدارة المركز.`;
     const phone = student.phone.replace(/[^0-9]/g, '');
@@ -77,14 +78,14 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
     <>
       <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
         <div className="space-y-8">
-          
+
           {/* Section 1: Daily Report */}
           <div className="bg-white rounded-xl shadow-lg p-6">
             <h2 className="text-xl font-bold text-gray-800 mb-4">التقرير اليومي</h2>
-            
+
             {/* Date selection for daily report */}
             <div className="flex flex-col sm:flex-row gap-2 mb-4">
-              <input 
+              <input
                 type="date"
                 value={selectedDailyDate}
                 onChange={(e) => setSelectedDailyDate(e.target.value)}
@@ -102,7 +103,7 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
                 <p className="text-3xl font-bold text-green-600">{dailyReport.present}</p>
                 <p className="text-sm text-green-800 font-semibold">حاضر</p>
               </div>
-              <button 
+              <button
                 onClick={() => dailyReport.absent > 0 && setIsAbsentModalOpen(true)}
                 className={`bg-red-100 p-4 rounded-lg text-center transition-all ${dailyReport.absent > 0 ? 'cursor-pointer hover:bg-red-200' : 'cursor-default'}`}
                 disabled={dailyReport.absent === 0}
@@ -115,15 +116,15 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
           </div>
 
           <div className="w-full sm:w-auto max-w-xs ml-auto">
-              <label htmlFor="month-filter" className="sr-only">اختر الشهر</label>
-              <input
-                type="month"
-                id="month-filter"
-                value={selectedMonth}
-                onChange={e => setSelectedMonth(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-              />
-           </div>
+            <label htmlFor="month-filter" className="sr-only">اختر الشهر</label>
+            <input
+              type="month"
+              id="month-filter"
+              value={selectedMonth}
+              onChange={e => setSelectedMonth(e.target.value)}
+              className="w-full px-4 py-2 border rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+            />
+          </div>
 
           {/* Section 2: Most Absent */}
           <div className="bg-white rounded-xl shadow-lg p-6">
@@ -143,28 +144,30 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
               </div>
             </div>
 
-             <div className="space-y-2">
+            <div className="space-y-2">
               {monthlyReport.mostAbsent.map((student, index) => (
                 <div key={student.student.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
                   <div className="flex items-center">
-                     <span className="font-bold text-gray-500 w-6 text-center">{index + 1}.</span>
-                     <UserIcon className="w-5 h-5 mx-2 text-gray-400" />
-                     <div className="flex flex-col">
-                        <button onClick={() => onViewStudent(student.student.id)} className="font-semibold text-gray-800 hover:text-blue-600 transition-colors text-right">
-                            {student.student.name}
-                        </button>
-                        <span className="text-xs text-gray-400">{groups.find(g => g.id === student.student.groupId)?.name}</span>
-                     </div>
+                    <span className="font-bold text-gray-500 w-6 text-center">{index + 1}.</span>
+                    <UserIcon className="w-5 h-5 mx-2 text-gray-400" />
+                    <div className="flex flex-col">
+                      <button onClick={() => onViewStudent(student.student.id)} className="font-semibold text-gray-800 hover:text-blue-600 transition-colors text-right">
+                        {student.student.name}
+                      </button>
+                      <span className="text-xs text-gray-400">{groups.find(g => g.id === student.student.groupId)?.name}</span>
+                    </div>
                   </div>
                   <div className="flex items-center gap-3">
-                    <button onClick={() => handleWhatsAppWarning(student.student, student.absentDays)} className="text-green-500 hover:text-green-600 transition-colors p-1" title="إرسال تنبيه لولي الأمر">
-                      <WhatsAppIcon className="w-5 h-5" />
-                    </button>
+                    {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
+                      <button onClick={() => handleWhatsAppWarning(student.student, student.absentDays)} className="text-green-500 hover:text-green-600 transition-colors p-1" title="إرسال تنبيه لولي الأمر">
+                        <WhatsAppIcon className="w-5 h-5" />
+                      </button>
+                    )}
                     <span className="font-bold text-red-600 bg-red-100 px-2 py-1 rounded-full text-sm">{student.absentDays} يوم</span>
                   </div>
                 </div>
               ))}
-               {monthlyReport.mostAbsent.length === 0 && <p className="text-center text-gray-400 py-4">{`لا يوجد طلاب لديهم غياب ${absentDaysFilter} يوم أو أكثر هذا الشهر.`}</p>}
+              {monthlyReport.mostAbsent.length === 0 && <p className="text-center text-gray-400 py-4">{`لا يوجد طلاب لديهم غياب ${absentDaysFilter} يوم أو أكثر هذا الشهر.`}</p>}
             </div>
           </div>
         </div>
@@ -175,6 +178,7 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
         absentStudents={dailyReport.absentStudents}
         groups={groups}
         onStudentClick={handleStudentClick}
+        currentUserRole={currentUserRole}
       />
     </>
   );

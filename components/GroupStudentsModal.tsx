@@ -59,13 +59,10 @@ const GroupStudentsModal: React.FC<GroupStudentsModalProps> = ({
                                 student={student}
                                 groupName={group.name}
                                 onOpenFeeModal={onOpenFeeModal}
-                                onAddTest={onAddTest}
-                                onDeleteTest={onDeleteTest}
-                                onAddNote={onAddNote}
                                 onEdit={onEdit}
                                 onToggleAttendance={onToggleAttendance}
                                 onArchive={onArchive}
-                                currentUserRole={currentUserRole}
+                                currentUserRole={currentUserRole || 'teacher'} // Default to teacher if undefined to be safe, though it should be passed
                                 onViewDetails={onViewDetails}
                             />
                         ))

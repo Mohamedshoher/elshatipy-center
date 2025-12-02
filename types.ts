@@ -30,6 +30,8 @@ export interface FeePayment {
   paymentDate?: string;
   amountPaid?: number;
   receiptNumber?: string;
+  collectedBy?: string; // Teacher ID
+  collectedByName?: string; // Teacher Name
 }
 
 export enum TestType {

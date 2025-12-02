@@ -9,9 +9,10 @@ interface AbsentStudentsModalProps {
   absentStudents: Student[];
   groups: Group[];
   onStudentClick: (studentId: string) => void;
+  currentUserRole?: 'director' | 'teacher' | 'supervisor';
 }
 
-const AbsentStudentsModal: React.FC<AbsentStudentsModalProps> = ({ isOpen, onClose, absentStudents, groups, onStudentClick }) => {
+const AbsentStudentsModal: React.FC<AbsentStudentsModalProps> = ({ isOpen, onClose, absentStudents, groups, onStudentClick, currentUserRole }) => {
   const [expandedGroupId, setExpandedGroupId] = useState<string | null>(null);
 
   const handleSendWhatsAppMessage = (student: Student, e: React.MouseEvent) => {
@@ -94,13 +95,15 @@ const AbsentStudentsModal: React.FC<AbsentStudentsModalProps> = ({ isOpen, onClo
                           <UserIcon className="w-5 h-5 ml-2" />
                           {student.name}
                         </button>
-                        <button
-                          onClick={(e) => handleSendWhatsAppMessage(student, e)}
-                          className="flex items-center justify-center bg-green-500 hover:bg-green-600 text-white p-2 rounded-full shadow-sm transition-all"
-                          title="إرسال رسالة لولي الأمر"
-                        >
-                          <WhatsAppIcon className="w-5 h-5" />
-                        </button>
+                        {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
+                          <button
+                            onClick={(e) => handleSendWhatsAppMessage(student, e)}
+                            className="flex items-center justify-center bg-green-500 hover:bg-green-600 text-white p-2 rounded-full shadow-sm transition-all"
+                            title="إرسال رسالة لولي الأمر"
+                          >
+                            <WhatsAppIcon className="w-5 h-5" />
+                          </button>
+                        )}
                       </li>
                     ))}
                   </ul>

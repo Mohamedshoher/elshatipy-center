@@ -11,6 +11,7 @@ import TrashIcon from './icons/TrashIcon';
 import WhatsAppIcon from './icons/WhatsAppIcon';
 import XIcon from './icons/XIcon';
 import CheckCircleIcon from './icons/CheckCircleIcon';
+import CheckIcon from './icons/CheckIcon';
 
 interface StudentDetailsModalProps {
     isOpen: boolean;
@@ -68,12 +69,12 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
     const [editingPlanData, setEditingPlanData] = useState<ProgressPlan>({});
 
     useEffect(() => {
-        if (isOpen && student) {
+        if (isOpen) {
             setActiveTab(initialTab);
             setNewPlan({ [TestTypeEnum.NEW]: '', [TestTypeEnum.RECENT_PAST]: '', [TestTypeEnum.DISTANT_PAST]: '' });
             setEditingPlanId(null);
         }
-    }, [isOpen, student, initialTab]);
+    }, [isOpen, initialTab]);
 
     const monthsSinceJoining = useMemo(() => {
         if (!student) return [];
@@ -304,12 +305,17 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
         window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
     };
 
-    const handleAddNewPlan = () => {
+    const handleAddNewPlan = (type?: TestType) => {
         if (!student || !currentUser) return;
         const authorName = currentUser.role === 'director' ? 'المدير' : currentUser.name;
         onSaveProgressPlan(student.id, newPlan, authorName);
-        setNewPlan({ [TestTypeEnum.NEW]: '', [TestTypeEnum.RECENT_PAST]: '', [TestTypeEnum.DISTANT_PAST]: '' });
-        alert('تمت إضافة الخطة الجديدة للسجل بنجاح!');
+
+        if (type) {
+            setNewPlan(prev => ({ ...prev, [type]: '' }));
+        } else {
+            setNewPlan({ [TestTypeEnum.NEW]: '', [TestTypeEnum.RECENT_PAST]: '', [TestTypeEnum.DISTANT_PAST]: '' });
+            alert('تمت إضافة الخطة الجديدة للسجل بنجاح!');
+        }
     };
 
     const handleWhatsAppSharePlan = (plan: ProgressPlan) => {
@@ -382,9 +388,9 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
                             <CurrencyDollarIcon className="w-5 h-5" />
                             <span className="hidden sm:inline">المصروفات</span>
                         </button>
-                        <button onClick={() => setActiveTab('notes')} className={getTabClass('notes')} title="الملحوظات">
+                        <button onClick={() => setActiveTab('notes')} className={getTabClass('notes')} title="الملاحظات">
                             <EditIcon className="w-5 h-5" />
-                            <span className="hidden sm:inline">الملحوظات</span>
+                            <span className="hidden sm:inline">الملاحظات</span>
                         </button>
                         <button onClick={() => setActiveTab('reports')} className={getTabClass('reports')} title="التقرير الشامل">
                             <DocumentReportIcon className="w-5 h-5" />
@@ -428,23 +434,40 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
                                     <div className="space-y-3">
                                         <div>
                                             <label className="block text-sm font-medium text-gray-600 mb-1">الجديد</label>
-                                            <textarea value={newPlan[TestTypeEnum.NEW] || ''} onChange={(e) => setNewPlan(p => ({ ...p, [TestTypeEnum.NEW]: e.target.value }))} rows={2} className="w-full px-3 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="مثال: سورة البقرة من آية 1 إلى 20" />
+                                            <div className="flex gap-2 items-start">
+                                                <textarea value={newPlan[TestTypeEnum.NEW] || ''} onChange={(e) => setNewPlan(p => ({ ...p, [TestTypeEnum.NEW]: e.target.value }))} rows={2} className="w-full px-3 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="مثال: سورة البقرة من آية 1 إلى 20" />
+                                                <button onClick={() => handleAddNewPlan(TestTypeEnum.NEW)} className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 flex-shrink-0 mt-1" title="حفظ الجديد فقط">
+                                                    <CheckIcon className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-600 mb-1">الماضي القريب</label>
-                                            <textarea value={newPlan[TestTypeEnum.RECENT_PAST] || ''} onChange={(e) => setNewPlan(p => ({ ...p, [TestTypeEnum.RECENT_PAST]: e.target.value }))} rows={2} className="w-full px-3 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="مثال: مراجعة آخر 5 أوجه" />
+                                            <div className="flex gap-2 items-start">
+                                                <textarea value={newPlan[TestTypeEnum.RECENT_PAST] || ''} onChange={(e) => setNewPlan(p => ({ ...p, [TestTypeEnum.RECENT_PAST]: e.target.value }))} rows={2} className="w-full px-3 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="مثال: مراجعة آخر 5 أوجه" />
+                                                <button onClick={() => handleAddNewPlan(TestTypeEnum.RECENT_PAST)} className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 flex-shrink-0 mt-1" title="حفظ الماضي القريب فقط">
+                                                    <CheckIcon className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </div>
                                         <div>
                                             <label className="block text-sm font-medium text-gray-600 mb-1">الماضي البعيد</label>
-                                            <textarea value={newPlan[TestTypeEnum.DISTANT_PAST] || ''} onChange={(e) => setNewPlan(p => ({ ...p, [TestTypeEnum.DISTANT_PAST]: e.target.value }))} rows={2} className="w-full px-3 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="مثال: مراجعة من سورة الناس إلى النبأ" />
+                                            <div className="flex gap-2 items-start">
+                                                <textarea value={newPlan[TestTypeEnum.DISTANT_PAST] || ''} onChange={(e) => setNewPlan(p => ({ ...p, [TestTypeEnum.DISTANT_PAST]: e.target.value }))} rows={2} className="w-full px-3 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-1 focus:ring-blue-500" placeholder="مثال: مراجعة من سورة الناس إلى النبأ" />
+                                                <button onClick={() => handleAddNewPlan(TestTypeEnum.DISTANT_PAST)} className="p-2 bg-blue-100 text-blue-600 rounded-lg hover:bg-blue-200 flex-shrink-0 mt-1" title="حفظ الماضي البعيد فقط">
+                                                    <CheckIcon className="w-5 h-5" />
+                                                </button>
+                                            </div>
                                         </div>
                                     </div>
                                     <div className="mt-4 flex justify-between items-center">
-                                        <button onClick={() => handleWhatsAppSharePlan(newPlan)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-green-700 bg-green-100 hover:bg-green-200 transition-colors font-semibold">
-                                            <WhatsAppIcon className="w-5 h-5" />
-                                            <span>مشاركة الخطة</span>
-                                        </button>
-                                        <button onClick={handleAddNewPlan} className="px-6 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors font-semibold">إضافة للسجل</button>
+                                        {(currentUser?.role === 'director' || currentUser?.role === 'supervisor') && (
+                                            <button onClick={() => handleWhatsAppSharePlan(newPlan)} className="flex items-center gap-2 px-4 py-2 rounded-lg text-green-700 bg-green-100 hover:bg-green-200 transition-colors font-semibold">
+                                                <WhatsAppIcon className="w-5 h-5" />
+                                                <span>مشاركة الخطة</span>
+                                            </button>
+                                        )}
+                                        <button onClick={() => handleAddNewPlan()} className="px-6 py-2 rounded-lg text-white bg-blue-600 hover:bg-blue-700 transition-colors font-semibold">إضافة الكل للسجل</button>
                                     </div>
                                 </div>
 
@@ -460,18 +483,20 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
                                                                 {new Date(record.date).toLocaleDateString('ar-EG')} - بواسطة: <span className="font-semibold">{record.authorName}</span>
                                                             </p>
                                                             <div className="mt-2 text-sm space-y-1">
-                                                                <p><span className="font-semibold">الجديد:</span> {record.plan[TestTypeEnum.NEW] || 'لم يحدد'}</p>
-                                                                <p><span className="font-semibold">القريب:</span> {record.plan[TestTypeEnum.RECENT_PAST] || 'لم يحدد'}</p>
-                                                                <p><span className="font-semibold">البعيد:</span> {record.plan[TestTypeEnum.DISTANT_PAST] || 'لم يحدد'}</p>
+                                                                {record.plan[TestTypeEnum.NEW] && <p><span className="font-semibold">الجديد:</span> {record.plan[TestTypeEnum.NEW]}</p>}
+                                                                {record.plan[TestTypeEnum.RECENT_PAST] && <p><span className="font-semibold">القريب:</span> {record.plan[TestTypeEnum.RECENT_PAST]}</p>}
+                                                                {record.plan[TestTypeEnum.DISTANT_PAST] && <p><span className="font-semibold">البعيد:</span> {record.plan[TestTypeEnum.DISTANT_PAST]}</p>}
                                                             </div>
                                                         </div>
                                                         <div className="flex flex-col items-center gap-2 flex-shrink-0 ml-2">
                                                             <button onClick={() => onTogglePlanCompletion(student.id, record.id)} title={record.isCompleted ? 'إلغاء الإكمال' : 'وضع علامة كمكتمل'}>
                                                                 <CheckCircleIcon className={`w-6 h-6 ${record.isCompleted ? 'text-green-500' : 'text-gray-300 hover:text-green-400'}`} />
                                                             </button>
-                                                            <button onClick={() => onDeletePlanRecord(student.id, record.id)} title="حذف الخطة من السجل">
-                                                                <TrashIcon className="w-5 h-5 text-gray-400 hover:text-red-500" />
-                                                            </button>
+                                                            {(currentUser?.role === 'director' || currentUser?.role === 'supervisor') && (
+                                                                <button onClick={() => onDeletePlanRecord(student.id, record.id)} title="حذف الخطة من السجل">
+                                                                    <TrashIcon className="w-5 h-5 text-gray-400 hover:text-red-500" />
+                                                                </button>
+                                                            )}
                                                         </div>
                                                     </div>
                                                 </div>
@@ -504,6 +529,52 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
                                             </div>
                                         );
                                     })}
+                                </div>
+
+                                <div className="mt-6 border-t pt-4">
+                                    <h3 className="text-lg font-bold text-gray-800 mb-4">سجل المدفوعات التفصيلي</h3>
+                                    <div className="overflow-x-auto">
+                                        <table className="min-w-full divide-y divide-gray-200">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">الشهر</th>
+                                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">تاريخ الدفع</th>
+                                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المبلغ</th>
+                                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">رقم الوصل</th>
+                                                    <th className="px-6 py-3 text-right text-xs font-medium text-gray-500 uppercase tracking-wider">المحصل</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="bg-white divide-y divide-gray-200">
+                                                {student.fees.filter(f => f.paid).length > 0 ? (
+                                                    student.fees.filter(f => f.paid).sort((a, b) => (b.paymentDate || '').localeCompare(a.paymentDate || '')).map((fee, index) => (
+                                                        <tr key={index}>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-medium">
+                                                                {new Date(fee.month + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' })}
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                {fee.paymentDate ? new Date(fee.paymentDate).toLocaleDateString('ar-EG') : '-'}
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold">
+                                                                {fee.amountPaid || fee.amount} ج.م
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                {fee.receiptNumber || '-'}
+                                                            </td>
+                                                            <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                                {fee.collectedByName || '-'}
+                                                            </td>
+                                                        </tr>
+                                                    ))
+                                                ) : (
+                                                    <tr>
+                                                        <td colSpan={5} className="px-6 py-4 text-center text-gray-500">
+                                                            لا توجد مدفوعات مسجلة.
+                                                        </td>
+                                                    </tr>
+                                                )}
+                                            </tbody>
+                                        </table>
+                                    </div>
                                 </div>
                             </div>
                         )}
@@ -568,6 +639,8 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
                                 </div>
                             </div>
                         )}
+
+
                         {activeTab === 'notes' && (
                             <div>
                                 <h4 className="font-bold text-gray-700 mb-4">إضافة ملحوظة جديدة</h4>
@@ -615,14 +688,16 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
                                 <div className="bg-gray-50 rounded-lg p-4 shadow-sm border border-gray-200">
                                     <div className="flex justify-between items-center mb-4">
                                         <h3 className="text-lg font-bold text-gray-800">التقرير الشامل</h3>
-                                        <button
-                                            onClick={(e) => { e.stopPropagation(); handleComprehensiveWhatsAppShare(); }}
-                                            className="flex items-center gap-2 bg-green-500 text-white font-bold py-2 px-3 rounded-lg shadow hover:bg-green-600 transition-all text-sm"
-                                            title="إرسال التقرير الشامل عبر واتساب"
-                                        >
-                                            <WhatsAppIcon className="w-5 h-5" />
-                                            <span className="hidden sm:inline">إرسال لولي الأمر</span>
-                                        </button>
+                                        {(currentUser?.role === 'director' || currentUser?.role === 'supervisor') && (
+                                            <button
+                                                onClick={(e) => { e.stopPropagation(); handleComprehensiveWhatsAppShare(); }}
+                                                className="flex items-center gap-2 bg-green-500 text-white font-bold py-2 px-3 rounded-lg shadow hover:bg-green-600 transition-all text-sm"
+                                                title="إرسال التقرير الشامل عبر واتساب"
+                                            >
+                                                <WhatsAppIcon className="w-5 h-5" />
+                                                <span className="hidden sm:inline">إرسال لولي الأمر</span>
+                                            </button>
+                                        )}
                                     </div>
 
                                     <div className="border-t pt-4">
@@ -659,8 +734,8 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
                         )}
                     </div>
                 </div>
-            </div>
-        </div>
+            </div >
+        </div >
     );
 };
 
