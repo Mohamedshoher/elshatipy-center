@@ -9,6 +9,8 @@ import ClipboardListIcon from './icons/ClipboardListIcon';
 import CurrencyDollarIcon from './icons/CurrencyDollarIcon';
 import ArchiveIcon from './icons/ArchiveIcon';
 import TrashIcon from './icons/TrashIcon';
+import CheckCircleIcon from './icons/CheckCircleIcon';
+import { TestType as TestTypeEnum, TestGrade as TestGradeEnum } from '../types';
 
 interface StudentCardProps {
   student: Student;
@@ -20,9 +22,10 @@ interface StudentCardProps {
   currentUserRole: 'director' | 'teacher' | 'supervisor';
   onViewDetails: (student: Student, tab?: 'fees' | 'tests' | 'attendanceLog') => void;
   onDeletePermanently?: (studentId: string) => void;
+  onMarkWeeklyReportSent?: (studentId: string) => void;
 }
 
-const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, onToggleAttendance, onArchive, currentUserRole, onViewDetails, onDeletePermanently }) => {
+const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, onToggleAttendance, onArchive, currentUserRole, onViewDetails, onDeletePermanently, onMarkWeeklyReportSent }) => {
   const today = new Date().toISOString().split('T')[0];
   const todayAttendance = student.attendance.find(a => a.date === today);
 
@@ -81,9 +84,79 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
 
             <div className="flex items-center gap-x-2">
               {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
-                <a href={`https://wa.me/${student.phone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" onClick={(e) => e.stopPropagation()} className="p-1 text-green-500 hover:text-green-600 transition-colors" aria-label={`واتساب ${student.name}`}>
-                  <WhatsAppIcon className="w-5 h-5" />
-                </a>
+                (() => {
+                  const now = new Date();
+                  const day = now.getDay();
+                  const dayIndex = (day + 1) % 7;
+                  const startOfWeek = new Date(now);
+                  startOfWeek.setDate(now.getDate() - dayIndex);
+                  startOfWeek.setHours(0, 0, 0, 0);
+
+                  const isSent = student.lastWeeklyReportDate && new Date(student.lastWeeklyReportDate) >= startOfWeek;
+
+                  const handleWhatsAppClick = (e: React.MouseEvent) => {
+                    e.stopPropagation();
+                    e.preventDefault();
+
+                    if (isSent) return;
+
+                    // Calculate Stats
+                    const endOfWeek = new Date(startOfWeek);
+                    endOfWeek.setDate(startOfWeek.getDate() + 6);
+                    endOfWeek.setHours(23, 59, 59, 999);
+
+                    const filterFn = (dateStr: string) => {
+                      const d = new Date(dateStr);
+                      return d >= startOfWeek && d <= endOfWeek;
+                    };
+
+                    const attendanceRecords = (student.attendance || []).filter(a => filterFn(a.date));
+                    const present = attendanceRecords.filter(a => a.status === AttendanceStatusEnum.PRESENT).length;
+                    const absent = attendanceRecords.filter(a => a.status === AttendanceStatusEnum.ABSENT).length;
+
+                    const testsInPeriod = (student.tests || []).filter(test => filterFn(test.date));
+
+                    // Construct Message
+                    let message = `مرحباً ولي أمر الطالب/ة: *${student.name}*\n`;
+                    message += `هذا هو التقرير الأسبوعي من مركز الشاطبي:\n\n`;
+                    message += `*📝 الحضور والغياب:*\n`;
+                    message += `  - أيام الحضور: ${present}\n`;
+                    message += `  - أيام الغياب: ${absent}\n\n`;
+
+                    message += `*📖 الاختبارات:*\n`;
+                    if (testsInPeriod.length > 0) {
+                      const latestNew = testsInPeriod.find(t => t.type === TestTypeEnum.NEW);
+                      const latestRecent = testsInPeriod.find(t => t.type === TestTypeEnum.RECENT_PAST);
+                      const latestDistant = testsInPeriod.find(t => t.type === TestTypeEnum.DISTANT_PAST);
+
+                      if (latestNew) message += `  - الجديد: ${latestNew.suraName}\n`;
+                      if (latestRecent) message += `  - الماضي القريب: ${latestRecent.suraName}\n`;
+                      if (latestDistant) message += `  - الماضي البعيد: ${latestDistant.suraName}\n`;
+                    } else {
+                      message += `  - لم تسجل اختبارات هذا الأسبوع.\n`;
+                    }
+                    message += `\nمع تحيات إدارة المركز.`;
+
+                    const phone = student.phone.replace(/[^0-9]/g, '');
+                    const encodedMessage = encodeURIComponent(message);
+                    window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
+
+                    if (onMarkWeeklyReportSent) {
+                      onMarkWeeklyReportSent(student.id);
+                    }
+                  };
+
+                  return (
+                    <button
+                      onClick={handleWhatsAppClick}
+                      className={`p-1 transition-colors ${isSent ? 'text-green-600 cursor-default' : 'text-green-500 hover:text-green-600'}`}
+                      title={isSent ? "تم إرسال التقرير الأسبوعي" : "إرسال التقرير الأسبوعي"}
+                      disabled={!!isSent}
+                    >
+                      {isSent ? <CheckCircleIcon className="w-5 h-5" /> : <WhatsAppIcon className="w-5 h-5" />}
+                    </button>
+                  );
+                })()
               )}
               <button onClick={(e) => { e.stopPropagation(); onViewDetails(student, 'fees'); }} className="p-1 text-gray-400 hover:text-yellow-500 transition-colors" aria-label={`مصروفات ${student.name}`}>
                 <CurrencyDollarIcon className="w-5 h-5" />

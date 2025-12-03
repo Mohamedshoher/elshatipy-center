@@ -17,6 +17,7 @@ interface GroupStudentsModalProps {
     onArchive: (studentId: string) => void;
     currentUserRole?: 'director' | 'teacher' | 'supervisor';
     onViewDetails: (student: Student) => void;
+    onMarkWeeklyReportSent?: (studentId: string) => void;
 }
 
 const GroupStudentsModal: React.FC<GroupStudentsModalProps> = ({
@@ -32,7 +33,8 @@ const GroupStudentsModal: React.FC<GroupStudentsModalProps> = ({
     onToggleAttendance,
     onArchive,
     currentUserRole,
-    onViewDetails
+    onViewDetails,
+    onMarkWeeklyReportSent
 }) => {
     if (!isOpen || !group) return null;
 
@@ -64,6 +66,7 @@ const GroupStudentsModal: React.FC<GroupStudentsModalProps> = ({
                                 onArchive={onArchive}
                                 currentUserRole={currentUserRole || 'teacher'} // Default to teacher if undefined to be safe, though it should be passed
                                 onViewDetails={onViewDetails}
+                                onMarkWeeklyReportSent={onMarkWeeklyReportSent}
                             />
                         ))
                     ) : (

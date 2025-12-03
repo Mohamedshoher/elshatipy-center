@@ -881,6 +881,15 @@ const App: React.FC = () => {
         }
     }, []);
 
+    const handleMarkWeeklyReportSent = useCallback(async (studentId: string) => {
+        try {
+            const studentRef = doc(db, 'students', studentId);
+            await updateDoc(studentRef, { lastWeeklyReportDate: new Date().toISOString() });
+        } catch (error) {
+            console.error("Error marking weekly report as sent:", error);
+        }
+    }, []);
+
     // ... (Archive Handlers - Same as before) ...
     const handleArchiveStudent = (studentId: string) => {
         const student = students.find(s => s.id === studentId);
@@ -1870,9 +1879,10 @@ const App: React.FC = () => {
                                 onViewDetails={handleOpenStudentDetails}
                                 typeFilter={studentTypeFilter}
                                 onTypeFilterChange={setStudentTypeFilter}
+                                onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
                             />;
                         case 'groups':
-                            return <GroupsPage students={students} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="supervisor" onViewDetails={handleOpenStudentDetails} />;
+                            return <GroupsPage students={students} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="supervisor" onViewDetails={handleOpenStudentDetails} onMarkWeeklyReportSent={handleMarkWeeklyReportSent} />;
                         case 'attendance_report':
                             return <AttendanceReportPage students={students} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />;
                         case 'tests_report':
@@ -1954,9 +1964,10 @@ const App: React.FC = () => {
                                 onViewDetails={handleOpenStudentDetails}
                                 typeFilter={studentTypeFilter}
                                 onTypeFilterChange={setStudentTypeFilter}
+                                onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
                             />;
                         case 'groups':
-                            return <GroupsPage students={activeStudents} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="director" onViewDetails={handleOpenStudentDetails} />;
+                            return <GroupsPage students={activeStudents} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="director" onViewDetails={handleOpenStudentDetails} onMarkWeeklyReportSent={handleMarkWeeklyReportSent} />;
                         case 'attendance_report':
                             return <AttendanceReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />;
                         case 'tests_report':

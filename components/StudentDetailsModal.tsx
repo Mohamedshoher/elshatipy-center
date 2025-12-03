@@ -119,6 +119,8 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
             label: new Date(m + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' })
         }));
         return [
+            { value: 'current_week', label: 'الأسبوع الحالي' },
+            { value: 'last_week', label: 'الأسبوع الماضي' },
             ...monthOptions,
             { value: 'last_3_months', label: 'آخر 3 أشهر' },
             { value: 'all_time', label: 'منذ البداية' },
@@ -146,15 +148,49 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
 
     const comprehensiveReportData = useMemo(() => {
         if (!student) return null;
-        const attendanceRecords = student.attendance.filter(a => reportMonths.some(m => a.date.startsWith(m)));
+
+        let filterFn: (date: string) => boolean;
+
+        if (reportPeriod === 'current_week' || reportPeriod === 'last_week') {
+            const now = new Date();
+            const day = now.getDay(); // 0 (Sun) to 6 (Sat)
+            const dayIndex = (day + 1) % 7; // Make Saturday 0
+
+            const start = new Date(now);
+            start.setDate(now.getDate() - dayIndex);
+            start.setHours(0, 0, 0, 0);
+
+            if (reportPeriod === 'last_week') {
+                start.setDate(start.getDate() - 7);
+            }
+
+            const end = new Date(start);
+            end.setDate(start.getDate() + 6);
+            end.setHours(23, 59, 59, 999);
+
+            filterFn = (dateStr: string) => {
+                const d = new Date(dateStr);
+                return d >= start && d <= end;
+            };
+        } else {
+            filterFn = (dateStr: string) => reportMonths.some(m => dateStr.startsWith(m));
+        }
+
+        const attendanceRecords = student.attendance.filter(a => filterFn(a.date));
         const present = attendanceRecords.filter(a => a.status === AttendanceStatusEnum.PRESENT).length;
         const absent = attendanceRecords.filter(a => a.status === AttendanceStatusEnum.ABSENT).length;
 
-        const relevantMonthsForFees = reportMonths.filter(m => new Date(m) >= new Date(student.joiningDate.substring(0, 7)));
+        // Fees logic: For weekly reports, we probably still want to show if the current month is paid?
+        // Or maybe just hide fees for weekly reports?
+        // Let's show pending fees for the month(s) covering the week.
+        const relevantMonthsForFees = reportPeriod.includes('week')
+            ? [new Date().toISOString().substring(0, 7)] // Just check current month for simplicity in weekly view
+            : reportMonths.filter(m => new Date(m) >= new Date(student.joiningDate.substring(0, 7)));
+
         const pendingFeeMonths = relevantMonthsForFees.filter(m => !student.fees.some(f => f.month === m && f.paid));
 
         const testsInPeriod = student.tests
-            .filter(test => reportMonths.some(m => test.date.startsWith(m)))
+            .filter(test => filterFn(test.date))
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
 
         const latestTest = testsInPeriod[0] || null;
@@ -176,7 +212,7 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
             latestRecentPastTest,
             latestDistantPastTest
         };
-    }, [student, reportMonths]);
+    }, [student, reportMonths, reportPeriod]);
 
     const getUniqueMonths = (records: { date: string }[]) => {
         if (!records) return [];
@@ -264,15 +300,17 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
         message += `  - أيام الحضور: ${comprehensiveReportData.present}\n`;
         message += `  - أيام الغياب: ${comprehensiveReportData.absent}\n\n`;
 
-        const relevantMonthsForFees = reportMonths.filter(m => new Date(m) >= new Date(student.joiningDate.substring(0, 7)));
-        const pendingFeeMonths = relevantMonthsForFees.filter(m => !student.fees.some(f => f.month === m && f.paid));
+        if (!reportPeriod.includes('week')) {
+            const relevantMonthsForFees = reportMonths.filter(m => new Date(m) >= new Date(student.joiningDate.substring(0, 7)));
+            const pendingFeeMonths = relevantMonthsForFees.filter(m => !student.fees.some(f => f.month === m && f.paid));
 
-        message += `*💵 المصروفات:*\n`;
-        if (pendingFeeMonths.length > 0) {
-            const monthNames = pendingFeeMonths.map(m => new Date(m + '-02').toLocaleString('ar-EG', { month: 'long' })).join(', ');
-            message += `  - يرجى ملاحظة أن مصروفات الشهور التالية لم تسدد بعد: *${monthNames}*.\n\n`;
-        } else {
-            message += `  - جميع مصروفات الفترة المحددة مسددة. شكراً لالتزامكم.\n\n`;
+            message += `*💵 المصروفات:*\n`;
+            if (pendingFeeMonths.length > 0) {
+                const monthNames = pendingFeeMonths.map(m => new Date(m + '-02').toLocaleString('ar-EG', { month: 'long' })).join(', ');
+                message += `  - يرجى ملاحظة أن مصروفات الشهور التالية لم تسدد بعد: *${monthNames}*.\n\n`;
+            } else {
+                message += `  - جميع مصروفات الفترة المحددة مسددة. شكراً لالتزامكم.\n\n`;
+            }
         }
 
         message += `*📖 الاختبارات:*\n`;

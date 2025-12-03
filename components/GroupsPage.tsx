@@ -20,6 +20,7 @@ interface GroupsPageProps {
   onArchive: (studentId: string) => void;
   currentUserRole: 'director' | 'teacher' | 'supervisor';
   onViewDetails: (student: Student, tab?: 'fees' | 'tests' | 'attendanceLog') => void;
+  onMarkWeeklyReportSent?: (studentId: string) => void;
 }
 
 type GroupType = 'all' | 'قرآن' | 'نور بيان' | 'تلقين';
@@ -141,6 +142,7 @@ const GroupsPage: React.FC<GroupsPageProps> = (props) => {
         onArchive={props.onArchive}
         currentUserRole={props.currentUserRole}
         onViewDetails={onViewDetails}
+        onMarkWeeklyReportSent={props.onMarkWeeklyReportSent}
       />
     </main>
   );

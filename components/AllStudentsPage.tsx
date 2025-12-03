@@ -19,6 +19,7 @@ interface AllStudentsPageProps {
   onViewDetails: (student: Student, tab?: 'fees' | 'tests' | 'attendanceLog') => void;
   typeFilter: GroupType;
   onTypeFilterChange: (filter: GroupType) => void;
+  onMarkWeeklyReportSent?: (studentId: string) => void;
 }
 
 const getGroupTypeFromName = (name: string | undefined): GroupType | null => {
@@ -99,6 +100,7 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
               onArchive={props.onArchive}
               currentUserRole={props.currentUserRole}
               onViewDetails={onViewDetails}
+              onMarkWeeklyReportSent={props.onMarkWeeklyReportSent}
             />
           ))
         ) : (
