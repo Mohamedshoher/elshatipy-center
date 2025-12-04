@@ -115,7 +115,26 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
             .reduce((sum, f) => sum + f.amountPaid!, 0);
 
         const totalExpenses = expenses
-            .filter(e => e.date.startsWith(selectedMonth))
+            .filter(e => {
+                // Check if it's a salary expense
+                const isSalary = [
+                    ExpenseCategory.TEACHER_SALARY,
+                    ExpenseCategory.SUPERVISOR_SALARY,
+                    ExpenseCategory.STAFF_SALARY,
+                    ExpenseCategory.TEACHER_BONUS
+                ].includes(e.category);
+
+                if (isSalary) {
+                    // Try to extract month from description " - شهر YYYY-MM"
+                    const match = e.description.match(/شهر (\d{4}-\d{2})/);
+                    if (match && match[1]) {
+                        return match[1] === selectedMonth;
+                    }
+                }
+
+                // Fallback to date for non-salaries or if extraction fails
+                return e.date.startsWith(selectedMonth);
+            })
             .reduce((sum, e) => sum + e.amount, 0);
 
         const net = teacherCollectionsSummary.totalReceived - totalExpenses;
@@ -159,7 +178,15 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
     }
 
     const isStaffPaid = (staffId: string) => {
-        return expenses.some(e => e.category === ExpenseCategory.STAFF_SALARY && e.description.includes(`(${staffId})`) && e.date.startsWith(selectedMonth));
+        return expenses.some(e => {
+            if (e.category !== ExpenseCategory.STAFF_SALARY || !e.description.includes(`(${staffId})`)) return false;
+
+            const match = e.description.match(/شهر (\d{4}-\d{2})/);
+            if (match && match[1]) {
+                return match[1] === selectedMonth;
+            }
+            return e.date.startsWith(selectedMonth);
+        });
     }
 
     return (
@@ -561,7 +588,12 @@ ${bonusDetails.length > 0 ? bonusDetails.map(b => `- ${b.date}: ${b.reason} (${b
                                 <ExpenseForm onLogExpense={onLogExpense} />
                                 <h4 className="font-bold text-lg text-gray-700 mt-6 mb-2">المصاريف المسجلة هذا الشهر</h4>
                                 <div className="space-y-2 max-h-60 overflow-y-auto">
-                                    {expenses.filter(e => e.date.startsWith(selectedMonth) && e.category !== ExpenseCategory.STAFF_SALARY && e.category !== ExpenseCategory.TEACHER_SALARY && e.category !== ExpenseCategory.TEACHER_BONUS && e.category !== ExpenseCategory.SUPERVISOR_SALARY).map(e => (
+                                    {expenses.filter(e => {
+                                        if (e.category === ExpenseCategory.STAFF_SALARY || e.category === ExpenseCategory.TEACHER_SALARY || e.category === ExpenseCategory.TEACHER_BONUS || e.category === ExpenseCategory.SUPERVISOR_SALARY) {
+                                            return false; // Don't show salaries here, or filter them correctly if you want to show them
+                                        }
+                                        return e.date.startsWith(selectedMonth);
+                                    }).map(e => (
                                         <div key={e.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
                                             <div>
                                                 <p className="font-semibold">{expenseCategoryLabels[e.category]}</p>

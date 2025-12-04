@@ -37,6 +37,7 @@ interface TeacherDetailsModalProps {
     onSendNotificationToAll: (content: string) => void;
     teacherCollections?: TeacherCollectionRecord[];
     currentUserRole?: 'director' | 'teacher' | 'supervisor';
+    onAddTeacherCollection?: (collection: Omit<TeacherCollectionRecord, 'id'>) => void;
 }
 
 const getAbsenceValue = (status: TeacherAttendanceStatus): number => {
@@ -86,14 +87,17 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
     onSendNotificationToAll,
     teacherCollections = [],
     currentUserRole,
+    onAddTeacherCollection,
 }) => {
-    const [activeTab, setActiveTab] = useState<'payroll' | 'attendance' | 'groups'>('payroll');
+    const [activeTab, setActiveTab] = useState<'payroll' | 'attendance' | 'groups' | 'collections'>('collections');
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
     const [additionalBonus, setAdditionalBonus] = useState('');
     const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
     const [bonusTypeToGive, setBonusTypeToGive] = useState<TeacherAttendanceStatus | null>(null);
     const [isDeductionModalOpen, setIsDeductionModalOpen] = useState(false);
     const [deductionTypeToApply, setDeductionTypeToApply] = useState<TeacherAttendanceStatus | null>(null);
+    const [newCollectionAmount, setNewCollectionAmount] = useState('');
+    const [newCollectionNotes, setNewCollectionNotes] = useState('');
 
     const employee = teacher || supervisor;
     const isSupervisor = !!supervisor;
@@ -163,7 +167,7 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
     };
 
 
-    const getTabClass = (tabName: 'payroll' | 'attendance' | 'groups') => {
+    const getTabClass = (tabName: 'payroll' | 'attendance' | 'groups' | 'collections') => {
         const baseClass = "py-3 px-2 font-semibold text-center transition-colors duration-200 focus:outline-none flex-shrink-0 flex items-center justify-center gap-2 flex-grow text-sm";
         if (activeTab === tabName) {
             return `${baseClass} border-b-2 border-teal-600 text-teal-600 bg-teal-50`;
@@ -285,6 +289,28 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
 
         alert(`تم تسليم مكافأة بقيمة ${amount.toLocaleString()} EGP بنجاح.`);
         setAdditionalBonus('');
+    };
+
+
+    const handleAddCollection = () => {
+        if (!onAddTeacherCollection || !employeeId) return;
+        const amount = parseFloat(newCollectionAmount);
+        if (!amount || amount <= 0) {
+            alert('يرجى إدخال مبلغ صحيح.');
+            return;
+        }
+
+        onAddTeacherCollection({
+            teacherId: employeeId,
+            date: new Date().toISOString(),
+            amount: amount,
+            month: selectedMonth,
+            notes: newCollectionNotes
+        });
+
+        setNewCollectionAmount('');
+        setNewCollectionNotes('');
+        alert('تم تسجيل التحصيل بنجاح.');
     };
 
 
@@ -481,8 +507,9 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
 
                         <div className="bg-gray-50 border rounded-xl overflow-hidden">
                             <div className="flex border-b border-gray-200 overflow-x-auto bg-white">
-                                <button onClick={() => setActiveTab('payroll')} className={getTabClass('payroll')}><CurrencyDollarIcon className="w-5 h-5" /> <span className="hidden sm:inline">الرواتب</span></button>
+                                <button onClick={() => setActiveTab('collections')} className={getTabClass('collections')}><CurrencyDollarIcon className="w-5 h-5" /> <span className="hidden sm:inline">سجل التحصيل</span></button>
                                 <button onClick={() => setActiveTab('attendance')} className={getTabClass('attendance')}><CalendarCheckIcon className="w-5 h-5" /> <span className="hidden sm:inline">سجل الحضور</span></button>
+                                <button onClick={() => setActiveTab('payroll')} className={getTabClass('payroll')}><CurrencyDollarIcon className="w-5 h-5" /> <span className="hidden sm:inline">الرواتب</span></button>
                                 <button onClick={() => setActiveTab('groups')} className={getTabClass('groups')}><UsersIcon className="w-5 h-5" /> <span className="hidden sm:inline">{isSupervisor ? 'الأقسام' : 'المجموعات'}</span></button>
                             </div>
 
@@ -528,33 +555,105 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
                                             <div className="col-span-1 sm:col-span-2 pt-2 border-t"><label className="text-sm text-gray-500 font-bold">الراتب النهائي</label><p className="font-bold text-3xl text-blue-600">{payrollData.finalSalary.toFixed(2)} <span className="text-sm text-gray-500 font-normal">EGP</span></p></div>
                                         </div>
 
-                                        {(bonusRecordsWithReason.length > 0 || deductionRecordsWithReason.length > 0) && (
+                                        {/* سجل المكافآت */}
+                                        {attendanceForMonth.filter(r => getBonusValue(r.status) > 0).length > 0 && (
                                             <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-100">
-                                                <h4 className="font-semibold text-gray-700 mb-3 text-sm uppercase tracking-wide">أسباب المكافآت والخصومات</h4>
-                                                {bonusRecordsWithReason.length > 0 && (
-                                                    <div className="mb-3">
-                                                        <h5 className="text-xs font-bold text-green-600 mb-1 uppercase">المكافآت:</h5>
-                                                        <ul className="list-disc list-inside space-y-1 text-sm">
-                                                            {bonusRecordsWithReason.map(r => (
-                                                                <li key={r.id} className="text-gray-600">
-                                                                    {new Date(r.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}: {r.reason}
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                )}
-                                                {deductionRecordsWithReason.length > 0 && (
-                                                    <div>
-                                                        <h5 className="text-xs font-bold text-red-600 mb-1 uppercase">الخصومات:</h5>
-                                                        <ul className="list-disc list-inside space-y-1 text-sm">
-                                                            {deductionRecordsWithReason.map(r => (
-                                                                <li key={r.id} className="text-gray-600">
-                                                                    {new Date(r.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short' })}: {r.reason}
-                                                                </li>
-                                                            ))}
-                                                        </ul>
-                                                    </div>
-                                                )}
+                                                <h4 className="font-semibold text-gray-700 mb-3 text-sm uppercase tracking-wide flex items-center gap-2">
+                                                    <span className="bg-green-100 text-green-700 px-2 py-1 rounded">سجل المكافآت</span>
+                                                </h4>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-sm">
+                                                        <thead className="bg-green-50 border-b border-green-200">
+                                                            <tr>
+                                                                <th className="text-right p-2 font-bold text-green-700">التاريخ</th>
+                                                                <th className="text-right p-2 font-bold text-green-700">النوع</th>
+                                                                <th className="text-right p-2 font-bold text-green-700">السبب</th>
+                                                                <th className="text-center p-2 font-bold text-green-700">القيمة</th>
+                                                                <th className="text-center p-2 font-bold text-green-700">إجراء</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {attendanceForMonth.filter(r => getBonusValue(r.status) > 0).map(r => {
+                                                                let bonusTypeText = '';
+                                                                switch (r.status) {
+                                                                    case TeacherAttendanceStatus.BONUS_DAY: bonusTypeText = 'يوم كامل'; break;
+                                                                    case TeacherAttendanceStatus.BONUS_HALF_DAY: bonusTypeText = 'نصف يوم'; break;
+                                                                    case TeacherAttendanceStatus.BONUS_QUARTER_DAY: bonusTypeText = 'ربع يوم'; break;
+                                                                }
+                                                                return (
+                                                                    <tr key={r.id} className="border-b border-gray-100 hover:bg-green-50 transition-colors">
+                                                                        <td className="p-2 text-gray-700">{new Date(r.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                                                                        <td className="p-2 text-gray-700">{bonusTypeText}</td>
+                                                                        <td className="p-2 text-gray-600">{r.reason || '-'}</td>
+                                                                        <td className="p-2 text-center font-bold text-green-600">{getBonusValue(r.status)}</td>
+                                                                        <td className="p-2 text-center">
+                                                                            <button
+                                                                                onClick={() => onSetTeacherAttendance(employeeId, r.date, TeacherAttendanceStatus.PRESENT)}
+                                                                                className="p-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                                                                title="إلغاء المكافأة"
+                                                                            >
+                                                                                <TrashIcon className="w-4 h-4" />
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* سجل الخصومات */}
+                                        {attendanceForMonth.filter(r => getAbsenceValue(r.status) > 0).length > 0 && (
+                                            <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                                                <h4 className="font-semibold text-gray-700 mb-3 text-sm uppercase tracking-wide flex items-center gap-2">
+                                                    <span className="bg-red-100 text-red-700 px-2 py-1 rounded">سجل الخصومات</span>
+                                                </h4>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-sm">
+                                                        <thead className="bg-red-50 border-b border-red-200">
+                                                            <tr>
+                                                                <th className="text-right p-2 font-bold text-red-700">التاريخ</th>
+                                                                <th className="text-right p-2 font-bold text-red-700">النوع</th>
+                                                                <th className="text-right p-2 font-bold text-red-700">السبب</th>
+                                                                <th className="text-center p-2 font-bold text-red-700">القيمة</th>
+                                                                <th className="text-center p-2 font-bold text-red-700">إجراء</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {attendanceForMonth.filter(r => getAbsenceValue(r.status) > 0).map(r => {
+                                                                let deductionTypeText = '';
+                                                                switch (r.status) {
+                                                                    case TeacherAttendanceStatus.ABSENT:
+                                                                    case TeacherAttendanceStatus.DEDUCTION_FULL_DAY: deductionTypeText = 'يوم كامل'; break;
+                                                                    case TeacherAttendanceStatus.HALF_DAY:
+                                                                    case TeacherAttendanceStatus.DEDUCTION_HALF_DAY: deductionTypeText = 'نصف يوم'; break;
+                                                                    case TeacherAttendanceStatus.QUARTER_DAY:
+                                                                    case TeacherAttendanceStatus.DEDUCTION_QUARTER_DAY: deductionTypeText = 'ربع يوم'; break;
+                                                                    case TeacherAttendanceStatus.MISSING_REPORT: deductionTypeText = 'تقرير ناقص'; break;
+                                                                }
+                                                                return (
+                                                                    <tr key={r.id} className="border-b border-gray-100 hover:bg-red-50 transition-colors">
+                                                                        <td className="p-2 text-gray-700">{new Date(r.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                                                                        <td className="p-2 text-gray-700">{deductionTypeText}</td>
+                                                                        <td className="p-2 text-gray-600">{r.reason || '-'}</td>
+                                                                        <td className="p-2 text-center font-bold text-red-600">{getAbsenceValue(r.status)}</td>
+                                                                        <td className="p-2 text-center">
+                                                                            <button
+                                                                                onClick={() => onSetTeacherAttendance(employeeId, r.date, TeacherAttendanceStatus.PRESENT)}
+                                                                                className="p-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                                                                title="إلغاء الخصم"
+                                                                            >
+                                                                                <TrashIcon className="w-4 h-4" />
+                                                                            </button>
+                                                                        </td>
+                                                                    </tr>
+                                                                );
+                                                            })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
                                             </div>
                                         )}
 
@@ -675,6 +774,95 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
                                                 )}
                                             </div>
                                         )}
+                                    </div>
+                                )}
+
+                                {activeTab === 'collections' && (
+                                    <div className="space-y-6">
+                                        {/* Financial Summary */}
+                                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                                            <div className="bg-blue-50 p-4 rounded-lg border border-blue-100">
+                                                <p className="text-sm text-blue-600 font-medium mb-1">إجمالي ما جمعه المدرس</p>
+                                                <p className="text-2xl font-bold text-blue-700">{payrollData.collectedAmount.toLocaleString()} EGP</p>
+                                            </div>
+                                            <div className="bg-green-50 p-4 rounded-lg border border-green-100">
+                                                <p className="text-sm text-green-600 font-medium mb-1">ما تم تسليمه للإدارة</p>
+                                                <p className="text-2xl font-bold text-green-700">{payrollData.totalHandedOver.toLocaleString()} EGP</p>
+                                            </div>
+                                            <div className={`p-4 rounded-lg border ${payrollData.remainingBalance > 0 ? 'bg-orange-50 border-orange-100' : 'bg-gray-50 border-gray-100'}`}>
+                                                <p className={`text-sm font-medium mb-1 ${payrollData.remainingBalance > 0 ? 'text-orange-600' : 'text-gray-600'}`}>المتبقي في ذمة المدرس</p>
+                                                <p className={`text-2xl font-bold ${payrollData.remainingBalance > 0 ? 'text-orange-700' : 'text-gray-700'}`}>{payrollData.remainingBalance.toLocaleString()} EGP</p>
+                                            </div>
+                                        </div>
+
+                                        {/* Add Collection Form */}
+                                        {onAddTeacherCollection && (
+                                            <div className="bg-gray-50 p-4 rounded-lg border border-gray-200">
+                                                <h4 className="font-bold text-gray-700 mb-3 text-sm">تسجيل تحصيل جديد</h4>
+                                                <div className="flex flex-col sm:flex-row gap-3 items-end">
+                                                    <div className="flex-grow w-full sm:w-auto">
+                                                        <label className="block text-xs text-gray-500 mb-1">المبلغ</label>
+                                                        <input
+                                                            type="number"
+                                                            value={newCollectionAmount}
+                                                            onChange={(e) => setNewCollectionAmount(e.target.value)}
+                                                            className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                                            placeholder="0.00"
+                                                        />
+                                                    </div>
+                                                    <div className="flex-grow-[2] w-full sm:w-auto">
+                                                        <label className="block text-xs text-gray-500 mb-1">ملاحظات</label>
+                                                        <input
+                                                            type="text"
+                                                            value={newCollectionNotes}
+                                                            onChange={(e) => setNewCollectionNotes(e.target.value)}
+                                                            className="w-full p-2 border rounded text-sm focus:ring-2 focus:ring-green-500 outline-none"
+                                                            placeholder="ملاحظات إضافية..."
+                                                        />
+                                                    </div>
+                                                    <button
+                                                        onClick={handleAddCollection}
+                                                        disabled={!newCollectionAmount}
+                                                        className="w-full sm:w-auto px-4 py-2 bg-green-600 text-white rounded font-bold hover:bg-green-700 transition-colors disabled:bg-gray-300 disabled:cursor-not-allowed text-sm h-[38px]"
+                                                    >
+                                                        تسجيل
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        <div>
+                                            <h4 className="font-bold text-gray-700 mb-3 text-sm">سجل التحصيلات السابق</h4>
+                                            {teacherCollections.filter(c => c.teacherId === employeeId).length > 0 ? (
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-sm text-right">
+                                                        <thead className="bg-gray-50 text-gray-600 font-medium border-b">
+                                                            <tr>
+                                                                <th className="py-3 px-4">التاريخ</th>
+                                                                <th className="py-3 px-4">الشهر</th>
+                                                                <th className="py-3 px-4">المبلغ</th>
+                                                                <th className="py-3 px-4">ملاحظات</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody className="divide-y divide-gray-100">
+                                                            {teacherCollections
+                                                                .filter(c => c.teacherId === employeeId)
+                                                                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                                                .map((collection) => (
+                                                                    <tr key={collection.id} className="hover:bg-gray-50 transition-colors">
+                                                                        <td className="py-3 px-4">{new Date(collection.date).toLocaleDateString('ar-EG')}</td>
+                                                                        <td className="py-3 px-4">{collection.month}</td>
+                                                                        <td className="py-3 px-4 font-bold text-green-600">{collection.amount.toLocaleString()} EGP</td>
+                                                                        <td className="py-3 px-4 text-gray-500">{collection.notes || '-'}</td>
+                                                                    </tr>
+                                                                ))}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            ) : (
+                                                <p className="text-gray-500 text-center py-8">لا يوجد سجلات تحصيل لهذا المدرس.</p>
+                                            )}
+                                        </div>
                                     </div>
                                 )}
                             </div>

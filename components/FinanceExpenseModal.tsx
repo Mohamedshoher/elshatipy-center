@@ -27,23 +27,42 @@ const expenseCategoryLabels: Record<ExpenseCategory, string> = {
 const FinanceExpenseModal: React.FC<FinanceExpenseModalProps> = ({ isOpen, onClose, month, expenses }) => {
 
   const expenseDetails = useMemo(() => {
-    const expensesForMonth = expenses.filter(e => e.date.startsWith(month));
+    const expensesForMonth = expenses.filter(e => {
+      // Check if it's a salary expense
+      const isSalary = [
+        ExpenseCategory.TEACHER_SALARY,
+        ExpenseCategory.SUPERVISOR_SALARY,
+        ExpenseCategory.STAFF_SALARY,
+        ExpenseCategory.TEACHER_BONUS
+      ].includes(e.category);
 
-    const salaries = expensesForMonth.filter(e => 
-        e.category === ExpenseCategory.TEACHER_SALARY || 
-        e.category === ExpenseCategory.STAFF_SALARY ||
-        e.category === ExpenseCategory.SUPERVISOR_SALARY ||
-        e.category === ExpenseCategory.TEACHER_BONUS
+      if (isSalary) {
+        // Try to extract month from description " - شهر YYYY-MM"
+        const match = e.description.match(/شهر (\d{4}-\d{2})/);
+        if (match && match[1]) {
+          return match[1] === month;
+        }
+      }
+
+      // Fallback to date for non-salaries or if extraction fails
+      return e.date.startsWith(month);
+    });
+
+    const salaries = expensesForMonth.filter(e =>
+      e.category === ExpenseCategory.TEACHER_SALARY ||
+      e.category === ExpenseCategory.STAFF_SALARY ||
+      e.category === ExpenseCategory.SUPERVISOR_SALARY ||
+      e.category === ExpenseCategory.TEACHER_BONUS
     );
-    
+
     const generalExpensesByCategory: { [key in ExpenseCategory]?: { total: number, items: Expense[] } } = {};
 
     expensesForMonth
-      .filter(e => 
-          e.category !== ExpenseCategory.TEACHER_SALARY && 
-          e.category !== ExpenseCategory.STAFF_SALARY && 
-          e.category !== ExpenseCategory.SUPERVISOR_SALARY &&
-          e.category !== ExpenseCategory.TEACHER_BONUS
+      .filter(e =>
+        e.category !== ExpenseCategory.TEACHER_SALARY &&
+        e.category !== ExpenseCategory.STAFF_SALARY &&
+        e.category !== ExpenseCategory.SUPERVISOR_SALARY &&
+        e.category !== ExpenseCategory.TEACHER_BONUS
       )
       .forEach(expense => {
         if (!generalExpensesByCategory[expense.category]) {
@@ -52,13 +71,13 @@ const FinanceExpenseModal: React.FC<FinanceExpenseModalProps> = ({ isOpen, onClo
         generalExpensesByCategory[expense.category]!.total += expense.amount;
         generalExpensesByCategory[expense.category]!.items.push(expense);
       });
-      
+
     const totalSalaries = salaries.reduce((sum, s) => sum + s.amount, 0);
     const totalGeneral = Object.values(generalExpensesByCategory).reduce((sum, category) => sum + (category?.total || 0), 0);
     const grandTotal = totalSalaries + totalGeneral;
 
     return {
-      salaries: salaries.sort((a,b) => a.description.localeCompare(b.description, 'ar')),
+      salaries: salaries.sort((a, b) => a.description.localeCompare(b.description, 'ar')),
       generalExpenses: Object.entries(generalExpensesByCategory),
       totalSalaries,
       totalGeneral,
@@ -79,39 +98,39 @@ const FinanceExpenseModal: React.FC<FinanceExpenseModalProps> = ({ isOpen, onClo
           </button>
         </div>
         <div className="flex-grow overflow-y-auto pr-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-            {/* Salaries Section */}
-            <div>
-                <h3 className="font-bold text-lg text-gray-800 mb-2">الرواتب والمكافآت ({expenseDetails.totalSalaries.toLocaleString()} EGP)</h3>
-                <div className="space-y-2">
-                    {expenseDetails.salaries.length > 0 ? expenseDetails.salaries.map(s => (
-                        <div key={s.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
-                            <span className="text-sm text-gray-700">{s.description}</span>
-                            <span className="font-semibold text-red-600">{s.amount.toLocaleString()} EGP</span>
-                        </div>
-                    )) : <p className="text-sm text-gray-400">لا توجد رواتب مسجلة.</p>}
+          {/* Salaries Section */}
+          <div>
+            <h3 className="font-bold text-lg text-gray-800 mb-2">الرواتب والمكافآت ({expenseDetails.totalSalaries.toLocaleString()} EGP)</h3>
+            <div className="space-y-2">
+              {expenseDetails.salaries.length > 0 ? expenseDetails.salaries.map(s => (
+                <div key={s.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                  <span className="text-sm text-gray-700">{s.description}</span>
+                  <span className="font-semibold text-red-600">{s.amount.toLocaleString()} EGP</span>
                 </div>
+              )) : <p className="text-sm text-gray-400">لا توجد رواتب مسجلة.</p>}
             </div>
-            {/* General Expenses Section */}
-            <div>
-                <h3 className="font-bold text-lg text-gray-800 mb-2">المصروفات العامة ({expenseDetails.totalGeneral.toLocaleString()} EGP)</h3>
-                <div className="space-y-2">
-                    {expenseDetails.generalExpenses.length > 0 ? expenseDetails.generalExpenses.map(([category, data]) => (
-                         <div key={category} className="bg-gray-50 p-2 rounded">
-                             <div className="flex justify-between items-center font-semibold">
-                                 <span className="text-gray-700">{expenseCategoryLabels[category as ExpenseCategory]}</span>
-                                 <span className="text-red-600">{data?.total.toLocaleString()} EGP</span>
-                             </div>
-                             <ul className="text-xs text-gray-500 mt-1 pr-4">
-                                {data?.items.map(item => <li key={item.id}>- {item.description}</li>)}
-                             </ul>
-                         </div>
-                    )) : <p className="text-sm text-gray-400">لا توجد مصروفات عامة مسجلة.</p>}
+          </div>
+          {/* General Expenses Section */}
+          <div>
+            <h3 className="font-bold text-lg text-gray-800 mb-2">المصروفات العامة ({expenseDetails.totalGeneral.toLocaleString()} EGP)</h3>
+            <div className="space-y-2">
+              {expenseDetails.generalExpenses.length > 0 ? expenseDetails.generalExpenses.map(([category, data]) => (
+                <div key={category} className="bg-gray-50 p-2 rounded">
+                  <div className="flex justify-between items-center font-semibold">
+                    <span className="text-gray-700">{expenseCategoryLabels[category as ExpenseCategory]}</span>
+                    <span className="text-red-600">{data?.total.toLocaleString()} EGP</span>
+                  </div>
+                  <ul className="text-xs text-gray-500 mt-1 pr-4">
+                    {data?.items.map(item => <li key={item.id}>- {item.description}</li>)}
+                  </ul>
                 </div>
+              )) : <p className="text-sm text-gray-400">لا توجد مصروفات عامة مسجلة.</p>}
             </div>
+          </div>
         </div>
         <div className="flex-shrink-0 mt-4 pt-4 border-t flex justify-between items-center">
-            <h3 className="text-lg font-bold text-gray-800">الإجمالي:</h3>
-            <span className="text-2xl font-bold text-red-700">{expenseDetails.grandTotal.toLocaleString()} EGP</span>
+          <h3 className="text-lg font-bold text-gray-800">الإجمالي:</h3>
+          <span className="text-2xl font-bold text-red-700">{expenseDetails.grandTotal.toLocaleString()} EGP</span>
         </div>
       </div>
     </div>

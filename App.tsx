@@ -1292,10 +1292,17 @@ const App: React.FC = () => {
         }
     };
 
-    const handleAddTeacherCollection = useCallback(async (collectionData: Omit<TeacherCollectionRecord, 'id' | 'date'>) => {
-        await addDoc(collection(db, "teacherCollections"), { date: new Date().toISOString().split('T')[0], ...collectionData });
-    }, []);
 
+
+
+    const handleAddTeacherCollection = useCallback(async (collectionData: Omit<TeacherCollectionRecord, 'id'>) => {
+        try {
+            await addDoc(collection(db, 'teacherCollections'), collectionData);
+        } catch (error) {
+            console.error("Error adding teacher collection:", error);
+            alert("حدث خطأ أثناء إضافة التحصيل.");
+        }
+    }, []);
 
     const handleDeleteTeacherCollection = useCallback(async (collectionId: string) => {
         if (window.confirm("هل أنت متأكد من رغبتك في حذف سجل التسليم هذا؟")) {
@@ -2140,6 +2147,7 @@ const App: React.FC = () => {
                         onSendNotificationToAll={handleSendNotificationToAll}
                         teacherCollections={teacherCollections}
                         currentUserRole={currentUser?.role}
+                        onAddTeacherCollection={handleAddTeacherCollection}
                     />
                 </>
             )}
