@@ -65,12 +65,12 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, o
               </button>
             </li>
           )}
-          <li>
+          {/* <li>
             <button onClick={() => handleAction(onShowFeeCollection)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-cyan-100 hover:text-cyan-800 transition-colors">
               <CashIcon className="w-6 h-6 ml-4 text-cyan-600" />
               <span className="font-semibold">تحصيل الرسوم</span>
             </button>
-          </li>
+          </li> */}
           <li>
             <button onClick={() => handleAction(onShowFinance)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-green-100 hover:text-green-800 transition-colors">
               <CurrencyDollarIcon className="w-6 h-6 ml-4 text-green-600" />

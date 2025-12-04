@@ -2,7 +2,7 @@
 
 import React, { useState, useMemo } from 'react';
 import type { Student, Teacher, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Group, TeacherCollectionRecord, Supervisor, Notification } from '../types';
-import { ExpenseCategory, TeacherAttendanceStatus, PaymentType } from '../types';
+import { ExpenseCategory, TeacherAttendanceStatus, PaymentType, roundToNearest5 } from '../types';
 import StaffManagerModal from './StaffManagerModal';
 import CogIcon from './icons/CogIcon';
 import TrashIcon from './icons/TrashIcon';
@@ -214,22 +214,22 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
                             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">
                                 <button onClick={() => setIsIncomeModalOpen(true)} className="text-right bg-green-100 p-6 rounded-lg transition-all duration-300 hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-2 focus:ring-green-400">
                                     <p className="text-lg text-green-800 font-semibold">إجمالي الدخل</p>
-                                    <p className="text-4xl font-bold text-green-600 mt-2">{financialOverview.income.toLocaleString()} EGP</p>
+                                    <p className="text-4xl font-bold text-green-600 mt-2">{roundToNearest5(financialOverview.income).toLocaleString()} EGP</p>
                                     <span className="text-xs text-green-700 mt-2 block">مصروفات الطلاب المسددة</span>
                                 </button>
                                 <button onClick={() => setIsExpenseModalOpen(true)} className="text-right bg-red-100 p-6 rounded-lg transition-all duration-300 hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-2 focus:ring-red-400">
                                     <p className="text-lg text-red-800 font-semibold">إجمالي المصروفات</p>
-                                    <p className="text-4xl font-bold text-red-600 mt-2">{financialOverview.totalExpenses.toLocaleString()} EGP</p>
+                                    <p className="text-4xl font-bold text-red-600 mt-2">{roundToNearest5(financialOverview.totalExpenses).toLocaleString()} EGP</p>
                                     <span className="text-xs text-red-700 mt-2 block">الرواتب والمصاريف العامة</span>
                                 </button>
                                 <button onClick={() => setIsCollectionsModalOpen(true)} className="text-right bg-cyan-100 p-6 rounded-lg transition-all duration-300 hover:shadow-lg hover:scale-105 focus:outline-none focus:ring-2 focus:ring-cyan-400">
                                     <p className="text-lg text-cyan-800 font-semibold">المبلغ المستلم</p>
-                                    <p className="text-4xl font-bold text-cyan-600 mt-2">{teacherCollectionsSummary.totalReceived.toLocaleString()} EGP</p>
+                                    <p className="text-4xl font-bold text-cyan-600 mt-2">{roundToNearest5(teacherCollectionsSummary.totalReceived).toLocaleString()} EGP</p>
                                     <span className="text-xs text-cyan-700 mt-2 block">من تحصيلات المدرسين</span>
                                 </button>
                                 <div className={`text-right p-6 rounded-lg ${financialOverview.net >= 0 ? 'bg-blue-100' : 'bg-orange-100'}`}>
                                     <p className={`text-lg font-semibold ${financialOverview.net >= 0 ? 'text-blue-800' : 'text-orange-800'}`}>صافي الربح / الخسارة</p>
-                                    <p className={`text-4xl font-bold mt-2 ${financialOverview.net >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>{financialOverview.net.toLocaleString()} EGP</p>
+                                    <p className={`text-4xl font-bold mt-2 ${financialOverview.net >= 0 ? 'text-blue-600' : 'text-orange-600'}`}>{roundToNearest5(financialOverview.net).toLocaleString()} EGP</p>
                                     <span className={`text-xs mt-2 block ${financialOverview.net >= 0 ? 'text-blue-700' : 'text-orange-700'}`}>المبلغ المستلم - المصروفات</span>
                                 </div>
                             </div>
@@ -314,7 +314,7 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
                                         .map(record => {
                                             const value = getAbsenceValue(record.status);
                                             const dailyRate = effectiveSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? effectiveSalary / financialSettings.workingDaysPerMonth : 0;
-                                            const amount = dailyRate * value * (financialSettings.absenceDeductionPercentage / 100);
+                                            const amount = roundToNearest5(dailyRate * value * (financialSettings.absenceDeductionPercentage / 100));
 
                                             let reason = 'خصم';
                                             // New system
@@ -339,7 +339,7 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
                                     attendanceForMonth.filter(record => getBonusValue(record.status) > 0).forEach(record => {
                                         const value = getBonusValue(record.status);
                                         const dailyRate = effectiveSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? effectiveSalary / financialSettings.workingDaysPerMonth : 0;
-                                        const amount = dailyRate * value;
+                                        const amount = roundToNearest5(dailyRate * value);
 
                                         let reason = 'مكافأة';
                                         if (record.status === TeacherAttendanceStatus.BONUS_DAY) reason = 'مكافأة يوم كامل';
@@ -357,9 +357,9 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
 
                                     const totalBonusAmount = bonusDetails.reduce((sum, item) => sum + item.amount, 0);
 
-                                    const finalSalary = isPartnership
+                                    const finalSalary = roundToNearest5(isPartnership
                                         ? partnershipAmount + totalBonusAmount - totalDeductionAmount
-                                        : baseSalary + totalBonusAmount - totalDeductionAmount;
+                                        : baseSalary + totalBonusAmount - totalDeductionAmount);
 
                                     const entityTypeLabel = entity.type === 'teacher' ? 'مدرس' : 'مشرف';
                                     const isExpanded = expandedPayrollTeacherId === entity.id;

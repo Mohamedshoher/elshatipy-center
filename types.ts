@@ -7,6 +7,11 @@
 
 
 
+// تقريب المبالغ المالية إلى أقرب 5 جنيهات
+export function roundToNearest5(amount: number): number {
+  return Math.round(amount / 5) * 5;
+}
+
 export interface Group {
   id: string;
   name: string;

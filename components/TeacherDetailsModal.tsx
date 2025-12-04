@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo } from 'react';
 import type { Teacher, Group, TeacherAttendanceRecord, TeacherPayrollAdjustment, Expense, FinancialSettings, Student, Supervisor, TeacherCollectionRecord } from '../types';
-import { TeacherStatus, ExpenseCategory, TeacherAttendanceStatus, PaymentType } from '../types';
+import { TeacherStatus, ExpenseCategory, TeacherAttendanceStatus, PaymentType, roundToNearest5 } from '../types';
 import PhoneIcon from './icons/PhoneIcon';
 import EditIcon from './icons/EditIcon';
 import TrashIcon from './icons/TrashIcon';
@@ -212,13 +212,14 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
         // Calculate effective salary for daily rate
         const effectiveSalary = isPartnership ? partnershipAmount : baseSalary;
 
-        const dailyRate = effectiveSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? effectiveSalary / financialSettings.workingDaysPerMonth : 0;
-        const absenceDeduction = dailyRate * absenceDays * (financialSettings.absenceDeductionPercentage / 100);
-        const attendanceBonus = dailyRate * bonusDays;
 
-        const finalSalary = isPartnership
+        const dailyRate = effectiveSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? effectiveSalary / financialSettings.workingDaysPerMonth : 0;
+        const absenceDeduction = roundToNearest5(dailyRate * absenceDays * (financialSettings.absenceDeductionPercentage / 100));
+        const attendanceBonus = roundToNearest5(dailyRate * bonusDays);
+
+        const finalSalary = roundToNearest5(isPartnership
             ? partnershipAmount + adjustments.bonus + attendanceBonus - absenceDeduction
-            : baseSalary + adjustments.bonus + attendanceBonus - absenceDeduction;
+            : baseSalary + adjustments.bonus + attendanceBonus - absenceDeduction);
 
         return {
             baseSalary,
