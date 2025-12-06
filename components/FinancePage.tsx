@@ -26,6 +26,7 @@ interface FinancePageProps {
     onUpdateStaff: (staffId: string, updatedData: Partial<Staff>) => void;
     onDeleteStaff: (staffId: string) => void;
     onLogExpense: (expense: Omit<Expense, 'id'>) => void;
+    onDeleteExpense: (expenseId: string) => void;
     onSetTeacherAttendance: (teacherId: string, date: string, status: TeacherAttendanceStatus, reason?: string) => void;
     onUpdatePayrollAdjustments: (adjustment: Partial<TeacherPayrollAdjustment> & Pick<TeacherPayrollAdjustment, 'teacherId' | 'month'> & { isPaid?: boolean }) => void;
     onUpdateFinancialSettings: (settings: FinancialSettings) => void;
@@ -74,7 +75,7 @@ const getBonusValue = (status: TeacherAttendanceStatus): number => {
 };
 
 const FinancePage: React.FC<FinancePageProps> = (props) => {
-    const { onBack, students, teachers, staff, supervisors, expenses, teacherAttendance, teacherPayrollAdjustments, financialSettings, onLogExpense, onUpdatePayrollAdjustments, onSetTeacherAttendance, onAddStaff, onUpdateStaff, onDeleteStaff, onUpdateFinancialSettings, groups, onResetTeacherPayment, onResetStaffPayment, teacherCollections, onViewTeacherDetails, onApplyDeductions } = props;
+    const { onBack, students, teachers, staff, supervisors, expenses, teacherAttendance, teacherPayrollAdjustments, financialSettings, onLogExpense, onDeleteExpense, onUpdatePayrollAdjustments, onSetTeacherAttendance, onAddStaff, onUpdateStaff, onDeleteStaff, onUpdateFinancialSettings, groups, onResetTeacherPayment, onResetStaffPayment, teacherCollections, onViewTeacherDetails, onApplyDeductions } = props;
 
     const [activeTab, setActiveTab] = useState<'overview' | 'teacher_payroll' | 'staff_expenses' | 'settings'>('overview');
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
@@ -594,12 +595,25 @@ ${bonusDetails.length > 0 ? bonusDetails.map(b => `- ${b.date}: ${b.reason} (${b
                                         }
                                         return e.date.startsWith(selectedMonth);
                                     }).map(e => (
-                                        <div key={e.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center">
+                                        <div key={e.id} className="bg-gray-50 p-3 rounded-lg flex justify-between items-center group">
                                             <div>
                                                 <p className="font-semibold">{expenseCategoryLabels[e.category]}</p>
                                                 <p className="text-sm text-gray-500">{e.description}</p>
                                             </div>
-                                            <p className="font-bold text-red-500">{e.amount.toLocaleString()} EGP</p>
+                                            <div className="flex items-center gap-2">
+                                                <p className="font-bold text-red-500">{e.amount.toLocaleString()} EGP</p>
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm('هل أنت متأكد من حذف هذا المصروف؟')) {
+                                                            onDeleteExpense(e.id);
+                                                        }
+                                                    }}
+                                                    className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                                                    title="حذف"
+                                                >
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </button>
+                                            </div>
                                         </div>
                                     ))}
                                 </div>
@@ -652,6 +666,7 @@ ${bonusDetails.length > 0 ? bonusDetails.map(b => `- ${b.date}: ${b.reason} (${b
                 onClose={() => setIsExpenseModalOpen(false)}
                 month={selectedMonth}
                 expenses={expenses}
+                onDeleteExpense={onDeleteExpense}
             />
             <FinanceCollectionsModal
                 isOpen={isCollectionsModalOpen}

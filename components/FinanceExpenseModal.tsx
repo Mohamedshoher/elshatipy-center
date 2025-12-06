@@ -1,15 +1,18 @@
 
 
+
 import React, { useMemo } from 'react';
 import type { Expense } from '../types';
 import { ExpenseCategory } from '../types';
 import XIcon from './icons/XIcon';
+import TrashIcon from './icons/TrashIcon';
 
 interface FinanceExpenseModalProps {
   isOpen: boolean;
   onClose: () => void;
   month: string;
   expenses: Expense[];
+  onDeleteExpense: (expenseId: string) => void;
 }
 
 const expenseCategoryLabels: Record<ExpenseCategory, string> = {
@@ -24,7 +27,7 @@ const expenseCategoryLabels: Record<ExpenseCategory, string> = {
 };
 
 
-const FinanceExpenseModal: React.FC<FinanceExpenseModalProps> = ({ isOpen, onClose, month, expenses }) => {
+const FinanceExpenseModal: React.FC<FinanceExpenseModalProps> = ({ isOpen, onClose, month, expenses, onDeleteExpense }) => {
 
   const expenseDetails = useMemo(() => {
     const expensesForMonth = expenses.filter(e => {
@@ -103,9 +106,22 @@ const FinanceExpenseModal: React.FC<FinanceExpenseModalProps> = ({ isOpen, onClo
             <h3 className="font-bold text-lg text-gray-800 mb-2">الرواتب والمكافآت ({expenseDetails.totalSalaries.toLocaleString()} EGP)</h3>
             <div className="space-y-2">
               {expenseDetails.salaries.length > 0 ? expenseDetails.salaries.map(s => (
-                <div key={s.id} className="flex justify-between items-center bg-gray-50 p-2 rounded">
+                <div key={s.id} className="flex justify-between items-center bg-gray-50 p-2 rounded group">
                   <span className="text-sm text-gray-700">{s.description}</span>
-                  <span className="font-semibold text-red-600">{s.amount.toLocaleString()} EGP</span>
+                  <div className="flex items-center gap-2">
+                    <span className="font-semibold text-red-600">{s.amount.toLocaleString()} EGP</span>
+                    <button
+                      onClick={() => {
+                        if (window.confirm('هل أنت متأكد من حذف هذا الراتب؟')) {
+                          onDeleteExpense(s.id);
+                        }
+                      }}
+                      className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                      title="حذف"
+                    >
+                      <TrashIcon className="w-4 h-4" />
+                    </button>
+                  </div>
                 </div>
               )) : <p className="text-sm text-gray-400">لا توجد رواتب مسجلة.</p>}
             </div>
@@ -116,12 +132,27 @@ const FinanceExpenseModal: React.FC<FinanceExpenseModalProps> = ({ isOpen, onClo
             <div className="space-y-2">
               {expenseDetails.generalExpenses.length > 0 ? expenseDetails.generalExpenses.map(([category, data]) => (
                 <div key={category} className="bg-gray-50 p-2 rounded">
-                  <div className="flex justify-between items-center font-semibold">
+                  <div className="flex justify-between items-center font-semibold mb-1">
                     <span className="text-gray-700">{expenseCategoryLabels[category as ExpenseCategory]}</span>
                     <span className="text-red-600">{data?.total.toLocaleString()} EGP</span>
                   </div>
-                  <ul className="text-xs text-gray-500 mt-1 pr-4">
-                    {data?.items.map(item => <li key={item.id}>- {item.description}</li>)}
+                  <ul className="text-xs text-gray-500 space-y-1">
+                    {data?.items.map(item => (
+                      <li key={item.id} className="flex justify-between items-center group pl-2">
+                        <span>- {item.description} ({item.amount.toLocaleString()})</span>
+                        <button
+                          onClick={() => {
+                            if (window.confirm('هل أنت متأكد من حذف هذا المصروف؟')) {
+                              onDeleteExpense(item.id);
+                            }
+                          }}
+                          className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                          title="حذف"
+                        >
+                          <TrashIcon className="w-3 h-3" />
+                        </button>
+                      </li>
+                    ))}
                   </ul>
                 </div>
               )) : <p className="text-sm text-gray-400">لا توجد مصروفات عامة مسجلة.</p>}

@@ -1,5 +1,4 @@
 
-
 import React, { useMemo, useState } from 'react';
 import type { Note, Student, Group, Teacher, TeacherCollectionRecord, Expense } from '../types';
 import { ExpenseCategory, roundToNearest5 } from '../types';
@@ -22,6 +21,7 @@ interface GeneralViewPageProps {
     teachers: Teacher[];
     teacherCollections: TeacherCollectionRecord[];
     expenses: Expense[];
+    onDeleteExpense: (expenseId: string) => void;
     onToggleAcknowledge: (noteId: string) => void;
     onViewStudent: (studentId: string) => void;
     onApproveStudent: (studentId: string) => void;
@@ -107,7 +107,7 @@ const GroupedStudentList: React.FC<{
 };
 
 
-const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, groups, teachers, teacherCollections, expenses, onToggleAcknowledge, onViewStudent, onApproveStudent, onRejectStudent }) => {
+const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, groups, teachers, teacherCollections, expenses, onDeleteExpense, onToggleAcknowledge, onViewStudent, onApproveStudent, onRejectStudent }) => {
 
     const [expandedNewGroups, setExpandedNewGroups] = useState<Set<string>>(new Set());
     const [expandedArchivedGroups, setExpandedArchivedGroups] = useState<Set<string>>(new Set());
@@ -388,6 +388,7 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
                 onClose={() => setIsExpenseModalOpen(false)}
                 month={selectedMonth}
                 expenses={expenses}
+                onDeleteExpense={onDeleteExpense}
             />
             <FinanceCollectionsModal
                 isOpen={isCollectionsModalOpen}

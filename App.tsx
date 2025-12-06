@@ -1224,6 +1224,15 @@ const App: React.FC = () => {
     const handleDeleteStaff = async (staffId: string) => { await deleteDoc(doc(db, 'staff', staffId)); };
     const handleLogExpense = async (expense: Omit<Expense, 'id'>) => { await addDoc(collection(db, 'expenses'), expense); };
 
+    const handleDeleteExpense = useCallback(async (expenseId: string) => {
+        try {
+            await deleteDoc(doc(db, 'expenses', expenseId));
+        } catch (error) {
+            console.error("Error deleting expense:", error);
+            alert("حدث خطأ أثناء حذف المصروف.");
+        }
+    }, []);
+
     const handleSetTeacherAttendance = async (teacherId: string, date: string, status: TeacherAttendanceStatus, reason?: string) => {
         try {
             const q = query(collection(db, "teacherAttendance"), where("teacherId", "==", teacherId), where("date", "==", date));
@@ -1846,7 +1855,7 @@ const App: React.FC = () => {
         const subViewContent = (() => {
             if (isArchiveView) return renderArchiveList();
             if (isDebtorsView) return <DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser.role} searchTerm={searchTerm} />;
-            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
+            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} onDeleteExpense={handleDeleteExpense} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
             if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={students} />;
             if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
             if (isFeeCollectionView) return <FeeCollectionPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={students} teacherCollections={collections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />;
@@ -1878,7 +1887,7 @@ const App: React.FC = () => {
                 onToggleFilter={() => setIsTeacherFilterVisible(!isTeacherFilterVisible)}
             />;
             if (isDirectorNotesView) return <DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} />;
-            if (isFinanceView) return <FinancePage onBack={handleBackToMain} students={students} teachers={teachers} staff={[]} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={collections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={[]} onApplyDeductions={handleApplyDeductions} />;
+            if (isFinanceView) return <FinancePage onBack={handleBackToMain} students={students} teachers={teachers} staff={[]} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onDeleteExpense={handleDeleteExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={collections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={[]} onApplyDeductions={handleApplyDeductions} />;
             if (isDirectorReportView) return <DirectorReportsPage groups={groups} students={students} onBack={handleBackToMain} />;
             if (viewingGroup) return <GroupReportPage group={viewingGroup} students={students.filter(s => s.groupId === viewingGroup.id)} teacher={teachers.find(t => t.id === viewingGroup.teacherId)} onBack={handleBackToMain} currentUserRole={currentUser?.role} />;
             return null;
@@ -1932,7 +1941,7 @@ const App: React.FC = () => {
         const subViewContent = (() => {
             if (isArchiveView) return renderArchiveList();
             if (isDebtorsView) return <DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser.role} searchTerm={searchTerm} />;
-            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
+            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} onDeleteExpense={handleDeleteExpense} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
             if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} />;
             if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
             if (isFeeCollectionView) return <FeeCollectionPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} teacherCollections={teacherCollections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />;
@@ -1964,7 +1973,7 @@ const App: React.FC = () => {
                 onToggleFilter={() => setIsTeacherFilterVisible(!isTeacherFilterVisible)}
             />;
             if (isDirectorNotesView) return <DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} />;
-            if (isFinanceView) return <FinancePage onBack={handleBackToMain} students={activeStudents} teachers={teachers} staff={staff} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={teacherCollections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={supervisors} onApplyDeductions={handleApplyDeductions} />;
+            if (isFinanceView) return <FinancePage onBack={handleBackToMain} students={activeStudents} teachers={teachers} staff={staff} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onDeleteExpense={handleDeleteExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={teacherCollections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={supervisors} onApplyDeductions={handleApplyDeductions} />;
             if (isDirectorReportView) return <DirectorReportsPage groups={groups} students={activeStudents} onBack={handleBackToMain} />;
             if (viewingGroup) return <GroupReportPage group={viewingGroup} students={activeStudents.filter(s => s.groupId === viewingGroup.id)} teacher={teachers.find(t => t.id === viewingGroup.teacherId)} onBack={handleBackToMain} currentUserRole={currentUser?.role} />;
             return null;
