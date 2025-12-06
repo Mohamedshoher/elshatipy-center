@@ -1,16 +1,19 @@
 
 
 import React, { useMemo, useState } from 'react';
-import type { Note, Student, Group, Teacher, TeacherCollectionRecord } from '../types';
+import type { Note, Student, Group, Teacher, TeacherCollectionRecord, Expense } from '../types';
+import { ExpenseCategory, roundToNearest5 } from '../types';
 import UserPlusIcon from './icons/UserPlusIcon';
 import ArchiveIcon from './icons/ArchiveIcon';
 import ClipboardListIcon from './icons/ClipboardListIcon';
 import CurrencyDollarIcon from './icons/CurrencyDollarIcon';
 import CheckCircleIcon from './icons/CheckCircleIcon';
 import ChevronDownIcon from './icons/ChevronDownIcon';
-import CashIcon from './icons/CashIcon';
 import XIcon from './icons/XIcon';
 import PendingStudents from './PendingStudents';
+import FinanceIncomeModal from './FinanceIncomeModal';
+import FinanceExpenseModal from './FinanceExpenseModal';
+import FinanceCollectionsModal from './FinanceCollectionsModal';
 
 interface GeneralViewPageProps {
     students: Student[];
@@ -18,6 +21,7 @@ interface GeneralViewPageProps {
     groups: Group[];
     teachers: Teacher[];
     teacherCollections: TeacherCollectionRecord[];
+    expenses: Expense[];
     onToggleAcknowledge: (noteId: string) => void;
     onViewStudent: (studentId: string) => void;
     onApproveStudent: (studentId: string) => void;
@@ -103,15 +107,19 @@ const GroupedStudentList: React.FC<{
 };
 
 
-const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, groups, teachers, teacherCollections, onToggleAcknowledge, onViewStudent, onApproveStudent, onRejectStudent }) => {
+const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, groups, teachers, teacherCollections, expenses, onToggleAcknowledge, onViewStudent, onApproveStudent, onRejectStudent }) => {
 
     const [expandedNewGroups, setExpandedNewGroups] = useState<Set<string>>(new Set());
     const [expandedArchivedGroups, setExpandedArchivedGroups] = useState<Set<string>>(new Set());
-    const [isReceivedMoneyModalOpen, setIsReceivedMoneyModalOpen] = useState(false);
+    const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
+
+    // Modal States
+    const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
+    const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
+    const [isCollectionsModalOpen, setIsCollectionsModalOpen] = useState(false);
 
     const now = new Date();
     const sevenDaysAgo = new Date(now.getTime() - 7 * 24 * 60 * 60 * 1000);
-    const currentMonth = now.toISOString().substring(0, 7);
 
     const groupMap = useMemo(() => new Map(groups.map(g => [g.id, g.name])), [groups]);
 
@@ -150,27 +158,11 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
             .slice(0, 5),
         [notes]);
 
-    const financialSummary = useMemo(() => {
-        let totalCollected = 0;
-        let totalDue = 0;
-        const activeStudentsInMonth = students.filter(s => !s.isArchived && s.joiningDate.substring(0, 7) <= currentMonth);
 
-        activeStudentsInMonth.forEach(student => {
-            totalDue += student.monthlyFee;
-            const feeRecord = student.fees.find(f => f.month === currentMonth);
-            if (feeRecord?.paid) {
-                totalCollected += feeRecord.amountPaid || student.monthlyFee;
-            }
-        });
-
-        return {
-            collected: totalCollected,
-            remaining: totalDue - totalCollected
-        };
-    }, [students, currentMonth]);
+    // --- Financial Calculations ---
 
     const teacherCollectionsSummary = useMemo(() => {
-        const collectionsThisMonth = teacherCollections.filter(c => c.month === currentMonth);
+        const collectionsThisMonth = teacherCollections.filter(c => c.month === selectedMonth);
         const totalReceived = collectionsThisMonth.reduce((sum, c) => sum + c.amount, 0);
 
         const teacherTotals: { [key: string]: number } = {};
@@ -186,11 +178,43 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
             amount,
         })).sort((a, b) => b.amount - a.amount);
 
-        return {
-            totalReceived,
-            details,
-        };
-    }, [teacherCollections, teachers, currentMonth]);
+        return { totalReceived, details };
+    }, [teacherCollections, teachers, selectedMonth]);
+
+
+    const financialOverview = useMemo(() => {
+        const income = students.flatMap(s => s.fees)
+            .filter(f => f.month === selectedMonth && f.paid && f.amountPaid)
+            .reduce((sum, f) => sum + f.amountPaid!, 0);
+
+        const totalExpenses = expenses
+            .filter(e => {
+                // Check if it's a salary expense
+                const isSalary = [
+                    ExpenseCategory.TEACHER_SALARY,
+                    ExpenseCategory.SUPERVISOR_SALARY,
+                    ExpenseCategory.STAFF_SALARY,
+                    ExpenseCategory.TEACHER_BONUS
+                ].includes(e.category);
+
+                if (isSalary) {
+                    // Try to extract month from description " - شهر YYYY-MM"
+                    const match = e.description.match(/شهر (\d{4}-\d{2})/);
+                    if (match && match[1]) {
+                        return match[1] === selectedMonth;
+                    }
+                }
+
+                // Fallback to date for non-salaries or if extraction fails
+                return e.date.startsWith(selectedMonth);
+            })
+            .reduce((sum, e) => sum + e.amount, 0);
+
+        // Net Profit = Received from Teachers - Total Expenses
+        const net = teacherCollectionsSummary.totalReceived - totalExpenses;
+        return { income, totalExpenses, net };
+    }, [students, expenses, selectedMonth, teacherCollectionsSummary.totalReceived]);
+
 
     const toggleNewGroup = (groupId: string) => {
         setExpandedNewGroups(prev => {
@@ -223,24 +247,80 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8 items-start">
 
                 <div className="space-y-8">
-                    <InfoCard title="الملخص المالي للشهر الحالي" icon={<CurrencyDollarIcon className="w-6 h-6 text-green-500" />}>
-                        <div className="space-y-3">
-                            <div className="bg-green-50 border border-green-200 text-green-700 p-4 rounded-lg flex justify-between items-center">
-                                <p className="font-semibold">المبلغ المحصّل</p>
-                                <p className="text-2xl font-bold">EGP {financialSummary.collected.toLocaleString()}</p>
+                    {/* Financial Summary Card */}
+                    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
+                        <div className="p-6">
+                            <div className="flex flex-col sm:flex-row justify-between items-center mb-6">
+                                <h2 className="text-xl font-bold text-gray-800 flex items-center gap-2 mb-4 sm:mb-0">
+                                    <CurrencyDollarIcon className="w-6 h-6 text-green-500" />
+                                    <span>الملخص المالي للشهر المحدد</span>
+                                </h2>
+                                <div className="w-full sm:w-auto">
+                                    <label htmlFor="month-filter" className="sr-only">عرض بيانات شهر</label>
+                                    <input
+                                        type="month"
+                                        id="month-filter"
+                                        value={selectedMonth}
+                                        onChange={e => setSelectedMonth(e.target.value)}
+                                        className="w-full px-4 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500 text-left"
+                                        dir="ltr"
+                                    />
+                                    <div className="text-xs text-gray-500 mt-1 text-right">عرض بيانات شهر</div>
+                                </div>
                             </div>
-                            <div className="bg-red-50 border border-red-200 text-red-700 p-4 rounded-lg flex justify-between items-center">
-                                <p className="font-semibold">المبلغ المتبقي</p>
-                                <p className="text-2xl font-bold">EGP {financialSummary.remaining.toLocaleString()}</p>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                {/* Total Income (Student Fees) */}
+                                <button
+                                    onClick={() => setIsIncomeModalOpen(true)}
+                                    className="bg-green-100 p-6 rounded-lg text-center transition-all duration-300 hover:shadow-md hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-green-400"
+                                >
+                                    <p className="text-lg text-green-800 font-semibold mb-2">إجمالي الدخل</p>
+                                    <p className="text-3xl font-bold text-green-700 dir-ltr">
+                                        EGP {roundToNearest5(financialOverview.income).toLocaleString()}
+                                    </p>
+                                    <p className="text-sm text-green-700 mt-2">مصروفات الطلاب المسددة</p>
+                                </button>
+
+                                {/* Total Expenses */}
+                                <button
+                                    onClick={() => setIsExpenseModalOpen(true)}
+                                    className="bg-red-100 p-6 rounded-lg text-center transition-all duration-300 hover:shadow-md hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-red-400"
+                                >
+                                    <p className="text-lg text-red-800 font-semibold mb-2">إجمالي المصروفات</p>
+                                    <p className="text-3xl font-bold text-red-700 dir-ltr">
+                                        EGP {roundToNearest5(financialOverview.totalExpenses).toLocaleString()}
+                                    </p>
+                                    <p className="text-sm text-red-700 mt-2">الرواتب والمصاريف العامة</p>
+                                </button>
+
+                                {/* Amount Received (From Teachers) */}
+                                <button
+                                    onClick={() => setIsCollectionsModalOpen(true)}
+                                    className="bg-cyan-100 p-6 rounded-lg text-center transition-all duration-300 hover:shadow-md hover:scale-[1.02] focus:outline-none focus:ring-2 focus:ring-cyan-400"
+                                >
+                                    <p className="text-lg text-cyan-800 font-semibold mb-2">المبلغ المستلم</p>
+                                    <p className="text-3xl font-bold text-cyan-700 dir-ltr">
+                                        EGP {roundToNearest5(teacherCollectionsSummary.totalReceived).toLocaleString()}
+                                    </p>
+                                    <p className="text-sm text-cyan-700 mt-2">من تحصيلات المدرسين</p>
+                                </button>
+
+                                {/* Net Profit / Loss */}
+                                <div className={`p-6 rounded-lg text-center ${financialOverview.net >= 0 ? 'bg-orange-50' : 'bg-red-50'}`}>
+                                    <p className={`text-lg font-semibold mb-2 ${financialOverview.net >= 0 ? 'text-orange-800' : 'text-red-800'}`}>
+                                        صافي الربح / الخسارة
+                                    </p>
+                                    <p className={`text-3xl font-bold dir-ltr ${financialOverview.net >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
+                                        {roundToNearest5(financialOverview.net).toLocaleString()} EGP
+                                    </p>
+                                    <p className={`text-sm mt-2 ${financialOverview.net >= 0 ? 'text-orange-700' : 'text-red-700'}`}>
+                                        المبلغ المستلم - المصروفات
+                                    </p>
+                                </div>
                             </div>
-                            <button
-                                onClick={() => setIsReceivedMoneyModalOpen(true)}
-                                className="w-full text-right bg-cyan-50 border border-cyan-200 text-cyan-700 p-4 rounded-lg flex justify-between items-center hover:bg-cyan-100 transition-colors focus:outline-none focus:ring-2 focus:ring-cyan-400">
-                                <p className="font-semibold">المبلغ المستلم</p>
-                                <p className="text-2xl font-bold">EGP {teacherCollectionsSummary.totalReceived.toLocaleString()}</p>
-                            </button>
                         </div>
-                    </InfoCard>
+                    </div>
 
                     <InfoCard title="طلاب جدد (آخر 7 أيام)" icon={<UserPlusIcon className="w-6 h-6 text-blue-500" />}>
                         <GroupedStudentList
@@ -295,31 +375,26 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
 
             </div>
 
-            {isReceivedMoneyModalOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-                    <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-lg flex flex-col max-h-[90vh]">
-                        <div className="flex-shrink-0 flex justify-between items-center mb-4">
-                            <h2 className="text-2xl font-bold text-gray-700">تفاصيل المبلغ المستلم</h2>
-                            <button onClick={() => setIsReceivedMoneyModalOpen(false)} className="text-gray-400 hover:text-gray-600">
-                                <XIcon className="w-6 h-6" />
-                            </button>
-                        </div>
-                        <div className="flex-grow overflow-y-auto space-y-2 pr-2">
-                            {teacherCollectionsSummary.details.length > 0 ? teacherCollectionsSummary.details.map(detail => (
-                                <div key={detail.teacherId} className="flex justify-between items-center bg-gray-100 p-3 rounded-md">
-                                    <span className="font-semibold text-gray-700">{detail.teacherName}</span>
-                                    <span className="font-bold text-gray-800">{detail.amount.toLocaleString()} EGP</span>
-                                </div>
-                            )) : (
-                                <p className="text-center text-gray-400 py-8">لم يتم استلام مبالغ من المدرسين هذا الشهر.</p>
-                            )}
-                        </div>
-                        <div className="flex-shrink-0 mt-6 flex justify-end">
-                            <button onClick={() => setIsReceivedMoneyModalOpen(false)} className="px-6 py-2 rounded-lg text-gray-700 bg-gray-200 hover:bg-gray-300">إغلاق</button>
-                        </div>
-                    </div>
-                </div>
-            )}
+            {/* Modals */}
+            <FinanceIncomeModal
+                isOpen={isIncomeModalOpen}
+                onClose={() => setIsIncomeModalOpen(false)}
+                month={selectedMonth}
+                students={students}
+                groups={groups}
+            />
+            <FinanceExpenseModal
+                isOpen={isExpenseModalOpen}
+                onClose={() => setIsExpenseModalOpen(false)}
+                month={selectedMonth}
+                expenses={expenses}
+            />
+            <FinanceCollectionsModal
+                isOpen={isCollectionsModalOpen}
+                onClose={() => setIsCollectionsModalOpen(false)}
+                month={selectedMonth}
+                collectionsSummary={teacherCollectionsSummary}
+            />
         </main>
     );
 };

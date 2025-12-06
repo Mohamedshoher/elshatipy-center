@@ -47,7 +47,7 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
 
   const studentsInAssignedGroups = useMemo(() => {
     const groupIds = assignedGroups.map(g => g.id);
-    return students.filter(s => groupIds.includes(s.groupId));
+    return students.filter(s => groupIds.includes(s.groupId) && !s.isArchived);
   }, [students, assignedGroups]);
 
   const collectedAmount = useMemo(() => {
@@ -325,7 +325,7 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
           </h2>
           <div className="space-y-4 max-h-[70vh] overflow-y-auto">
             {assignedGroups.length > 0 ? assignedGroups.map(group => {
-              const studentsInGroup = students.filter(s => s.groupId === group.id);
+              const studentsInGroup = students.filter(s => s.groupId === group.id && !s.isArchived);
               return (
                 <div key={group.id} className="bg-gray-50 p-4 rounded-lg border">
                   <h3 className="font-bold text-lg text-gray-700 mb-3">{group.name} ({studentsInGroup.length} طالب)</h3>

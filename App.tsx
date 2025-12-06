@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
-import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor } from './types';
+import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus } from './types';
 import { ExpenseCategory, TeacherAttendanceStatus, DayOfWeek, TestType as TestTypeEnum } from './types';
 import StudentCard from './components/StudentCard';
 import StudentForm from './components/StudentForm';
@@ -76,6 +76,7 @@ const App: React.FC = () => {
     const [teacherAttendance, setTeacherAttendance] = useState<TeacherAttendanceRecord[]>([]);
     const [teacherPayrollAdjustments, setTeacherPayrollAdjustments] = useState<TeacherPayrollAdjustment[]>([]);
     const [teacherCollections, setTeacherCollections] = useState<TeacherCollectionRecord[]>([]);
+    const [teacherManualBonuses, setTeacherManualBonuses] = useState<TeacherManualBonus[]>([]);
     const [financialSettings, setFinancialSettings] = useState<FinancialSettings>({ workingDaysPerMonth: 22, absenceDeductionPercentage: 100 });
 
     // --- Error State ---
@@ -128,6 +129,7 @@ const App: React.FC = () => {
         if (lowerName.includes('قرآن')) return 'قرآن';
         if (lowerName.includes('نور بيان')) return 'نور بيان';
         if (lowerName.includes('تلقين') || lowerName.includes('تقلين')) return 'تلقين';
+        if (lowerName.includes('إقراء') || lowerName.includes('اقراء')) return 'إقراء';
         return null;
     };
 
@@ -146,6 +148,7 @@ const App: React.FC = () => {
             { name: 'teacherAttendance', setter: setTeacherAttendance },
             { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments },
             { name: 'teacherCollections', setter: setTeacherCollections },
+            { name: 'teacherManualBonuses', setter: setTeacherManualBonuses },
         ];
 
         const unsubscribers = collections.map(({ name, setter }) =>
@@ -942,11 +945,13 @@ const App: React.FC = () => {
 
         // Then archive in background
         try {
+            const currentGroupName = groups.find(g => g.id === studentToArchive.groupId)?.name || 'غير محدد';
             const updateData: any = {
                 isArchived: true,
                 archivedBy: archivedByValue,
                 archiveDate: new Date().toISOString().split('T')[0],
                 hasDebt: hasDebt,
+                archivedGroupName: currentGroupName, // Save group name for history even if group is deleted
             };
 
             if (hasDebt) {
@@ -1315,6 +1320,25 @@ const App: React.FC = () => {
         }
     }, []);
 
+    // Manual Bonus Handlers
+    const handleAddManualBonus = useCallback(async (bonusData: Omit<TeacherManualBonus, 'id'>) => {
+        try {
+            await addDoc(collection(db, 'teacherManualBonuses'), bonusData);
+        } catch (error) {
+            console.error("Error adding manual bonus:", error);
+            alert("حدث خطأ أثناء إضافة المكافأة.");
+        }
+    }, []);
+
+    const handleDeleteManualBonus = useCallback(async (bonusId: string) => {
+        try {
+            await deleteDoc(doc(db, 'teacherManualBonuses', bonusId));
+        } catch (error) {
+            console.error("Error deleting manual bonus:", error);
+            alert("حدث خطأ أثناء حذف المكافأة.");
+        }
+    }, []);
+
     // ... (Reset Pay handlers) ...
     const handleResetTeacherPayment = useCallback(async (teacherId: string, month: string, teacherName: string) => {
         if (window.confirm(`هل أنت متأكد من رغبتك في إلغاء دفع راتب المدرس "${teacherName}" لشهر ${month}؟ سيتم حذف المصروف من السجل المالي.`)) {
@@ -1553,7 +1577,7 @@ const App: React.FC = () => {
                             <StudentCard
                                 key={student.id}
                                 student={student}
-                                groupName={groups.find(g => g.id === student.groupId)?.name}
+                                groupName={student.archivedGroupName || groups.find(g => g.id === student.groupId)?.name}
                                 onOpenFeeModal={handleOpenFeeModal}
                                 onEdit={handleEditStudent}
                                 onToggleAttendance={handleToggleAttendance}
@@ -1822,7 +1846,7 @@ const App: React.FC = () => {
         const subViewContent = (() => {
             if (isArchiveView) return renderArchiveList();
             if (isDebtorsView) return <DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser.role} searchTerm={searchTerm} />;
-            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
+            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
             if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={students} />;
             if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
             if (isFeeCollectionView) return <FeeCollectionPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={students} teacherCollections={collections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />;
@@ -1908,7 +1932,7 @@ const App: React.FC = () => {
         const subViewContent = (() => {
             if (isArchiveView) return renderArchiveList();
             if (isDebtorsView) return <DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser.role} searchTerm={searchTerm} />;
-            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
+            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
             if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} />;
             if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
             if (isFeeCollectionView) return <FeeCollectionPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} teacherCollections={teacherCollections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />;
@@ -2146,8 +2170,11 @@ const App: React.FC = () => {
                         onViewTeacherReport={setViewingTeacherReportId}
                         onSendNotificationToAll={handleSendNotificationToAll}
                         teacherCollections={teacherCollections}
+                        teacherManualBonuses={teacherManualBonuses}
                         currentUserRole={currentUser?.role}
                         onAddTeacherCollection={handleAddTeacherCollection}
+                        onAddManualBonus={handleAddManualBonus}
+                        onDeleteManualBonus={handleDeleteManualBonus}
                     />
                 </>
             )}

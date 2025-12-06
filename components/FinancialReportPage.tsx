@@ -23,6 +23,9 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
     const unpaidStudentsByGroup: Record<string, Student[]> = {};
 
     students.forEach(student => {
+      // Skip archived students
+      if (student.isArchived) return;
+
       // Only consider students who have joined on or before the selected month
       if (student.joiningDate.substring(0, 7) > selectedMonth) {
         return;

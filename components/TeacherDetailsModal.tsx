@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo } from 'react';
-import type { Teacher, Group, TeacherAttendanceRecord, TeacherPayrollAdjustment, Expense, FinancialSettings, Student, Supervisor, TeacherCollectionRecord } from '../types';
+import type { Teacher, Group, TeacherAttendanceRecord, TeacherPayrollAdjustment, Expense, FinancialSettings, Student, Supervisor, TeacherCollectionRecord, TeacherManualBonus } from '../types';
 import { TeacherStatus, ExpenseCategory, TeacherAttendanceStatus, PaymentType, roundToNearest5 } from '../types';
 import PhoneIcon from './icons/PhoneIcon';
 import EditIcon from './icons/EditIcon';
@@ -36,8 +36,11 @@ interface TeacherDetailsModalProps {
     onViewTeacherReport: (teacherId: string) => void;
     onSendNotificationToAll: (content: string) => void;
     teacherCollections?: TeacherCollectionRecord[];
+    teacherManualBonuses?: TeacherManualBonus[];
     currentUserRole?: 'director' | 'teacher' | 'supervisor';
     onAddTeacherCollection?: (collection: Omit<TeacherCollectionRecord, 'id'>) => void;
+    onAddManualBonus?: (bonus: Omit<TeacherManualBonus, 'id'>) => void;
+    onDeleteManualBonus?: (bonusId: string) => void;
 }
 
 const getAbsenceValue = (status: TeacherAttendanceStatus): number => {
@@ -86,12 +89,16 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
     onViewTeacherReport,
     onSendNotificationToAll,
     teacherCollections = [],
+    teacherManualBonuses = [],
     currentUserRole,
     onAddTeacherCollection,
+    onAddManualBonus,
+    onDeleteManualBonus,
 }) => {
     const [activeTab, setActiveTab] = useState<'payroll' | 'attendance' | 'groups' | 'collections'>('collections');
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
     const [additionalBonus, setAdditionalBonus] = useState('');
+    const [bonusReason, setBonusReason] = useState('');
     const [isBonusModalOpen, setIsBonusModalOpen] = useState(false);
     const [bonusTypeToGive, setBonusTypeToGive] = useState<TeacherAttendanceStatus | null>(null);
     const [isDeductionModalOpen, setIsDeductionModalOpen] = useState(false);
@@ -181,7 +188,7 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
     }, [employeeId, teacherAttendance, selectedMonth]);
 
     const payrollData = useMemo(() => {
-        if (!employeeId) return { baseSalary: 0, adjustments: { bonus: 0, isPaid: false }, absenceDays: 0, bonusDays: 0, absenceDeduction: 0, attendanceBonus: 0, finalSalary: 0, isPaid: false, isPartnership: false, partnershipAmount: 0, collectedAmount: 0, totalHandedOver: 0, remainingBalance: 0 };
+        if (!employeeId) return { baseSalary: 0, adjustments: { bonus: 0, isPaid: false }, absenceDays: 0, bonusDays: 0, absenceDeduction: 0, attendanceBonus: 0, manualBonusTotal: 0, finalSalary: 0, isPaid: false, isPartnership: false, partnershipAmount: 0, collectedAmount: 0, totalHandedOver: 0, remainingBalance: 0 };
 
         // Calculate collected amount for this teacher (if teacher)
         let collectedAmount = 0;
@@ -204,6 +211,10 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
         const totalHandedOver = collectionsForMonth.reduce((sum, c) => sum + c.amount, 0);
         const remainingBalance = collectedAmount - totalHandedOver;
 
+        // Calculate manual bonuses for this month
+        const manualBonusesForMonth = teacherManualBonuses.filter(b => b.teacherId === employeeId && b.month === selectedMonth);
+        const manualBonusTotal = manualBonusesForMonth.reduce((sum, b) => sum + b.amount, 0);
+
         const adjustments = teacherPayrollAdjustments.find(p => p.teacherId === employeeId && p.month === selectedMonth) || { bonus: 0, isPaid: false };
 
         const absenceDays = attendanceForMonth.reduce((total, record) => total + getAbsenceValue(record.status), 0);
@@ -218,8 +229,8 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
         const attendanceBonus = roundToNearest5(dailyRate * bonusDays);
 
         const finalSalary = roundToNearest5(isPartnership
-            ? partnershipAmount + adjustments.bonus + attendanceBonus - absenceDeduction
-            : baseSalary + adjustments.bonus + attendanceBonus - absenceDeduction);
+            ? partnershipAmount + manualBonusTotal + attendanceBonus - absenceDeduction
+            : baseSalary + manualBonusTotal + attendanceBonus - absenceDeduction);
 
         return {
             baseSalary,
@@ -228,6 +239,7 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
             bonusDays,
             absenceDeduction,
             attendanceBonus,
+            manualBonusTotal,
             finalSalary,
             isPaid: adjustments.isPaid,
             isPartnership,
@@ -237,7 +249,7 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
             remainingBalance,
             partnershipPercentage
         };
-    }, [employeeId, employeeSalary, selectedMonth, teacherPayrollAdjustments, attendanceForMonth, financialSettings, teacherCollections, teacher, isSupervisor, groups, students]);
+    }, [employeeId, employeeSalary, selectedMonth, teacherPayrollAdjustments, attendanceForMonth, financialSettings, teacherCollections, teacherManualBonuses, teacher, isSupervisor, groups, students]);
 
     const bonusRecordsWithReason = useMemo(() =>
         attendanceForMonth.filter(r => getBonusValue(r.status) > 0 && r.reason),
@@ -266,30 +278,50 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
     }
 
     const handlePayAdditionalBonus = () => {
-        if (!employeeId) return;
+        if (!employeeId || !onAddManualBonus) return;
         const amount = parseFloat(additionalBonus);
-        if (!amount || amount <= 0) {
-            alert('يرجى إدخال مبلغ مكافأة صحيح.');
+
+        // Check for valid number (not zero, not NaN)
+        if (isNaN(amount) || amount === 0) {
+            alert('يرجى إدخال مبلغ صحيح (موجب للمكافأة، سالب للخصم).');
             return;
         }
 
-        const descRole = isSupervisor ? 'مشرف' : 'مدرس';
-        onLogExpense({
-            date: new Date().toISOString().split('T')[0],
-            category: ExpenseCategory.TEACHER_BONUS, // Shared for now or add specific
-            description: `مكافأة إضافية لـ ${descRole}: ${employeeName} - شهر ${selectedMonth}`,
-            amount: amount,
-        });
+        const isDeduction = amount < 0;
+        const absoluteAmount = Math.abs(amount);
 
-        const newTotalBonus = (payrollData.adjustments.bonus || 0) + amount;
-        onUpdatePayrollAdjustments({
+        // Add to manual bonuses - build object without undefined values
+        const manualBonusData: any = {
             teacherId: employeeId,
             month: selectedMonth,
-            bonus: newTotalBonus,
+            amount: amount, // Keep the sign (positive for bonus, negative for deduction)
+            date: new Date().toISOString(),
+            addedBy: currentUserRole || 'director'
+        };
+
+        // Only add reason if it has a value
+        if (bonusReason && bonusReason.trim()) {
+            manualBonusData.reason = bonusReason.trim();
+        }
+
+        onAddManualBonus(manualBonusData);
+
+        // Also log as expense
+        const descRole = isSupervisor ? 'مشرف' : 'مدرس';
+        const actionType = isDeduction ? 'خصم يدوي' : 'مكافأة يدوية';
+        const expenseCategory = isDeduction ? ExpenseCategory.OTHER : ExpenseCategory.TEACHER_BONUS;
+
+        onLogExpense({
+            date: new Date().toISOString().split('T')[0],
+            category: expenseCategory,
+            description: `${actionType} ${isDeduction ? 'من' : 'لـ'} ${descRole}: ${employeeName}${bonusReason ? ` - ${bonusReason}` : ''} - شهر ${selectedMonth}`,
+            amount: absoluteAmount, // Expense is always positive
         });
 
-        alert(`تم تسليم مكافأة بقيمة ${amount.toLocaleString()} EGP بنجاح.`);
+        const actionText = isDeduction ? 'خصم' : 'مكافأة';
+        alert(`تم تسجيل ${actionText} بقيمة ${absoluteAmount.toLocaleString()} EGP بنجاح.`);
         setAdditionalBonus('');
+        setBonusReason('');
     };
 
 
@@ -320,26 +352,26 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
         const monthName = new Date(selectedMonth + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' });
         const roleTitle = isSupervisor ? 'المشرف/ة' : 'المدرس/ة';
 
-        let message = `*تقرير الراتب - ${monthName}*\n`;
-        message += `*${roleTitle}:* ${employeeName}\n\n`;
-        message += `*--- تفاصيل الراتب ---*\n`;
+        let message = `*تقرير الراتب - ${monthName}*\\n`;
+        message += `*${roleTitle}:* ${employeeName}\\n\\n`;
+        message += `*--- تفاصيل الراتب ---*\\n`;
 
         if (payrollData.isPartnership) {
-            message += `*نوع المحاسبة:* شراكة (${payrollData.partnershipPercentage}%)\n`;
-            message += `*المبلغ المحصّل:* ${payrollData.collectedAmount.toLocaleString()} EGP\n`;
-            message += `*المبلغ المسلّم للإدارة:* ${payrollData.totalHandedOver.toLocaleString()} EGP\n`;
+            message += `*نوع المحاسبة:* شراكة (${payrollData.partnershipPercentage}%)\\n`;
+            message += `*المبلغ المحصّل:* ${payrollData.collectedAmount.toLocaleString()} EGP\\n`;
+            message += `*المبلغ المسلّم للإدارة:* ${payrollData.totalHandedOver.toLocaleString()} EGP\\n`;
             if (payrollData.remainingBalance > 0) {
-                message += `*المبلغ المتبقي (في ذمتك):* ${payrollData.remainingBalance.toLocaleString()} EGP\n`;
+                message += `*المبلغ المتبقي (في ذمتك):* ${payrollData.remainingBalance.toLocaleString()} EGP\\n`;
             }
-            message += `*نصيبك من المحصل:* ${payrollData.partnershipAmount.toFixed(2)} EGP\n`;
+            message += `*نصيبك من المحصل:* ${payrollData.partnershipAmount.toFixed(2)} EGP\\n`;
         } else {
-            message += `*الراتب الأساسي:* ${payrollData.baseSalary.toLocaleString()} EGP\n`;
+            message += `*الراتب الأساسي:* ${payrollData.baseSalary.toLocaleString()} EGP\\n`;
         }
 
-        message += `*مكافأة حضور (${payrollData.bonusDays} يوم):* +${payrollData.attendanceBonus.toFixed(2)} EGP\n`;
+        message += `*مكافأة حضور (${payrollData.bonusDays} يوم):* +${payrollData.attendanceBonus.toFixed(2)} EGP\\n`;
 
         if (bonusRecordsWithReason.length > 0) {
-            message += `*تفاصيل المكافآت:*\n`;
+            message += `*تفاصيل المكافآت:*\\n`;
             bonusRecordsWithReason.forEach(r => {
                 let bonusAmountText = '';
                 switch (r.status) {
@@ -347,29 +379,34 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
                     case TeacherAttendanceStatus.BONUS_HALF_DAY: bonusAmountText = 'نصف يوم'; break;
                     case TeacherAttendanceStatus.BONUS_QUARTER_DAY: bonusAmountText = 'ربع يوم'; break;
                 }
-                message += `  - ${new Date(r.date).toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric' })}: ${r.reason} (${bonusAmountText})\n`;
+                message += `  - ${new Date(r.date).toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric' })}: ${r.reason} (${bonusAmountText})\\n`;
             });
         }
 
-        if (payrollData.adjustments.bonus > 0) {
-            message += `*مكافآت إضافية:* +${payrollData.adjustments.bonus.toLocaleString()} EGP\n`;
+        // المكافآت اليدوية
+        const manualBonusesForMonth = teacherManualBonuses.filter(b => b.teacherId === employeeId && b.month === selectedMonth);
+        if (manualBonusesForMonth.length > 0) {
+            message += `*مكافآت يدوية (${manualBonusesForMonth.length}):* +${payrollData.manualBonusTotal.toLocaleString()} EGP\\n`;
+            manualBonusesForMonth.forEach(b => {
+                message += `  - ${new Date(b.date).toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric' })}: ${b.amount.toLocaleString()} EGP${b.reason ? ` - ${b.reason}` : ''}\\n`;
+            });
         }
 
-        message += `*خصم الغياب (${payrollData.absenceDays} يوم):* -${payrollData.absenceDeduction.toFixed(2)} EGP\n`;
+        message += `*خصم الغياب (${payrollData.absenceDays} يوم):* -${payrollData.absenceDeduction.toFixed(2)} EGP\\n`;
 
         if (deductionRecordsWithReason.length > 0) {
-            message += `*تفاصيل الخصومات:*\n`;
+            message += `*تفاصيل الخصومات:*\\n`;
             deductionRecordsWithReason.forEach(r => {
                 let deductionAmountText = '';
                 switch (r.status) {
                     case TeacherAttendanceStatus.HALF_DAY: deductionAmountText = 'نصف يوم'; break;
                     case TeacherAttendanceStatus.QUARTER_DAY: deductionAmountText = 'ربع يوم'; break;
                 }
-                message += `  - ${new Date(r.date).toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric' })}: ${r.reason} (${deductionAmountText})\n`;
+                message += `  - ${new Date(r.date).toLocaleDateString('ar-EG-u-nu-latn', { day: 'numeric' })}: ${r.reason} (${deductionAmountText})\\n`;
             });
         }
 
-        message += `*الراتب النهائي:* *${payrollData.finalSalary.toFixed(2)} EGP*\n\n`;
+        message += `*الراتب النهائي:* *${payrollData.finalSalary.toFixed(2)} EGP*\\n\\n`;
         message += `مع تحيات إدارة مركز الشاطبي.`;
 
         const phone = employeePhone.replace(/[^0-9]/g, '');
@@ -410,68 +447,6 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
 
                     <div className="overflow-y-auto p-4">
 
-
-                        {/* Deduction Buttons - الخصومات */}
-                        <div className="mb-4">
-                            <h3 className="text-sm font-bold text-gray-700 mb-2">الخصومات</h3>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => handleDeductionClick(TeacherAttendanceStatus.DEDUCTION_FULL_DAY)}
-                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.DEDUCTION_FULL_DAY
-                                        ? 'bg-orange-600 text-white shadow'
-                                        : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
-                                        }`}
-                                >
-                                    خصم يوم
-                                </button>
-                                <button
-                                    onClick={() => handleDeductionClick(TeacherAttendanceStatus.DEDUCTION_HALF_DAY)}
-                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.DEDUCTION_HALF_DAY
-                                        ? 'bg-orange-600 text-white shadow'
-                                        : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
-                                        }`}
-                                >
-                                    خصم نصف
-                                </button>
-                                <button
-                                    onClick={() => handleDeductionClick(TeacherAttendanceStatus.DEDUCTION_QUARTER_DAY)}
-                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.DEDUCTION_QUARTER_DAY
-                                        ? 'bg-orange-600 text-white shadow'
-                                        : 'bg-orange-50 text-orange-700 border border-orange-200 hover:bg-orange-100'
-                                        }`}
-                                >
-                                    خصم ربع
-                                </button>
-                            </div>
-                        </div>
-
-                        {/* Bonus Buttons - المكافآت */}
-                        <div className="mb-4">
-                            <h3 className="text-sm font-bold text-gray-700 mb-2">المكافآت</h3>
-                            <div className="flex gap-2">
-                                <button
-                                    onClick={() => handleBonusClick(TeacherAttendanceStatus.BONUS_DAY)}
-                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.BONUS_DAY ? 'bg-purple-600 text-white shadow' : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
-                                        }`}
-                                >
-                                    مكافأة يوم
-                                </button>
-                                <button
-                                    onClick={() => handleBonusClick(TeacherAttendanceStatus.BONUS_HALF_DAY)}
-                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.BONUS_HALF_DAY ? 'bg-purple-600 text-white shadow' : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
-                                        }`}
-                                >
-                                    مكافأة نصف
-                                </button>
-                                <button
-                                    onClick={() => handleBonusClick(TeacherAttendanceStatus.BONUS_QUARTER_DAY)}
-                                    className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.BONUS_QUARTER_DAY ? 'bg-purple-600 text-white shadow' : 'bg-purple-50 text-purple-700 border border-purple-200 hover:bg-purple-100'
-                                        }`}
-                                >
-                                    مكافأة ربع
-                                </button>
-                            </div>
-                        </div>
 
                         <div className="border-t pt-3 flex justify-between items-center mb-4">
                             <div className="flex items-center gap-2">
@@ -552,7 +527,7 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
 
                                             <div><label className="text-xs text-gray-500 font-bold uppercase">خصم الغياب ({payrollData.absenceDays} يوم)</label><p className="font-bold text-lg text-red-500">{payrollData.absenceDeduction.toFixed(2)}</p></div>
                                             <div><label className="text-xs text-gray-500 font-bold uppercase">مكافأة حضور ({payrollData.bonusDays} يوم)</label><p className="font-bold text-lg text-green-500">{payrollData.attendanceBonus.toFixed(2)}</p></div>
-                                            <div><label className="text-xs text-gray-500 font-bold uppercase">المكافآت الإضافية</label><p className="font-bold text-lg text-green-500">{payrollData.adjustments.bonus.toLocaleString()}</p></div>
+                                            <div><label className="text-xs text-gray-500 font-bold uppercase">المكافآت اليدوية</label><p className="font-bold text-lg text-purple-500">{payrollData.manualBonusTotal.toLocaleString()}</p></div>
                                             <div className="col-span-1 sm:col-span-2 pt-2 border-t"><label className="text-sm text-gray-500 font-bold">الراتب النهائي</label><p className="font-bold text-3xl text-blue-600">{payrollData.finalSalary.toFixed(2)} <span className="text-sm text-gray-500 font-normal">EGP</span></p></div>
                                         </div>
 
@@ -658,6 +633,117 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
                                             </div>
                                         )}
 
+                                        {/* إضافة مكافأة/خصم يدوي - متاح دائماً */}
+                                        <div className="p-4 bg-gradient-to-r from-purple-50 to-pink-50 rounded-lg shadow-sm border border-purple-200">
+                                            <h4 className="font-bold text-purple-800 mb-3 flex items-center gap-2">
+                                                <span className="text-2xl">💰</span>
+                                                <span>إضافة مكافأة أو خصم</span>
+                                            </h4>
+                                            <div className="space-y-3">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-purple-700 mb-1">
+                                                        المبلغ (EGP)
+                                                        <span className="text-xs text-gray-500 mr-2">• موجب للمكافأة، سالب للخصم</span>
+                                                    </label>
+                                                    <input
+                                                        type="number"
+                                                        value={additionalBonus}
+                                                        onChange={(e) => setAdditionalBonus(e.target.value)}
+                                                        className="w-full px-4 py-2.5 border-2 border-purple-200 rounded-lg bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                                                        placeholder="500 أو -200"
+                                                        step="0.01"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-purple-700 mb-1">السبب (اختياري)</label>
+                                                    <input
+                                                        type="text"
+                                                        value={bonusReason}
+                                                        onChange={(e) => setBonusReason(e.target.value)}
+                                                        className="w-full px-4 py-2.5 border-2 border-purple-200 rounded-lg bg-white focus:ring-2 focus:ring-purple-500 focus:border-purple-500 outline-none transition-all"
+                                                        placeholder="مثلاً: تميز في الأداء أو تأخير"
+                                                    />
+                                                </div>
+                                                <button
+                                                    onClick={handlePayAdditionalBonus}
+                                                    className="w-full py-3 px-6 rounded-lg bg-gradient-to-r from-purple-600 to-pink-600 text-white font-bold hover:from-purple-700 hover:to-pink-700 shadow-lg hover:shadow-xl transition-all disabled:from-gray-300 disabled:to-gray-400 disabled:shadow-none disabled:cursor-not-allowed"
+                                                    disabled={!additionalBonus || parseFloat(additionalBonus) === 0 || isNaN(parseFloat(additionalBonus))}
+                                                >
+                                                    ✨ تسجيل
+                                                </button>
+                                            </div>
+                                            <p className="text-xs text-purple-600 mt-3 bg-white/50 p-2 rounded">
+                                                💡 أدخل رقماً موجباً للمكافأة (+500) أو سالباً للخصم (-200). سيتم احتسابها في الراتب النهائي.
+                                            </p>
+                                        </div>
+
+
+                                        {/* سجل المكافآت والخصومات اليدوية */}
+                                        {teacherManualBonuses.filter(b => b.teacherId === employeeId && b.month === selectedMonth).length > 0 && (
+                                            <div className="p-4 bg-white rounded-lg shadow-sm border border-gray-100">
+                                                <h4 className="font-semibold text-gray-700 mb-3 text-sm uppercase tracking-wide flex items-center justify-between">
+                                                    <span className="flex items-center gap-2">
+                                                        <span className="bg-purple-100 text-purple-700 px-2 py-1 rounded">سجل المكافآت والخصومات</span>
+                                                        <span className={`text-xs px-2 py-0.5 rounded-full ${payrollData.manualBonusTotal >= 0 ? 'bg-green-50 text-green-600' : 'bg-red-50 text-red-600'}`}>
+                                                            {payrollData.manualBonusTotal >= 0 ? '+' : ''}{payrollData.manualBonusTotal.toLocaleString()} EGP
+                                                        </span>
+                                                    </span>
+                                                </h4>
+                                                <div className="overflow-x-auto">
+                                                    <table className="w-full text-sm">
+                                                        <thead className="bg-gray-50 border-b border-gray-200">
+                                                            <tr>
+                                                                <th className="text-right p-2 font-bold text-gray-700">التاريخ</th>
+                                                                <th className="text-right p-2 font-bold text-gray-700">النوع</th>
+                                                                <th className="text-right p-2 font-bold text-gray-700">المبلغ</th>
+                                                                <th className="text-right p-2 font-bold text-gray-700">السبب</th>
+                                                                <th className="text-center p-2 font-bold text-gray-700">إجراء</th>
+                                                            </tr>
+                                                        </thead>
+                                                        <tbody>
+                                                            {teacherManualBonuses
+                                                                .filter(b => b.teacherId === employeeId && b.month === selectedMonth)
+                                                                .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                                                .map(bonus => {
+                                                                    const isDeduction = bonus.amount < 0;
+                                                                    const absoluteAmount = Math.abs(bonus.amount);
+                                                                    return (
+                                                                        <tr key={bonus.id} className="border-b border-gray-100 hover:bg-gray-50 transition-colors">
+                                                                            <td className="p-2 text-gray-700">{new Date(bonus.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'short', year: 'numeric' })}</td>
+                                                                            <td className="p-2">
+                                                                                <span className={`inline-flex items-center gap-1 px-2 py-0.5 rounded-full text-xs font-bold ${isDeduction ? 'bg-red-100 text-red-700' : 'bg-green-100 text-green-700'}`}>
+                                                                                    {isDeduction ? '⬇️ خصم' : '⬆️ مكافأة'}
+                                                                                </span>
+                                                                            </td>
+                                                                            <td className={`p-2 font-bold ${isDeduction ? 'text-red-600' : 'text-green-600'}`}>
+                                                                                {isDeduction ? '-' : '+'}{absoluteAmount.toLocaleString()} EGP
+                                                                            </td>
+                                                                            <td className="p-2 text-gray-600">{bonus.reason || '-'}</td>
+                                                                            <td className="p-2 text-center">
+                                                                                {onDeleteManualBonus && (
+                                                                                    <button
+                                                                                        onClick={() => {
+                                                                                            const actionType = isDeduction ? 'الخصم' : 'المكافأة';
+                                                                                            if (confirm(`هل أنت متأكد من حذف ${actionType} (${absoluteAmount.toLocaleString()} EGP)؟`)) {
+                                                                                                onDeleteManualBonus(bonus.id);
+                                                                                            }
+                                                                                        }}
+                                                                                        className="p-1 bg-red-50 text-red-600 rounded hover:bg-red-100 transition-colors"
+                                                                                        title={`حذف ${isDeduction ? 'الخصم' : 'المكافأة'}`}
+                                                                                    >
+                                                                                        <TrashIcon className="w-4 h-4" />
+                                                                                    </button>
+                                                                                )}
+                                                                            </td>
+                                                                        </tr>
+                                                                    );
+                                                                })}
+                                                        </tbody>
+                                                    </table>
+                                                </div>
+                                            </div>
+                                        )}
+
                                         <div className="flex justify-end items-center gap-3">
                                             {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
                                                 <button onClick={handleSendWhatsAppReport} className="flex items-center gap-2 bg-blue-100 text-blue-700 font-bold py-3 px-4 rounded-lg hover:bg-blue-200 transition-all text-sm" title="إرسال التقرير عبر واتساب">
@@ -675,31 +761,6 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
                                                 </button>
                                             )}
                                         </div>
-
-                                        {payrollData.isPaid && (
-                                            <div className="mt-4 pt-4 border-t border-gray-200">
-                                                <h4 className="font-semibold text-gray-700 mb-3">تسليم مكافأة إضافية</h4>
-                                                <div className="flex items-end gap-2">
-                                                    <div className="flex-grow">
-                                                        <label className="text-sm text-gray-500">مبلغ المكافأة</label>
-                                                        <input
-                                                            type="number"
-                                                            value={additionalBonus}
-                                                            onChange={(e) => setAdditionalBonus(e.target.value)}
-                                                            className="w-full p-2 border rounded bg-white focus:ring-2 focus:ring-purple-500 outline-none"
-                                                            placeholder="أدخل المبلغ"
-                                                        />
-                                                    </div>
-                                                    <button
-                                                        onClick={handlePayAdditionalBonus}
-                                                        className="py-2 px-6 rounded bg-purple-600 text-white font-bold hover:bg-purple-700 h-[42px] shadow-md disabled:bg-gray-300 disabled:shadow-none"
-                                                        disabled={!additionalBonus || parseFloat(additionalBonus) <= 0}
-                                                    >
-                                                        تسليم
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        )}
                                     </div>
                                 )}
                                 {activeTab === 'attendance' && (

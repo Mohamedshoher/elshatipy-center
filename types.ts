@@ -110,6 +110,7 @@ export interface Student {
   isArchived: boolean;
   archivedBy?: string; // 'director' or teacher's id
   archiveDate?: string; // YYYY-MM-DD
+  archivedGroupName?: string; // اسم المجموعة عند الأرشفة (للحفاظ عليه في حال حذف المجموعة)
   isPending?: boolean; // true if waiting for approval
   approvedBy?: string; // 'director' or supervisor's id
   approvalDate?: string; // YYYY-MM-DD
@@ -140,7 +141,7 @@ export interface Teacher {
   password?: string;
 }
 
-export type GroupType = 'all' | 'قرآن' | 'نور بيان' | 'تلقين';
+export type GroupType = 'all' | 'قرآن' | 'نور بيان' | 'تلقين' | 'إقراء';
 
 export interface Supervisor {
   id: string;
@@ -245,6 +246,16 @@ export interface TeacherCollectionRecord {
   amount: number;
   date: string; // YYYY-MM-DD
   notes?: string;
+}
+
+export interface TeacherManualBonus {
+  id: string;
+  teacherId: string;
+  month: string; // YYYY-MM
+  amount: number;
+  date: string; // YYYY-MM-DD
+  reason?: string;
+  addedBy: string; // 'director' or supervisor's id
 }
 
 // NOTIFICATION TYPE

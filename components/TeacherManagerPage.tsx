@@ -55,31 +55,31 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
     // Get teachers for current tab
     const getTeachersForTab = (tab: GroupType | 'الإشراف' | 'all') => {
         const sortBySearchRelevance = (items: any[]) => {
-            if (!searchTerm) return items;
-
-            const searchLower = searchTerm.toLowerCase().trim();
+            const searchLower = searchTerm ? searchTerm.toLowerCase().trim() : '';
 
             return items.sort((a, b) => {
                 const aName = a.name.toLowerCase();
                 const bName = b.name.toLowerCase();
 
-                // Check if name starts with search term (first word match)
-                const aStartsWith = aName.startsWith(searchLower);
-                const bStartsWith = bName.startsWith(searchLower);
+                if (searchTerm) {
+                    // Check if name starts with search term (first word match)
+                    const aStartsWith = aName.startsWith(searchLower);
+                    const bStartsWith = bName.startsWith(searchLower);
 
-                if (aStartsWith && !bStartsWith) return -1;
-                if (!aStartsWith && bStartsWith) return 1;
+                    if (aStartsWith && !bStartsWith) return -1;
+                    if (!aStartsWith && bStartsWith) return 1;
 
-                // Check if first word starts with search term
-                const aFirstWord = aName.split(' ')[0];
-                const bFirstWord = bName.split(' ')[0];
-                const aFirstWordMatch = aFirstWord.startsWith(searchLower);
-                const bFirstWordMatch = bFirstWord.startsWith(searchLower);
+                    // Check if first word starts with search term
+                    const aFirstWord = aName.split(' ')[0];
+                    const bFirstWord = bName.split(' ')[0];
+                    const aFirstWordMatch = aFirstWord.startsWith(searchLower);
+                    const bFirstWordMatch = bFirstWord.startsWith(searchLower);
 
-                if (aFirstWordMatch && !bFirstWordMatch) return -1;
-                if (!aFirstWordMatch && bFirstWordMatch) return 1;
+                    if (aFirstWordMatch && !bFirstWordMatch) return -1;
+                    if (!aFirstWordMatch && bFirstWordMatch) return 1;
+                }
 
-                // Otherwise, alphabetical
+                // Otherwise or finally, alphabetical
                 return aName.localeCompare(bName, 'ar');
             });
         };
@@ -191,22 +191,45 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
 
     return (
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-            {/* Controls Header: Tabs */}
+            {/* Controls Header: Dropdown Filters */}
             <div className="flex flex-col items-center justify-center mb-6 gap-4">
-                <div className="flex flex-col sm:flex-row gap-2 w-full sm:w-auto justify-center items-center">
-                    {/* Type Tabs */}
-                    <div className="bg-white p-1 rounded-lg shadow-md inline-flex flex-nowrap overflow-x-auto max-w-full justify-start sm:justify-center gap-1">
-                        <button onClick={() => setActiveTab('all')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'all' ? 'bg-gray-800 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>الكل</button>
-                        <button onClick={() => setActiveTab('تلقين')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'تلقين' ? 'bg-purple-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>تلقين</button>
-                        <button onClick={() => setActiveTab('نور بيان')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'نور بيان' ? 'bg-orange-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>نور بيان</button>
-                        <button onClick={() => setActiveTab('قرآن')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'قرآن' ? 'bg-green-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>قرآن</button>
-                        <button onClick={() => setActiveTab('الإشراف')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeTab === 'الإشراف' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>الإشراف</button>
+                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto justify-center items-stretch sm:items-center">
+                    {/* Type Filter - Dropdown */}
+                    <div className="relative">
+                        <select
+                            value={activeTab}
+                            onChange={(e) => setActiveTab(e.target.value as GroupType | 'الإشراف' | 'all')}
+                            className="appearance-none w-full sm:w-auto px-5 py-2.5 pr-10 bg-white border-2 border-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all cursor-pointer shadow-sm"
+                        >
+                            <option value="all">الكل</option>
+                            <option value="قرآن">قرآن</option>
+                            <option value="نور بيان">نور بيان</option>
+                            <option value="تلقين">تلقين</option>
+                            <option value="إقراء">إقراء</option>
+                            <option value="الإشراف">الإشراف</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500">
+                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                            </svg>
+                        </div>
                     </div>
 
-                    {/* Status Tabs */}
-                    <div className="bg-white p-1 rounded-lg shadow-md inline-flex flex-nowrap overflow-x-auto max-w-full justify-start sm:justify-center gap-1">
-                        <button onClick={() => setActiveStatusFilter('active')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeStatusFilter === 'active' ? 'bg-blue-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>نشط</button>
-                        <button onClick={() => setActiveStatusFilter('inactive')} className={`px-4 py-2 rounded-md text-sm font-bold transition-all whitespace-nowrap ${activeStatusFilter === 'inactive' ? 'bg-red-600 text-white shadow' : 'text-gray-500 hover:bg-gray-100'}`}>غير نشط</button>
+                    {/* Status Filter - Dropdown */}
+                    <div className="relative">
+                        <select
+                            value={activeStatusFilter}
+                            onChange={(e) => setActiveStatusFilter(e.target.value as 'active' | 'inactive')}
+                            className="appearance-none w-full sm:w-auto px-5 py-2.5 pr-10 bg-white border-2 border-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all cursor-pointer shadow-sm"
+                        >
+                            <option value="active">نشط</option>
+                            <option value="inactive">غير نشط</option>
+                        </select>
+                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500">
+                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                                <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
+                            </svg>
+                        </div>
                     </div>
                 </div>
             </div>
