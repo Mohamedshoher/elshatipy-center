@@ -41,6 +41,7 @@ interface TeacherDetailsModalProps {
     onAddTeacherCollection?: (collection: Omit<TeacherCollectionRecord, 'id'>) => void;
     onAddManualBonus?: (bonus: Omit<TeacherManualBonus, 'id'>) => void;
     onDeleteManualBonus?: (bonusId: string) => void;
+    onResetPayment?: (employeeId: string, month: string, employeeName: string) => void;
 }
 
 const getAbsenceValue = (status: TeacherAttendanceStatus): number => {
@@ -94,6 +95,7 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
     onAddTeacherCollection,
     onAddManualBonus,
     onDeleteManualBonus,
+    onResetPayment,
 }) => {
     const [activeTab, setActiveTab] = useState<'payroll' | 'attendance' | 'groups' | 'collections'>('collections');
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
@@ -752,9 +754,24 @@ const TeacherDetailsModal: React.FC<TeacherDetailsModalProps> = ({
                                                 </button>
                                             )}
                                             {payrollData.isPaid ? (
-                                                <span className="inline-block flex-grow text-center py-3 px-4 rounded-lg bg-green-100 text-green-800 font-bold border border-green-200">
-                                                    ✅ تم دفع الراتب
-                                                </span>
+                                                <div className="flex gap-2 flex-grow">
+                                                    <span className="flex-grow text-center py-3 px-4 rounded-lg bg-green-100 text-green-800 font-bold border border-green-200 flex items-center justify-center gap-2">
+                                                        ✅ تم دفع الراتب
+                                                    </span>
+                                                    {onResetPayment && (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (window.confirm('هل أنت متأكد من إلغاء دفع الراتب لهذا الشهر؟ سيتم حذف المصروف المسجل واسترجاع حالة الدفع.')) {
+                                                                    onResetPayment(employeeId, selectedMonth, employeeName);
+                                                                }
+                                                            }}
+                                                            className="py-3 px-4 rounded-lg bg-yellow-500 text-white font-bold hover:bg-yellow-600 shadow-md hover:shadow-lg transition-all whitespace-nowrap"
+                                                            title="إلغاء الدفع"
+                                                        >
+                                                            إلغاء الدفع
+                                                        </button>
+                                                    )}
+                                                </div>
                                             ) : (
                                                 <button onClick={() => handlePayEmployee(payrollData.finalSalary)} className="flex-grow py-3 px-6 rounded-lg bg-green-600 text-white font-bold hover:bg-green-700 shadow-md hover:shadow-lg transition-all">
                                                     دفع الراتب

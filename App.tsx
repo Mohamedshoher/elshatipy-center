@@ -2282,6 +2282,7 @@ const App: React.FC = () => {
                         onAddTeacherCollection={handleAddTeacherCollection}
                         onAddManualBonus={handleAddManualBonus}
                         onDeleteManualBonus={handleDeleteManualBonus}
+                        onResetPayment={handleResetTeacherPayment}
                     />
                 </>
             )}
