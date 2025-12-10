@@ -117,6 +117,13 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
                     const testsInPeriod = (student.tests || []).filter(test => filterFn(test.date));
 
                     // Construct Message
+                    const gradeMap: Record<string, string> = {
+                      [TestGradeEnum.EXCELLENT]: 'ممتاز',
+                      [TestGradeEnum.VERY_GOOD]: 'جيد جداً',
+                      [TestGradeEnum.GOOD]: 'جيد',
+                      [TestGradeEnum.REPEAT]: 'إعادة',
+                    };
+
                     let message = `مرحباً ولي أمر الطالب/ة: *${student.name}*\n`;
                     message += `هذا هو التقرير الأسبوعي من مركز الشاطبي:\n\n`;
                     message += `*📝 الحضور والغياب:*\n`;
@@ -129,11 +136,23 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
                       const latestRecent = testsInPeriod.find(t => t.type === TestTypeEnum.RECENT_PAST);
                       const latestDistant = testsInPeriod.find(t => t.type === TestTypeEnum.DISTANT_PAST);
 
-                      if (latestNew) message += `  - الجديد: ${latestNew.suraName}\n`;
-                      if (latestRecent) message += `  - الماضي القريب: ${latestRecent.suraName}\n`;
-                      if (latestDistant) message += `  - الماضي البعيد: ${latestDistant.suraName}\n`;
+                      if (latestNew) message += `  - الجديد: ${latestNew.suraName} / ${gradeMap[latestNew.grade] || ''}\n`;
+                      if (latestRecent) message += `  - الماضي القريب: ${latestRecent.suraName} / ${gradeMap[latestRecent.grade] || ''}\n`;
+                      if (latestDistant) message += `  - الماضي البعيد: ${latestDistant.suraName} / ${gradeMap[latestDistant.grade] || ''}\n`;
                     } else {
                       message += `  - لم تسجل اختبارات هذا الأسبوع.\n`;
+                    }
+
+                    message += `\n*💰 المصروفات:*\n`;
+                    const currentMonth = new Date().toISOString().slice(0, 7);
+                    const isPaidCurrentMonth = (student.fees || []).some(f => f.month === currentMonth && f.paid);
+
+                    if (student.hasDebt) {
+                      message += `  - يوجد متأخرات 🔴\n`;
+                    } else if (isPaidCurrentMonth) {
+                      message += `  - تم سداد الشهر الحالي ✅\n`;
+                    } else {
+                      message += `  - لم يتم سداد الشهر الحالي 🟠\n`;
                     }
                     message += `\nمع تحيات إدارة المركز.`;
 
