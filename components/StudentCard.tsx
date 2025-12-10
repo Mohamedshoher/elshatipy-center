@@ -143,17 +143,7 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
                       message += `  - لم تسجل اختبارات هذا الأسبوع.\n`;
                     }
 
-                    message += `\n*💰 المصروفات:*\n`;
-                    const currentMonth = new Date().toISOString().slice(0, 7);
-                    const isPaidCurrentMonth = (student.fees || []).some(f => f.month === currentMonth && f.paid);
 
-                    if (student.hasDebt) {
-                      message += `  - يوجد متأخرات 🔴\n`;
-                    } else if (isPaidCurrentMonth) {
-                      message += `  - تم سداد الشهر الحالي ✅\n`;
-                    } else {
-                      message += `  - لم يتم سداد الشهر الحالي 🟠\n`;
-                    }
                     message += `\nمع تحيات إدارة المركز.`;
 
                     const phone = student.phone.replace(/[^0-9]/g, '');
