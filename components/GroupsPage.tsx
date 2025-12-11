@@ -65,6 +65,19 @@ const GroupsPage: React.FC<GroupsPageProps> = (props) => {
       });
   }, [groups, searchTerm, typeFilter]);
 
+  // ESC Key listener
+  React.useEffect(() => {
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        if (selectedGroup) {
+          setSelectedGroup(null);
+        }
+      }
+    };
+    window.addEventListener('keydown', handleKeyDown);
+    return () => window.removeEventListener('keydown', handleKeyDown);
+  }, [selectedGroup]);
+
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-center sm:justify-start mb-6">
@@ -92,7 +105,7 @@ const GroupsPage: React.FC<GroupsPageProps> = (props) => {
         </div>
       </div>
 
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredGroups.length > 0 ? (
           filteredGroups.map(group => {
             const studentsInGroup = students.filter(s => s.groupId === group.id && !s.isArchived);
@@ -101,7 +114,7 @@ const GroupsPage: React.FC<GroupsPageProps> = (props) => {
             return (
               <div key={group.id} className="bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 ease-in-out hover:shadow-lg">
                 <div
-                  className="p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50"
+                  className="p-4 flex justify-between items-center cursor-pointer hover:bg-gray-50 h-full"
                   onClick={() => setSelectedGroup(group)}
                   role="button"
                 >
@@ -129,7 +142,7 @@ const GroupsPage: React.FC<GroupsPageProps> = (props) => {
             );
           })
         ) : (
-          <div className="text-center py-20 bg-white rounded-xl shadow mx-auto max-w-3xl mt-8">
+          <div className="col-span-1 md:col-span-2 text-center py-20 bg-white rounded-xl shadow mx-auto w-full mt-8">
             <h2 className="text-2xl font-semibold text-gray-600">
               {searchTerm || typeFilter !== 'all' ? "لا توجد مجموعات تطابق البحث" : "لا توجد مجموعات لعرضها"}
             </h2>

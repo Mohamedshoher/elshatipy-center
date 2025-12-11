@@ -1,5 +1,5 @@
 
-import React, { useMemo, useState } from 'react';
+import React, { useMemo, useState, useEffect } from 'react';
 import type { Note, Student, Group, Teacher, TeacherCollectionRecord, Expense } from '../types';
 import { ExpenseCategory, roundToNearest5 } from '../types';
 import UserPlusIcon from './icons/UserPlusIcon';
@@ -147,6 +147,20 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
     const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
     const [isExpenseModalOpen, setIsExpenseModalOpen] = useState(false);
     const [isCollectionsModalOpen, setIsCollectionsModalOpen] = useState(false);
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (isIncomeModalOpen) { setIsIncomeModalOpen(false); return; }
+                if (isExpenseModalOpen) { setIsExpenseModalOpen(false); return; }
+                if (isCollectionsModalOpen) { setIsCollectionsModalOpen(false); return; }
+                if (activeSection) { setActiveSection(null); return; }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isIncomeModalOpen, isExpenseModalOpen, isCollectionsModalOpen, activeSection]);
 
     const todayStr = new Date().toISOString().split('T')[0];
 

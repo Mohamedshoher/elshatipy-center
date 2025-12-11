@@ -100,7 +100,7 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
         </div>
       )}
 
-      <div className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredAndSortedStudents.length > 0 ? (
           filteredAndSortedStudents.map(student => (
             <StudentCard
@@ -117,7 +117,7 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
             />
           ))
         ) : (
-          <div className="text-center py-20 bg-white rounded-xl shadow">
+          <div className="col-span-1 md:col-span-2 text-center py-20 bg-white rounded-xl shadow">
             <h2 className="text-2xl font-semibold text-gray-600">لا يوجد طلاب</h2>
             <p className="text-gray-400 mt-2">{searchTerm || typeFilter !== 'all' ? `لم يتم العثور على طلاب يطابقون معايير التصفية.` : "لا يوجد طلاب نشطون لعرضهم."}</p>
           </div>

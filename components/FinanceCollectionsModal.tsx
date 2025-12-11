@@ -32,22 +32,20 @@ const FinanceCollectionsModal: React.FC<FinanceCollectionsModalProps> = ({ isOpe
         </div>
         <div className="flex-grow overflow-y-auto pr-2">
           {collectionsSummary.details.length > 0 ? (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0">
-                <tr>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">المدرس</th>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">المبلغ المسلَّم</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {collectionsSummary.details.map(item => (
-                  <tr key={item.teacherId}>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm font-medium text-gray-900">{item.teacherName}</td>
-                    <td className="px-4 py-2 whitespace-nowrap text-sm font-semibold text-blue-600">{item.amount.toLocaleString()} EGP</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {collectionsSummary.details.map(item => (
+                <div key={item.teacherId} className="bg-gray-50 rounded-xl p-4 border border-gray-100 shadow-sm flex items-center justify-between hover:shadow-md transition-shadow">
+                  <div>
+                    <h3 className="font-bold text-gray-800 text-lg">{item.teacherName}</h3>
+                    <span className="text-xs text-gray-500">مدرس</span>
+                  </div>
+                  <div className="text-left">
+                    <span className="block text-xl font-bold text-blue-600">{item.amount.toLocaleString()} EGP</span>
+                    <span className="text-xs text-green-600">تم التسليم</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <p className="text-center text-gray-500 py-8">لم يتم استلام أي مبالغ من المدرسين خلال هذا الشهر.</p>
           )}

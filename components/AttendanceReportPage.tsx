@@ -25,6 +25,13 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
     setSelectedDailyDate(date.toISOString().split('T')[0]);
   };
 
+  // Sync selectedMonth with selectedDailyDate
+  React.useEffect(() => {
+    if (selectedDailyDate) {
+      setSelectedMonth(selectedDailyDate.substring(0, 7));
+    }
+  }, [selectedDailyDate]);
+
   const dailyReport = useMemo(() => {
     let present = 0;
     let absentStudents: Student[] = [];
@@ -99,32 +106,23 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
             </div>
 
             <div className="grid grid-cols-2 gap-4 text-center">
-              <div className="bg-green-100 p-4 rounded-lg">
-                <p className="text-3xl font-bold text-green-600">{dailyReport.present}</p>
+              <div className="bg-green-100 p-3 rounded-lg">
+                <p className="text-2xl font-bold text-green-600">{dailyReport.present}</p>
                 <p className="text-sm text-green-800 font-semibold">حاضر</p>
               </div>
               <button
                 onClick={() => dailyReport.absent > 0 && setIsAbsentModalOpen(true)}
-                className={`bg-red-100 p-4 rounded-lg text-center transition-all ${dailyReport.absent > 0 ? 'cursor-pointer hover:bg-red-200' : 'cursor-default'}`}
+                className={`bg-red-100 p-3 rounded-lg text-center transition-all ${dailyReport.absent > 0 ? 'cursor-pointer hover:bg-red-200' : 'cursor-default'}`}
                 disabled={dailyReport.absent === 0}
               >
-                <p className="text-3xl font-bold text-red-600">{dailyReport.absent}</p>
+                <p className="text-2xl font-bold text-red-600">{dailyReport.absent}</p>
                 <p className="text-sm text-red-800 font-semibold">غائب</p>
-                {dailyReport.absent > 0 && <span className="text-xs text-red-700">(انقر لعرض التفاصيل)</span>}
+                {dailyReport.absent > 0 && <span className="text-xs text-red-700 block mt-1">(انقر لعرض التفاصيل)</span>}
               </button>
             </div>
           </div>
 
-          <div className="w-full sm:w-auto max-w-xs ml-auto">
-            <label htmlFor="month-filter" className="sr-only">اختر الشهر</label>
-            <input
-              type="month"
-              id="month-filter"
-              value={selectedMonth}
-              onChange={e => setSelectedMonth(e.target.value)}
-              className="w-full px-4 py-2 border rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
-            />
-          </div>
+
 
           {/* Section 2: Most Absent */}
           <div className="bg-white rounded-xl shadow-lg p-6">
@@ -144,7 +142,7 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
               </div>
             </div>
 
-            <div className="space-y-2">
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {monthlyReport.mostAbsent.map((student, index) => (
                 <div key={student.student.id} className="flex items-center justify-between bg-gray-50 p-3 rounded-lg">
                   <div className="flex items-center">
@@ -167,8 +165,8 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
                   </div>
                 </div>
               ))}
-              {monthlyReport.mostAbsent.length === 0 && <p className="text-center text-gray-400 py-4">{`لا يوجد طلاب لديهم غياب ${absentDaysFilter} يوم أو أكثر هذا الشهر.`}</p>}
             </div>
+            {monthlyReport.mostAbsent.length === 0 && <p className="text-center text-gray-400 py-4 col-span-1 md:col-span-2">{`لا يوجد طلاب لديهم غياب ${absentDaysFilter} يوم أو أكثر هذا الشهر.`}</p>}
           </div>
         </div>
       </main>

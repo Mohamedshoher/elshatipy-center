@@ -1,6 +1,6 @@
 
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useEffect } from 'react';
 import type { Student, Teacher, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Group, TeacherCollectionRecord, Supervisor, Notification } from '../types';
 import { ExpenseCategory, TeacherAttendanceStatus, PaymentType, roundToNearest5 } from '../types';
 import StaffManagerModal from './StaffManagerModal';
@@ -189,6 +189,20 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
             return e.date.startsWith(selectedMonth);
         });
     }
+
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (isStaffModalOpen) { setIsStaffModalOpen(false); return; }
+                if (isIncomeModalOpen) { setIsIncomeModalOpen(false); return; }
+                if (isExpenseModalOpen) { setIsExpenseModalOpen(false); return; }
+                if (isCollectionsModalOpen) { setIsCollectionsModalOpen(false); return; }
+                if (isAttendanceCheckModalOpen) { setIsAttendanceCheckModalOpen(false); return; }
+            }
+        };
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [isStaffModalOpen, isIncomeModalOpen, isExpenseModalOpen, isCollectionsModalOpen, isAttendanceCheckModalOpen]);
 
     return (
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">

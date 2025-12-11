@@ -257,31 +257,35 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                         {(filteredItems as { teachers: Teacher[]; supervisors: Supervisor[] }).teachers.length > 0 && (
                             <>
                                 <h3 className="text-lg font-bold text-gray-700 mb-2">المدرسين</h3>
-                                {(filteredItems as { teachers: Teacher[]; supervisors: Supervisor[] }).teachers.map((teacher: Teacher) => (
-                                    <TeacherCard
-                                        key={teacher.id}
-                                        teacher={teacher}
-                                        teacherAttendance={props.teacherAttendance}
-                                        onSetTeacherAttendance={props.onSetTeacherAttendance}
-                                        onDeductionClick={(id, status) => handleDeductionClick(id, status, false)}
-                                        onClick={() => onViewTeacherDetails(teacher)}
-                                    />
-                                ))}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {(filteredItems as { teachers: Teacher[]; supervisors: Supervisor[] }).teachers.map((teacher: Teacher) => (
+                                        <TeacherCard
+                                            key={teacher.id}
+                                            teacher={teacher}
+                                            teacherAttendance={props.teacherAttendance}
+                                            onSetTeacherAttendance={props.onSetTeacherAttendance}
+                                            onDeductionClick={(id, status) => handleDeductionClick(id, status, false)}
+                                            onClick={() => onViewTeacherDetails(teacher)}
+                                        />
+                                    ))}
+                                </div>
                             </>
                         )}
                         {(filteredItems as { teachers: Teacher[]; supervisors: Supervisor[] }).supervisors.length > 0 && (
                             <>
                                 <h3 className="text-lg font-bold text-gray-700 mb-2 mt-6">المشرفين</h3>
-                                {(filteredItems as { teachers: Teacher[]; supervisors: Supervisor[] }).supervisors.map((supervisor: Supervisor) => (
-                                    <SupervisorCard
-                                        key={supervisor.id}
-                                        supervisor={supervisor}
-                                        teacherAttendance={props.teacherAttendance}
-                                        onSetTeacherAttendance={props.onSetTeacherAttendance}
-                                        onDeductionClick={(id, status) => handleDeductionClick(id, status, true)}
-                                        onClick={() => onViewSupervisorDetails(supervisor)}
-                                    />
-                                ))}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {(filteredItems as { teachers: Teacher[]; supervisors: Supervisor[] }).supervisors.map((supervisor: Supervisor) => (
+                                        <SupervisorCard
+                                            key={supervisor.id}
+                                            supervisor={supervisor}
+                                            teacherAttendance={props.teacherAttendance}
+                                            onSetTeacherAttendance={props.onSetTeacherAttendance}
+                                            onDeductionClick={(id, status) => handleDeductionClick(id, status, true)}
+                                            onClick={() => onViewSupervisorDetails(supervisor)}
+                                        />
+                                    ))}
+                                </div>
                             </>
                         )}
                         {(filteredItems as { teachers: Teacher[]; supervisors: Supervisor[] }).teachers.length === 0 &&
@@ -299,16 +303,18 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                     <>
                         {activeTab === 'الإشراف' ? (
                             <>
-                                {(filteredItems as Supervisor[]).map((item: Supervisor) => (
-                                    <SupervisorCard
-                                        key={item.id}
-                                        supervisor={item}
-                                        teacherAttendance={props.teacherAttendance}
-                                        onSetTeacherAttendance={props.onSetTeacherAttendance}
-                                        onDeductionClick={(id, status) => handleDeductionClick(id, status, true)}
-                                        onClick={() => onViewSupervisorDetails(item)}
-                                    />
-                                ))}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {(filteredItems as Supervisor[]).map((item: Supervisor) => (
+                                        <SupervisorCard
+                                            key={item.id}
+                                            supervisor={item}
+                                            teacherAttendance={props.teacherAttendance}
+                                            onSetTeacherAttendance={props.onSetTeacherAttendance}
+                                            onDeductionClick={(id, status) => handleDeductionClick(id, status, true)}
+                                            onClick={() => onViewSupervisorDetails(item)}
+                                        />
+                                    ))}
+                                </div>
                                 {(filteredItems as Supervisor[]).length === 0 && (
                                     <div className="text-center py-20 bg-white rounded-xl shadow border border-gray-100">
                                         <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">
@@ -321,16 +327,18 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                             </>
                         ) : (
                             <>
-                                {(filteredItems as Teacher[]).map((item: Teacher) => (
-                                    <TeacherCard
-                                        key={item.id}
-                                        teacher={item}
-                                        teacherAttendance={props.teacherAttendance}
-                                        onSetTeacherAttendance={props.onSetTeacherAttendance}
-                                        onDeductionClick={(id, status) => handleDeductionClick(id, status, false)}
-                                        onClick={() => onViewTeacherDetails(item)}
-                                    />
-                                ))}
+                                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                                    {(filteredItems as Teacher[]).map((item: Teacher) => (
+                                        <TeacherCard
+                                            key={item.id}
+                                            teacher={item}
+                                            teacherAttendance={props.teacherAttendance}
+                                            onSetTeacherAttendance={props.onSetTeacherAttendance}
+                                            onDeductionClick={(id, status) => handleDeductionClick(id, status, false)}
+                                            onClick={() => onViewTeacherDetails(item)}
+                                        />
+                                    ))}
+                                </div>
                                 {(filteredItems as Teacher[]).length === 0 && (
                                     <div className="text-center py-20 bg-white rounded-xl shadow border border-gray-100">
                                         <div className="bg-gray-50 w-16 h-16 rounded-full flex items-center justify-center mx-auto mb-4">

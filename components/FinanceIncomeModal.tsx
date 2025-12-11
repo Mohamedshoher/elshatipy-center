@@ -51,24 +51,20 @@ const FinanceIncomeModal: React.FC<FinanceIncomeModalProps> = ({ isOpen, onClose
         </div>
         <div className="flex-grow overflow-y-auto pr-2">
           {incomeByGroup.length > 0 ? (
-            <table className="min-w-full divide-y divide-gray-200">
-              <thead className="bg-gray-50 sticky top-0">
-                <tr>
-                  <th className="px-4 py-2 text-right text-xs font-medium text-gray-500 uppercase">المجموعة</th>
-                  <th className="px-4 py-2 text-center text-xs font-medium text-gray-500 uppercase">عدد الطلاب</th>
-                  <th className="px-4 py-2 text-left text-xs font-medium text-gray-500 uppercase">إجمالي المحصل</th>
-                </tr>
-              </thead>
-              <tbody className="bg-white divide-y divide-gray-200">
-                {incomeByGroup.map(item => (
-                  <tr key={item.groupName} className="hover:bg-gray-50">
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-gray-800">{item.groupName}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm text-center text-gray-500">{item.count}</td>
-                    <td className="px-4 py-3 whitespace-nowrap text-sm font-bold text-left text-green-600">{item.total.toLocaleString()} EGP</td>
-                  </tr>
-                ))}
-              </tbody>
-            </table>
+            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+              {incomeByGroup.map(item => (
+                <div key={item.groupName} className="bg-gray-50 rounded-xl p-4 border border-gray-100 shadow-sm flex flex-col hover:shadow-md transition-shadow">
+                  <div className="flex justify-between items-center mb-2 border-b border-gray-200 pb-2">
+                    <h3 className="font-bold text-gray-800 text-lg">{item.groupName}</h3>
+                    <span className="bg-blue-100 text-blue-700 text-xs font-bold px-2 py-1 rounded-full">{item.count} طلاب</span>
+                  </div>
+                  <div className="flex justify-between items-center mt-auto">
+                    <span className="text-gray-500 text-sm">المحصل:</span>
+                    <span className="text-xl font-bold text-green-600">{item.total.toLocaleString()} EGP</span>
+                  </div>
+                </div>
+              ))}
+            </div>
           ) : (
             <p className="text-center text-gray-500 py-8">لم يتم تحصيل أي مصروفات خلال هذا الشهر.</p>
           )}

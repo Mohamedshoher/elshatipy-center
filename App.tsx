@@ -1738,6 +1738,26 @@ const App: React.FC = () => {
         return <LocalLoginScreen onLogin={handleLogin} teachers={teachers} supervisors={supervisors} />;
     }
 
+    // Global Key Listener for Modals (ESC to close)
+    useEffect(() => {
+        const handleKeyDown = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') {
+                if (studentToArchive) { setStudentToArchive(null); return; }
+                if (studentToUnarchiveId) { setStudentToUnarchiveId(null); return; }
+                if (isFeeModalOpen) { setIsFeeModalOpen(false); setPaymentDetails(null); return; }
+                if (teacherForDetails || supervisorForDetails) { setTeacherForDetails(null); setSupervisorForDetails(null); return; }
+                if (isTeacherFormOpen) { setIsTeacherFormOpen(false); setTeacherToEdit(null); setSupervisorToEdit(null); return; }
+                if (isGroupManagerOpen) { setIsGroupManagerOpen(false); return; }
+                if (detailsModalState) { setDetailsModalState(null); return; }
+                if (isFormOpen) { setIsFormOpen(false); setStudentToEdit(null); return; }
+                if (isSidebarOpen) { setIsSidebarOpen(false); return; }
+            }
+        };
+
+        window.addEventListener('keydown', handleKeyDown);
+        return () => window.removeEventListener('keydown', handleKeyDown);
+    }, [studentToArchive, studentToUnarchiveId, isFeeModalOpen, teacherForDetails, supervisorForDetails, isTeacherFormOpen, isGroupManagerOpen, detailsModalState, isFormOpen, isSidebarOpen]);
+
     const renderHeader = () => {
         const backButton = (<button onClick={handleBackToMain} className="p-2 rounded-lg bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition-all" aria-label="العودة"> <ArrowRightIcon className="w-6 h-6" /> </button>);
 
