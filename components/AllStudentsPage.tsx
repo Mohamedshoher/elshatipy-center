@@ -1,17 +1,12 @@
-
-import React, { useMemo, useState } from 'react';
-import type { Student, Note, Group, AttendanceStatus, WeeklySchedule, TestRecord, GroupType } from '../types';
+import React, { useMemo } from 'react';
+import type { Student, Group, AttendanceStatus, WeeklySchedule, TestRecord, GroupType } from '../types';
 import StudentCard from './StudentCard';
 
 interface AllStudentsPageProps {
   students: Student[];
-  notes: Note[];
   groups: Group[];
   searchTerm: string;
   onOpenFeeModal: (studentId: string, month: string, amount: number) => void;
-  onAddTest: (studentId: string, testData: Omit<TestRecord, 'id' | 'date'>) => void;
-  onDeleteTest: (studentId: string, testId: string) => void;
-  onAddNote: (studentId: string, content: string) => void;
   onEdit: (student: Student) => void;
   onToggleAttendance: (studentId: string, date: string, status: AttendanceStatus) => void;
   onArchive: (studentId: string) => void;
@@ -35,17 +30,11 @@ const getGroupTypeFromName = (name: string | undefined): GroupType | null => {
 const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
   const { students, searchTerm, groups, currentUserRole, onViewDetails, typeFilter, onTypeFilterChange } = props;
 
-  const [groupFilter, setGroupFilter] = useState('all');
-
   const filteredAndSortedStudents = useMemo(() => {
     let filtered = students
       .filter(s =>
         s.name.toLowerCase().includes(searchTerm.toLowerCase())
       )
-      .filter(s => {
-        if (groupFilter === 'all') return true;
-        return s.groupId === groupFilter;
-      })
       .filter(s => {
         if (typeFilter === 'all') return true;
         const group = groups.find(g => g.id === s.groupId);
@@ -70,19 +59,19 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
     });
 
     return filtered;
-  }, [students, searchTerm, groups, groupFilter, typeFilter]);
+  }, [students, searchTerm, groups, typeFilter]);
 
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       {currentUserRole === 'director' && (
-        <div className="flex justify-center sm:justify-start mb-6">
+        <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
           <div className="relative inline-block w-full sm:w-64">
             <label htmlFor="type-filter" className="block text-sm font-medium text-gray-700 mb-1 mr-1">تصفية حسب النوع</label>
             <div className="relative">
               <select
                 id="type-filter"
                 value={typeFilter}
-                onChange={(e) => { onTypeFilterChange(e.target.value as GroupType); setGroupFilter('all'); }}
+                onChange={(e) => { onTypeFilterChange(e.target.value as GroupType); }}
                 className="block w-full appearance-none bg-white border border-gray-300 text-gray-700 py-3 px-4 pr-8 rounded-xl leading-tight focus:outline-none focus:bg-white focus:border-blue-500 focus:ring-2 focus:ring-blue-200 shadow-sm transition-all duration-200 font-bold"
               >
                 <option value="all">الكل</option>
@@ -98,6 +87,16 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
               </div>
             </div>
           </div>
+
+
+        </div>
+      )}
+
+      {/* Show count for non-directors too if useful, or keep it consistent */}
+      {currentUserRole !== 'director' && filteredAndSortedStudents.length > 0 && (
+        <div className="mb-4 text-left">
+          <span className="text-gray-500 text-sm ml-2">عدد الطلاب:</span>
+          <span className="font-bold text-gray-800">{filteredAndSortedStudents.length}</span>
         </div>
       )}
 
@@ -120,7 +119,7 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
         ) : (
           <div className="text-center py-20 bg-white rounded-xl shadow">
             <h2 className="text-2xl font-semibold text-gray-600">لا يوجد طلاب</h2>
-            <p className="text-gray-400 mt-2">{searchTerm || groupFilter !== 'all' || typeFilter !== 'all' ? `لم يتم العثور على طلاب يطابقون معايير التصفية.` : "لا يوجد طلاب نشطون لعرضهم."}</p>
+            <p className="text-gray-400 mt-2">{searchTerm || typeFilter !== 'all' ? `لم يتم العثور على طلاب يطابقون معايير التصفية.` : "لا يوجد طلاب نشطون لعرضهم."}</p>
           </div>
         )}
       </div>

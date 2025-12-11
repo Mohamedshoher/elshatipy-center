@@ -2004,12 +2004,8 @@ const App: React.FC = () => {
                             return <AllStudentsPage
                                 students={students}
                                 searchTerm={searchTerm}
-                                notes={notes}
                                 groups={groups}
                                 onOpenFeeModal={handleOpenFeeModal}
-                                onAddTest={handleAddTest}
-                                onDeleteTest={handleDeleteTest}
-                                onAddNote={handleAddNote}
                                 onEdit={handleEditStudent}
                                 onToggleAttendance={handleToggleAttendance}
                                 onArchive={handleArchiveStudent}
@@ -2089,12 +2085,8 @@ const App: React.FC = () => {
                             return <AllStudentsPage
                                 students={activeStudents}
                                 searchTerm={searchTerm}
-                                notes={notes}
                                 groups={groups}
                                 onOpenFeeModal={handleOpenFeeModal}
-                                onAddTest={handleAddTest}
-                                onDeleteTest={handleDeleteTest}
-                                onAddNote={handleAddNote}
                                 onEdit={handleEditStudent}
                                 onToggleAttendance={handleToggleAttendance}
                                 onArchive={handleArchiveStudent}
@@ -2141,12 +2133,8 @@ const App: React.FC = () => {
                             return <AllStudentsPage
                                 students={teacherStudents}
                                 searchTerm={searchTerm}
-                                notes={notes}
                                 groups={visibleGroups}
                                 onOpenFeeModal={handleOpenFeeModal}
-                                onAddTest={handleAddTest}
-                                onDeleteTest={handleDeleteTest}
-                                onAddNote={handleAddNote}
                                 onEdit={handleEditStudent}
                                 onToggleAttendance={handleToggleAttendance}
                                 onArchive={handleArchiveStudent}

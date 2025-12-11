@@ -193,13 +193,13 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             {/* Controls Header: Dropdown Filters */}
             <div className="flex flex-col items-center justify-center mb-6 gap-4">
-                <div className="flex flex-col sm:flex-row gap-3 w-full sm:w-auto justify-center items-stretch sm:items-center">
+                <div className="flex flex-row gap-2 w-auto justify-center items-center">
                     {/* Type Filter - Dropdown */}
                     <div className="relative">
                         <select
                             value={activeTab}
                             onChange={(e) => setActiveTab(e.target.value as GroupType | 'الإشراف' | 'all')}
-                            className="appearance-none w-full sm:w-auto px-5 py-2.5 pr-10 bg-white border-2 border-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all cursor-pointer shadow-sm"
+                            className="appearance-none w-full sm:w-auto pl-3 pr-8 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200 transition-all cursor-pointer shadow-sm"
                         >
                             <option value="all">الكل</option>
                             <option value="قرآن">قرآن</option>
@@ -209,7 +209,7 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                             <option value="الإشراف">الإشراف</option>
                         </select>
                         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500">
-                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                            <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                                 <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
                             </svg>
                         </div>
@@ -220,13 +220,13 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                         <select
                             value={activeStatusFilter}
                             onChange={(e) => setActiveStatusFilter(e.target.value as 'active' | 'inactive')}
-                            className="appearance-none w-full sm:w-auto px-5 py-2.5 pr-10 bg-white border-2 border-gray-200 rounded-lg text-sm font-bold text-gray-700 hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all cursor-pointer shadow-sm"
+                            className="appearance-none w-full sm:w-auto pl-3 pr-8 py-2 bg-white border border-gray-300 rounded-md text-sm font-medium text-gray-700 hover:border-blue-400 focus:border-blue-500 focus:outline-none focus:ring-1 focus:ring-blue-200 transition-all cursor-pointer shadow-sm"
                         >
                             <option value="active">نشط</option>
                             <option value="inactive">غير نشط</option>
                         </select>
                         <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500">
-                            <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
+                            <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                                 <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
                             </svg>
                         </div>
