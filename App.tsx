@@ -2024,7 +2024,7 @@ const App: React.FC = () => {
                         case 'attendance_report':
                             return <AttendanceReportPage students={students} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />;
                         case 'tests_report':
-                            return <TestsReportPage students={students} groups={groups} onViewStudent={handleViewStudent} />;
+                            return <TestsReportPage students={students} groups={groups} onViewStudent={handleViewStudent} onBack={handleBackToMain} />;
                         case 'financial_report':
                             return <FinancialReportPage students={students} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />;
                         default:
@@ -2105,7 +2105,7 @@ const App: React.FC = () => {
                         case 'attendance_report':
                             return <AttendanceReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />;
                         case 'tests_report':
-                            return <TestsReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} />;
+                            return <TestsReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} onBack={handleBackToMain} />;
                         case 'financial_report':
                             return <FinancialReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />;
                         default:
@@ -2168,7 +2168,7 @@ const App: React.FC = () => {
                         case 'attendance_report':
                             return <AttendanceReportPage students={teacherStudents} groups={visibleGroups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />;
                         case 'tests_report':
-                            return <TestsReportPage students={teacherStudents} groups={visibleGroups} onViewStudent={handleViewStudent} />;
+                            return <TestsReportPage students={teacherStudents} groups={visibleGroups} onViewStudent={handleViewStudent} onBack={handleBackToMain} />;
                         case 'financial_report':
                             return <FinancialReportPage students={teacherStudents} groups={visibleGroups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />;
                         default:
