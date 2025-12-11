@@ -93,7 +93,7 @@ const FinanceExpenseModal: React.FC<FinanceExpenseModalProps> = ({ isOpen, onClo
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-3xl flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-[95vw] h-[90vh] flex flex-col overflow-hidden">
         <div className="flex-shrink-0 flex justify-between items-center mb-4 border-b pb-3">
           <h2 className="text-2xl font-bold text-gray-700">تفاصيل المصروفات لشهر {monthName}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">

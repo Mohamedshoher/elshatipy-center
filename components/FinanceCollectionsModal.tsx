@@ -7,12 +7,12 @@ interface FinanceCollectionsModalProps {
   onClose: () => void;
   month: string;
   collectionsSummary: {
-      totalReceived: number;
-      details: {
-          teacherId: string;
-          teacherName: string;
-          amount: number;
-      }[];
+    totalReceived: number;
+    details: {
+      teacherId: string;
+      teacherName: string;
+      amount: number;
+    }[];
   };
 }
 
@@ -23,7 +23,7 @@ const FinanceCollectionsModal: React.FC<FinanceCollectionsModalProps> = ({ isOpe
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl p-6 w-full max-w-2xl flex flex-col max-h-[90vh]">
+      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-[95vw] h-[90vh] flex flex-col overflow-hidden">
         <div className="flex-shrink-0 flex justify-between items-center mb-4 border-b pb-3">
           <h2 className="text-2xl font-bold text-gray-700">تفاصيل المبالغ المستلمة - {monthName}</h2>
           <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
@@ -53,8 +53,8 @@ const FinanceCollectionsModal: React.FC<FinanceCollectionsModalProps> = ({ isOpe
           )}
         </div>
         <div className="flex-shrink-0 mt-4 pt-4 border-t flex justify-between items-center">
-            <h3 className="text-lg font-bold text-gray-800">الإجمالي:</h3>
-            <span className="text-2xl font-bold text-blue-700">{collectionsSummary.totalReceived.toLocaleString()} EGP</span>
+          <h3 className="text-lg font-bold text-gray-800">الإجمالي:</h3>
+          <span className="text-2xl font-bold text-blue-700">{collectionsSummary.totalReceived.toLocaleString()} EGP</span>
         </div>
       </div>
     </div>

@@ -3,7 +3,7 @@ import React, { useState, useMemo } from 'react';
 import type { Student, Group, TestType } from '../types';
 import { TestType as TestTypeEnum } from '../types';
 import UserIcon from './icons/UserIcon';
-import ChevronDownIcon from './icons/ChevronDownIcon';
+
 
 const testTypeLabels: Record<TestType, string> = {
   [TestTypeEnum.NEW]: 'جديد',
@@ -18,34 +18,56 @@ interface TestsReportPageProps {
   onViewStudent: (studentId: string) => void;
 }
 
-const CollapsibleSection: React.FC<{
+const ModalSection: React.FC<{
   title: string;
   children: React.ReactNode;
-  defaultOpen?: boolean;
+  defaultOpen?: boolean; // Kept for compatibility but unused
   headerContent?: React.ReactNode;
-}> = ({ title, children, defaultOpen = false, headerContent }) => {
-  const [isOpen, setIsOpen] = useState(defaultOpen);
+}> = ({ title, children, headerContent }) => {
+  const [isOpen, setIsOpen] = useState(false);
 
   return (
-    <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-      <button
-        onClick={() => setIsOpen(!isOpen)}
-        className="w-full p-6 flex items-center justify-between hover:bg-gray-50 transition-colors text-right"
+    <>
+      <div
+        onClick={() => setIsOpen(true)}
+        className="bg-white rounded-xl shadow p-6 flex items-center justify-between cursor-pointer hover:shadow-md transition-all border border-gray-100 group"
       >
         <div className="flex items-center gap-4 flex-1">
-          <h2 className="text-xl font-bold text-gray-800">{title}</h2>
+          <h2 className="text-xl font-bold text-gray-800 group-hover:text-blue-600 transition-colors">{title}</h2>
           {headerContent && <div onClick={e => e.stopPropagation()}>{headerContent}</div>}
         </div>
-        <ChevronDownIcon
-          className={`w-6 h-6 text-gray-500 transition-transform duration-300 ${isOpen ? 'rotate-180' : ''}`}
-        />
-      </button>
+        <div className="bg-gray-50 p-2 rounded-full group-hover:bg-blue-50 transition-colors">
+          <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6 text-gray-400 group-hover:text-blue-500" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 8V4m0 0h4M4 4l5 5m11-1V4m0 0h-4m4 0l-5 5M4 16v4m0 0h4m-4 0l5-5m11 5l-5-5m5 5v-4m0 4h-4" />
+          </svg>
+        </div>
+      </div>
+
       {isOpen && (
-        <div className="px-6 pb-6 border-t border-gray-100 pt-4">
-          {children}
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50 p-4 backdrop-blur-sm" onClick={() => setIsOpen(false)}>
+          <div
+            className="bg-white rounded-2xl shadow-2xl w-full max-w-[95vw] h-[90vh] flex flex-col overflow-hidden"
+            onClick={e => e.stopPropagation()}
+          >
+            <div className="p-6 border-b border-gray-100 flex items-center justify-between z-10 flex-shrink-0 bg-white">
+              <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
+              <button
+                onClick={() => setIsOpen(false)}
+                className="p-2 hover:bg-gray-100 rounded-full text-gray-400 hover:text-gray-600 transition-colors"
+                aria-label="Close"
+              >
+                <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                </svg>
+              </button>
+            </div>
+            <div className="p-6 bg-gray-50 flex-grow overflow-y-auto">
+              {children}
+            </div>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 };
 
@@ -131,7 +153,7 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
         </div>
 
         {/* Section 1: Daily Report */}
-        <CollapsibleSection title="تقرير الاختبارات اليومي" defaultOpen={true}>
+        <ModalSection title="الاختبار اليومي" defaultOpen={true}>
           <div className="flex flex-col sm:flex-row gap-2 mb-4">
             <input
               type="date"
@@ -149,35 +171,43 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
             <p className="text-3xl font-bold text-blue-600">{dailyReport.totalTests}</p>
             <p className="text-sm text-blue-800 font-semibold">إجمالي الاختبارات</p>
           </div>
-        </CollapsibleSection>
+        </ModalSection>
 
         {/* Section 2: Most Tested */}
-        <CollapsibleSection title={`الطلاب الأكثر اختبارًا - ${selectedMonthName}`} defaultOpen={false}>
+        <ModalSection title={`الأكثر اختبارًا - ${selectedMonthName}`} defaultOpen={false}>
           {/* Filters for Most Tested */}
-          <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 items-end mb-4 bg-gray-50 p-3 rounded-lg">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">حسب المجموعة</label>
-              <select value={mostTestedGroupFilter} onChange={(e) => setMostTestedGroupFilter(e.target.value)} className="w-full p-2 border rounded-md text-sm bg-white">
-                <option value="all">كل المجموعات</option>
-                {[...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">حسب نوع الاختبار</label>
-              <select value={mostTestedTypeFilter} onChange={(e) => setMostTestedTypeFilter(e.target.value as TestType | 'all')} className="w-full p-2 border rounded-md text-sm bg-white">
-                <option value="all">كل الأنواع</option>
-                {Object.entries(testTypeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">أجرى على الأقل</label>
-              <div className="flex items-center gap-2">
-                <input type="number" min="1" value={mostTestedTestsFilter} onChange={(e) => setMostTestedTestsFilter(Math.max(1, parseInt(e.target.value) || 1))} className="w-full p-2 border rounded-md text-sm" />
-                <span className="text-sm flex-shrink-0">اختبار</span>
-              </div>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <select
+              value={mostTestedGroupFilter}
+              onChange={(e) => setMostTestedGroupFilter(e.target.value)}
+              className="py-1.5 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">كل المجموعات</option>
+              {[...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+
+            <select
+              value={mostTestedTypeFilter}
+              onChange={(e) => setMostTestedTypeFilter(e.target.value as TestType | 'all')}
+              className="py-1.5 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">كل الأنواع</option>
+              {Object.entries(testTypeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
+
+            <div className="flex items-center gap-2 bg-white border border-gray-300 rounded-lg px-3 py-1.5">
+              <span className="text-sm text-gray-500 whitespace-nowrap">على الأقل:</span>
+              <input
+                type="number"
+                min="1"
+                value={mostTestedTestsFilter}
+                onChange={(e) => setMostTestedTestsFilter(Math.max(1, parseInt(e.target.value) || 1))}
+                className="w-12 text-sm text-center focus:outline-none"
+              />
+              <span className="text-sm text-gray-500">اختبار</span>
             </div>
           </div>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
+          <div className="space-y-2">
             {mostTestedReport.map(({ student, count }, index) => (
               <div key={student.id} className="flex items-center justify-between bg-gray-100 p-3 rounded-lg">
                 <div className="flex items-center">
@@ -210,27 +240,30 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
             ))}
             {mostTestedReport.length === 0 && <p className="text-center text-gray-400 py-4">لا يوجد طلاب يطابقون هذه المعايير.</p>}
           </div>
-        </CollapsibleSection>
+        </ModalSection>
 
         {/* Section 3: Not Tested */}
-        <CollapsibleSection title={`الطلاب الذين لم يتم اختبارهم - ${selectedMonthName}`} defaultOpen={false}>
+        <ModalSection title={`لم يختبروا - ${selectedMonthName}`} defaultOpen={false}>
           {/* Filters for Not Tested */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 items-end mb-4 bg-gray-50 p-3 rounded-lg">
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">حسب المجموعة</label>
-              <select value={notTestedGroupFilter} onChange={(e) => setNotTestedGroupFilter(e.target.value)} className="w-full p-2 border rounded-md text-sm bg-white">
-                <option value="all">كل المجموعات</option>
-                {[...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
-              </select>
-            </div>
-            <div>
-              <label className="block text-xs text-gray-500 mb-1">نوع الاختبار</label>
-              <select value={notTestedTypeFilter} onChange={(e) => setNotTestedTypeFilter(e.target.value as TestType)} className="w-full p-2 border rounded-md text-sm bg-white">
-                {Object.entries(testTypeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-              </select>
-            </div>
+          <div className="flex flex-wrap items-center gap-3 mb-4">
+            <select
+              value={notTestedGroupFilter}
+              onChange={(e) => setNotTestedGroupFilter(e.target.value)}
+              className="py-1.5 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              <option value="all">كل المجموعات</option>
+              {[...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(g => <option key={g.id} value={g.id}>{g.name}</option>)}
+            </select>
+
+            <select
+              value={notTestedTypeFilter}
+              onChange={(e) => setNotTestedTypeFilter(e.target.value as TestType)}
+              className="py-1.5 px-3 border border-gray-300 rounded-lg text-sm bg-white focus:outline-none focus:ring-2 focus:ring-blue-500"
+            >
+              {Object.entries(testTypeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
+            </select>
           </div>
-          <div className="space-y-2 max-h-60 overflow-y-auto">
+          <div className="space-y-2">
             {notTestedReport.map((student, index) => (
               <div key={student.id} className="flex items-center justify-between bg-yellow-50 p-3 rounded-lg">
                 <div className="flex items-center">
@@ -262,12 +295,12 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
             ))}
             {notTestedReport.length === 0 && <p className="text-center text-gray-400 py-4">جميع الطلاب في المجموعة المحددة تم اختبارهم.</p>}
           </div>
-        </CollapsibleSection>
+        </ModalSection>
 
         {/* Section 4: Group Comparison Chart */}
-        <CollapsibleSection title={`مقارنة أداء المجموعات - ${selectedMonthName}`} defaultOpen={false}>
+        <ModalSection title={`مقارنة الأداء - ${selectedMonthName}`} defaultOpen={false}>
           <GroupComparisonChart students={students} groups={groups} selectedMonth={selectedMonth} />
-        </CollapsibleSection>
+        </ModalSection>
       </div>
     </main>
   );
