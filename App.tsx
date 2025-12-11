@@ -110,101 +110,105 @@ const App: React.FC = () => {
     const [isDirectorReportView, setIsDirectorReportView] = useState(false);
 
     // --- Automatic Missing Reports Check ---
+    // --- Automatic Missing Reports Check ---
     useEffect(() => {
         const checkMissingReports = async () => {
             // Only run for director and if data is loaded
             if (currentUser?.role !== 'director' || teachers.length === 0 || groups.length === 0 || students.length === 0) return;
 
             const today = new Date();
-            // Check last 3 days to cover weekends if app wasn't opened
-            for (let i = 1; i <= 3; i++) {
-                const dateToCheck = new Date(today);
-                dateToCheck.setDate(today.getDate() - i);
-                const dateString = dateToCheck.toISOString().split('T')[0];
-                const dayOfWeek = dateToCheck.getDay(); // 0 = Sunday, 4 = Thursday, 5 = Friday
+            // Start checking from Yesterday (1 day ago)
+            const dateToCheck = new Date(today);
+            dateToCheck.setDate(today.getDate() - 1);
 
-                // Skip Thursday (4) and Friday (5)
-                if (dayOfWeek === 4 || dayOfWeek === 5) continue;
+            const dateString = dateToCheck.toISOString().split('T')[0];
+            const dayOfWeek = dateToCheck.getDay(); // 0 = Sunday, 4 = Thursday, 5 = Friday
 
-                const batch = writeBatch(db);
-                let hasUpdates = false;
+            // Skip Thursday (4) and Friday (5)
+            if (dayOfWeek === 4 || dayOfWeek === 5) return;
 
-                for (const teacher of teachers) {
-                    if (teacher.status !== TeacherStatus.ACTIVE) continue;
+            const batch = writeBatch(db);
+            let hasUpdates = false;
 
-                    // 1. Check if ANY deduction/attendance record already exists for this day for this teacher
-                    // If a record exists (present, absent, deduction, etc.), we assume handled.
-                    const alreadyHandled = teacherAttendance.some(
-                        a => a.teacherId === teacher.id && a.date === dateString
-                    );
-                    if (alreadyHandled) continue;
+            for (const teacher of teachers) {
+                if (teacher.status !== TeacherStatus.ACTIVE) continue;
 
-                    // 2. Check if any student in teacher's groups has attendance for this day
-                    const teacherGroupIds = groups.filter(g => g.teacherId === teacher.id).map(g => g.id);
-                    if (teacherGroupIds.length === 0) continue; // No groups to report on
+                // 1. Check if ANY deduction/attendance record already exists for this day for this teacher
+                // If a record exists (present, absent, deduction, etc.), we assume handled.
+                const alreadyHandled = teacherAttendance.some(
+                    a => a.teacherId === teacher.id && a.date === dateString
+                );
+                if (alreadyHandled) continue;
 
-                    // Check attendance in ALL students belonging to teacher's groups
-                    const hasStudentAttendance = students.some(s =>
-                        teacherGroupIds.includes(s.groupId) &&
-                        s.attendance?.some(a => a.date === dateString)
-                    );
+                // 2. Check if any student in teacher's groups has attendance for this day
+                const teacherGroupIds = groups.filter(g => g.teacherId === teacher.id).map(g => g.id);
+                if (teacherGroupIds.length === 0) continue; // No groups to report on
 
-                    if (!hasStudentAttendance) {
-                        // MISSING REPORT!
-                        hasUpdates = true;
+                // Check attendance in ALL students belonging to teacher's groups
+                const hasStudentAttendance = students.some(s =>
+                    teacherGroupIds.includes(s.groupId) &&
+                    s.attendance?.some(a => a.date === dateString)
+                );
 
-                        // Add deduction record
-                        const attRef = doc(collection(db, 'teacher_attendance'));
-                        const newDeduction: TeacherAttendanceRecord = {
-                            id: attRef.id,
-                            teacherId: teacher.id,
-                            date: dateString,
-                            status: TeacherAttendanceStatus.MISSING_REPORT, // Equiv to quarter day deduction
-                            reason: 'لم يتم تسجيل تقرير يومي (حضور الطلاب)'
-                        };
-                        batch.set(attRef, newDeduction);
+                if (!hasStudentAttendance) {
+                    // MISSING REPORT!
+                    hasUpdates = true;
 
-                        // Add Teacher Notification
-                        const teacherNotifRef = doc(collection(db, 'notifications'));
-                        const teacherNotif: Notification = {
-                            id: teacherNotifRef.id,
-                            date: new Date().toISOString(),
-                            senderName: 'النظام',
-                            content: `تم تسجيل خصم ربع يوم بتاريخ ${dateString} لعدم تسجيل التقرير اليومي (حضور الطلاب).`,
-                            target: { type: 'teacher', id: teacher.id },
-                            readBy: [],
-                            deletedBy: []
-                        };
-                        batch.set(teacherNotifRef, teacherNotif);
+                    // Add deduction record
+                    const attRef = doc(collection(db, 'teacher_attendance'));
+                    const newDeduction: TeacherAttendanceRecord = {
+                        id: attRef.id,
+                        teacherId: teacher.id,
+                        date: dateString,
+                        status: TeacherAttendanceStatus.MISSING_REPORT, // Equiv to quarter day deduction
+                        reason: 'لم يتم تسجيل تقرير يومي (حضور الطلاب)'
+                    };
+                    batch.set(attRef, newDeduction);
 
-                        // Add Director Notification
-                        const directorNotifRef = doc(collection(db, 'director_notifications'));
-                        const directorNotif: DirectorNotification = {
-                            id: directorNotifRef.id,
-                            date: new Date().toISOString(),
-                            forDate: dateString,
-                            teacherId: teacher.id,
-                            teacherName: teacher.name,
-                            type: DirectorNotificationType.TEACHER_ABSENT_REPORT,
-                            content: `لم يقم المدرس ${teacher.name} بتسجيل التقرير اليومي ليوم ${dateString}. تم تسجيل خصم ربع يوم تلقائياً.`,
-                            isRead: false
-                        };
-                        batch.set(directorNotifRef, directorNotif);
-                    }
+                    // Add Teacher Notification
+                    const teacherNotifRef = doc(collection(db, 'notifications'));
+                    const teacherNotif: Notification = {
+                        id: teacherNotifRef.id,
+                        date: new Date().toISOString(),
+                        senderName: 'النظام',
+                        content: `تم تسجيل خصم ربع يوم بتاريخ ${dateString} لعدم تسجيل التقرير اليومي (حضور الطلاب).`,
+                        target: { type: 'teacher', id: teacher.id },
+                        readBy: [],
+                        deletedBy: []
+                    };
+                    batch.set(teacherNotifRef, teacherNotif);
+
+                    // Add Director Notification
+                    const directorNotifRef = doc(collection(db, 'director_notifications'));
+                    const directorNotif: DirectorNotification = {
+                        id: directorNotifRef.id,
+                        date: new Date().toISOString(),
+                        forDate: dateString,
+                        teacherId: teacher.id,
+                        teacherName: teacher.name,
+                        type: DirectorNotificationType.TEACHER_ABSENT_REPORT,
+                        content: `لم يقم المدرس ${teacher.name} بتسجيل التقرير اليومي ليوم ${dateString}. تم تسجيل خصم ربع يوم تلقائياً.`,
+                        isRead: false
+                    };
+                    batch.set(directorNotifRef, directorNotif);
                 }
+            }
 
-                if (hasUpdates) {
-                    try {
-                        await batch.commit();
-                        console.log(`Processed missing reports for ${dateString}`);
-                    } catch (err) {
-                        console.error("Error processing missing reports batch:", err);
-                    }
+            if (hasUpdates) {
+                try {
+                    await batch.commit();
+                    console.log(`Processed missing reports for ${dateString}`);
+                } catch (err) {
+                    console.error("Error processing missing reports batch:", err);
                 }
             }
         };
 
         checkMissingReports();
+
+        // Run check every hour to ensure it runs eventually after midnight if app is open
+        const interval = setInterval(checkMissingReports, 60 * 60 * 1000);
+        return () => clearInterval(interval);
     }, [currentUser, teachers, groups, students, teacherAttendance]);
     const [isDirectorNotesView, setIsDirectorNotesView] = useState(false);
     const [isDirectorNotificationsView, setIsDirectorNotificationsView] = useState(false);
@@ -1984,7 +1988,7 @@ const App: React.FC = () => {
                 isFilterVisible={isTeacherFilterVisible}
                 onToggleFilter={() => setIsTeacherFilterVisible(!isTeacherFilterVisible)}
             />;
-            if (isDirectorNotesView) return <DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} />;
+            if (isDirectorNotesView) return <DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />;
             if (isFinanceView) return <FinancePage onBack={handleBackToMain} students={students} teachers={teachers} staff={[]} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onDeleteExpense={handleDeleteExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={collections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={[]} onApplyDeductions={handleApplyDeductions} />;
             if (isDirectorReportView) return <DirectorReportsPage groups={groups} students={students} onBack={handleBackToMain} />;
             if (viewingGroup) return <GroupReportPage group={viewingGroup} students={students.filter(s => s.groupId === viewingGroup.id)} teacher={teachers.find(t => t.id === viewingGroup.teacherId)} onBack={handleBackToMain} currentUserRole={currentUser?.role} />;
@@ -2066,7 +2070,7 @@ const App: React.FC = () => {
                 isFilterVisible={isTeacherFilterVisible}
                 onToggleFilter={() => setIsTeacherFilterVisible(!isTeacherFilterVisible)}
             />;
-            if (isDirectorNotesView) return <DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} />;
+            if (isDirectorNotesView) return <DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />;
             if (isFinanceView) return <FinancePage onBack={handleBackToMain} students={activeStudents} teachers={teachers} staff={staff} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onDeleteExpense={handleDeleteExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={teacherCollections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={supervisors} onApplyDeductions={handleApplyDeductions} />;
             if (isDirectorReportView) return <DirectorReportsPage groups={groups} students={activeStudents} onBack={handleBackToMain} />;
             if (viewingGroup) return <GroupReportPage group={viewingGroup} students={activeStudents.filter(s => s.groupId === viewingGroup.id)} teacher={teachers.find(t => t.id === viewingGroup.teacherId)} onBack={handleBackToMain} currentUserRole={currentUser?.role} />;

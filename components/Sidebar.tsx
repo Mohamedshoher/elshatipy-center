@@ -71,12 +71,7 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, o
               <span className="font-semibold">تحصيل الرسوم</span>
             </button>
           </li> */}
-          <li>
-            <button onClick={() => handleAction(onShowFinance)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-green-100 hover:text-green-800 transition-colors">
-              <CurrencyDollarIcon className="w-6 h-6 ml-4 text-green-600" />
-              <span className="font-semibold">الإدارة المالية</span>
-            </button>
-          </li>
+
 
           <li className="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 uppercase">التقارير والمتابعة</li>
           <li>

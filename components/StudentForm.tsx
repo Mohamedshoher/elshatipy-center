@@ -9,11 +9,19 @@ interface StudentFormProps {
   groups: Group[];
 }
 
+const getTodayDateString = () => {
+  const d = new Date();
+  const year = d.getFullYear();
+  const month = String(d.getMonth() + 1).padStart(2, '0');
+  const day = String(d.getDate()).padStart(2, '0');
+  return `${year}-${month}-${day}`;
+};
+
 const StudentForm: React.FC<StudentFormProps> = ({ isOpen, onClose, onSave, studentToEdit, groups }) => {
   const [name, setName] = useState('');
   const [phone, setPhone] = useState('');
   const [monthlyFee, setMonthlyFee] = useState('');
-  const [joiningDate, setJoiningDate] = useState(new Date().toISOString().split('T')[0]);
+  const [joiningDate, setJoiningDate] = useState(getTodayDateString());
   const [groupId, setGroupId] = useState('');
 
   useEffect(() => {
@@ -28,7 +36,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ isOpen, onClose, onSave, stud
         setName('');
         setPhone('');
         setMonthlyFee('');
-        setJoiningDate(new Date().toISOString().split('T')[0]);
+        setJoiningDate(getTodayDateString());
         setGroupId(groups[0]?.id || '');
       }
     }
@@ -86,7 +94,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ isOpen, onClose, onSave, stud
             </select>
           </div>
           <div className="mb-6">
-            <label htmlFor="joiningDate" className="block text-gray-600 mb-2">تاريخ الانضمام</label>
+            <label htmlFor="joiningDate" className="block text-gray-600 mb-2">تاريخ الانضمام (تاريخ الدخول)</label>
             <input type="date" id="joiningDate" value={joiningDate} onChange={(e) => setJoiningDate(e.target.value)} className="w-full px-4 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500" required />
           </div>
           <div className="flex flex-col sm:flex-row justify-end gap-4">

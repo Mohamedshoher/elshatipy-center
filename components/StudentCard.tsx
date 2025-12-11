@@ -43,13 +43,13 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
         tabIndex={0}
         onKeyDown={(e) => e.key === 'Enter' && !student.isArchived && onViewDetails(student)}
       >
-        <div className="flex flex-col gap-4">
+        <div className="flex flex-col gap-2">
 
-          <div className="w-full flex items-center justify-between gap-3 mb-3">
+          <div className="w-full flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <UserIcon className="w-8 h-8 text-blue-500 flex-shrink-0" />
               <div className="flex items-baseline gap-3 min-w-0 flex-1">
-                <h3 className="text-xl font-bold text-gray-800 truncate">{student.name}</h3>
+                <h3 className={`${student.name.length > 25 ? 'text-base' : (student.name.length > 18 ? 'text-lg' : 'text-xl')} font-bold text-gray-800`}>{student.name}</h3>
                 {groupName && (
                   <span className="text-xs text-gray-500 whitespace-nowrap mr-auto">{groupName}</span>
                 )}
@@ -57,20 +57,20 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
             </div>
           </div>
 
-          <div className="w-full flex flex-wrap items-center justify-between gap-y-2" onClick={(e) => e.stopPropagation()}>
-            <div className="flex gap-2">
+          <div className="w-full flex items-center justify-between flex-nowrap" onClick={(e) => e.stopPropagation()}>
+            <div className="flex gap-2 flex-shrink-0">
               {!student.isArchived ? (
                 <>
-                  <button onClick={() => onToggleAttendance(student.id, today, AttendanceStatusEnum.PRESENT)} className={`py-1 px-4 rounded-full font-semibold text-sm transition-all border ${todayAttendance?.status === AttendanceStatusEnum.PRESENT ? 'bg-green-600 text-white border-transparent shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`} aria-label={`تسجيل حضور لـ ${student.name}`}>
+                  <button onClick={() => onToggleAttendance(student.id, today, AttendanceStatusEnum.PRESENT)} className={`py-1 px-3 rounded-full font-semibold text-sm transition-all border ${todayAttendance?.status === AttendanceStatusEnum.PRESENT ? 'bg-green-600 text-white border-transparent shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`} aria-label={`تسجيل حضور لـ ${student.name}`}>
                     حاضر
                   </button>
-                  <button onClick={() => onToggleAttendance(student.id, today, AttendanceStatusEnum.ABSENT)} className={`py-1 px-4 rounded-full font-semibold text-sm transition-all border ${todayAttendance?.status === AttendanceStatusEnum.ABSENT ? 'bg-red-600 text-white border-transparent shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`} aria-label={`تسجيل غياب لـ ${student.name}`}>
+                  <button onClick={() => onToggleAttendance(student.id, today, AttendanceStatusEnum.ABSENT)} className={`py-1 px-3 rounded-full font-semibold text-sm transition-all border ${todayAttendance?.status === AttendanceStatusEnum.ABSENT ? 'bg-red-600 text-white border-transparent shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`} aria-label={`تسجيل غياب لـ ${student.name}`}>
                     غياب
                   </button>
                 </>
               ) : (
                 <>
-                  <button onClick={(e) => { e.stopPropagation(); onArchive(student.id); }} className="py-1 px-4 rounded-full font-semibold text-sm bg-green-600 text-white shadow hover:bg-green-700 transition-all" aria-label={`استعادة ${student.name}`}>
+                  <button onClick={(e) => { e.stopPropagation(); onArchive(student.id); }} className="py-1 px-3 rounded-full font-semibold text-sm bg-green-600 text-white shadow hover:bg-green-700 transition-all" aria-label={`استعادة ${student.name}`}>
                     استعادة
                   </button>
                   {currentUserRole === 'director' && onDeletePermanently && (
@@ -82,7 +82,7 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
               )}
             </div>
 
-            <div className="flex items-center gap-x-2">
+            <div className="flex items-center gap-x-1 sm:gap-x-2 flex-shrink-0">
               {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
                 (() => {
                   const now = new Date();
