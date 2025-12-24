@@ -40,7 +40,7 @@ const UntestedStudentsPage: React.FC<UntestedStudentsPageProps> = ({ groups, stu
 
   const untestedStudents = useMemo(() => {
     return students.filter(student =>
-      !student.tests.some(test => test.date.startsWith(selectedMonth))
+      !student.isArchived && !student.tests.some(test => test.date.startsWith(selectedMonth))
     );
   }, [students, selectedMonth]);
 
