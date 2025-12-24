@@ -1,0 +1,52 @@
+import { collection, doc, addDoc, updateDoc, arrayUnion } from 'firebase/firestore';
+import { db } from '../services/firebase';
+import type { Parent } from '../types';
+
+/**
+ * إنشاء أو تحديث حساب ولي أمر تلقائياً عند حفظ/تعديل طالب
+ * @param studentPhone رقم هاتف الطالب (يجب أن يكون 16 رقم يبدأ بـ 02)
+ * @param studentName اسم الطالب
+ * @param studentId معرّف الطالب
+ * @param existingParents قائمة أولياء الأمور الحالية
+ */
+export const createParentAccountIfNeeded = async (
+    studentPhone: string,
+    studentName: string,
+    studentId: string,
+    existingParents: Parent[]
+): Promise<void> => {
+    // التحقق من صحة رقم الهاتف (13 رقم يبدأ بـ 02)
+    if (!studentPhone.startsWith('02') || studentPhone.length !== 13) {
+        console.log('رقم الهاتف غير صالح لإنشاء حساب ولي أمر');
+        return;
+    }
+
+    try {
+        // التحقق من وجود حساب ولي أمر بهذا الرقم
+        const existingParent = existingParents.find(p => p.phone === studentPhone);
+
+        if (existingParent) {
+            // تحديث قائمة الطلاب إذا لم يكن الطالب موجوداً
+            if (!existingParent.studentIds.includes(studentId)) {
+                await updateDoc(doc(db, 'parents', existingParent.id), {
+                    studentIds: arrayUnion(studentId)
+                });
+                console.log(`✅ تم إضافة الطالب ${studentName} لحساب ولي الأمر الموجود`);
+            }
+        } else {
+            // إنشاء حساب جديد
+            const password = studentPhone.slice(-6); // آخر 6 أرقام
+            await addDoc(collection(db, 'parents'), {
+                phone: studentPhone,
+                name: `ولي أمر ${studentName}`,
+                password: password,
+                studentIds: [studentId]
+            });
+            console.log(`✅ تم إنشاء حساب جديد لولي أمر ${studentName}`);
+            console.log(`📱 رقم الهاتف: ${studentPhone}`);
+            console.log(`🔑 كلمة المرور: ${password}`);
+        }
+    } catch (error) {
+        console.error('❌ خطأ في إنشاء/تحديث حساب ولي الأمر:', error);
+    }
+};
