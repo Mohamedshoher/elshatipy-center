@@ -34,6 +34,9 @@ const AttendanceActionModal: React.FC<AttendanceActionModalProps> = ({ isOpen, o
 
                         <button onClick={() => onSetStatus(TeacherAttendanceStatus.BONUS_HALF_DAY)} className="p-3 rounded-xl bg-teal-50 text-teal-700 text-xs font-bold hover:bg-teal-100 border border-teal-100">مكافأة (نصف)</button>
                         <button onClick={() => onSetStatus(TeacherAttendanceStatus.DEDUCTION_HALF_DAY)} className="p-3 rounded-xl bg-orange-50 text-orange-700 text-xs font-bold hover:bg-orange-100 border border-orange-100">خصم (نصف)</button>
+
+                        <button onClick={() => onSetStatus(TeacherAttendanceStatus.BONUS_QUARTER_DAY)} className="p-3 rounded-xl bg-teal-50 text-teal-700 text-xs font-bold hover:bg-teal-100 border border-teal-100">مكافأة (ربع)</button>
+                        <button onClick={() => onSetStatus(TeacherAttendanceStatus.DEDUCTION_QUARTER_DAY)} className="p-3 rounded-xl bg-orange-50 text-orange-700 text-xs font-bold hover:bg-orange-100 border border-orange-100">خصم (ربع)</button>
                     </div>
 
                     {currentStatus && (
