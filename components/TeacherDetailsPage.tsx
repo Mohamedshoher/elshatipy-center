@@ -10,6 +10,7 @@ import DocumentReportIcon from './icons/DocumentReportIcon';
 import CurrencyDollarIcon from './icons/CurrencyDollarIcon';
 import CalendarCheckIcon from './icons/CalendarCheckIcon';
 import WhatsAppIcon from './icons/WhatsAppIcon';
+import MessageIcon from './icons/MessageIcon';
 import ArrowRightIcon from './icons/ArrowRightIcon';
 import UserIcon from './icons/UserIcon';
 import BriefcaseIcon from './icons/BriefcaseIcon';
@@ -197,6 +198,46 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                 onDeleteTeacherAttendance(record.id);
             }
             setIsActionModalOpen(false);
+        } else if (status === TeacherAttendanceStatus.BONUS_DAY || status === TeacherAttendanceStatus.BONUS_HALF_DAY || status === TeacherAttendanceStatus.BONUS_QUARTER_DAY) {
+            handleBonusClick(status);
+        } else if (status === TeacherAttendanceStatus.DEDUCTION_FULL_DAY || status === TeacherAttendanceStatus.DEDUCTION_HALF_DAY || status === TeacherAttendanceStatus.DEDUCTION_QUARTER_DAY) {
+            handleDeductionClick(status);
+        } else {
+            onSetTeacherAttendance(employeeId, calendarSelectedDate, status);
+            setIsActionModalOpen(false);
+        }
+    };
+
+    const handleOpenChatWithParent = () => {
+        if (!students || students.length === 0) {
+            alert('لا توجد طلاب مرتبطين بهذا المدرس');
+            return;
+        }
+
+        // Get unique parent phone numbers from the teacher's students
+        const parentPhones = Array.from(new Set(
+            students
+                .filter(s => assignedGroups.some(g => g.id === s.groupId))
+                .map(s => s.phone)
+                .filter(phone => phone && /^\d{11}$/.test(phone.replace(/[^0-9]/g, '')))
+        ));
+
+        if (parentPhones.length === 0) {
+            alert('الرجاء إدخال أرقام صحيحة لأولياء الأمور');
+            return;
+        }
+
+        // If multiple parents, you could show a selection modal, but for now open the first one
+        const parentPhone = parentPhones[0].replace(/[^0-9]/g, '');
+        
+        // Open the chat - currently opens web.whatsapp for direct chat
+        const isMobile = /Android|iPhone|iPad|iPod/i.test(navigator.userAgent);
+        if (isMobile) {
+            window.open(`https://api.whatsapp.com/send?phone=${parentPhone}`, '_blank');
+        } else {
+            window.open(`https://web.whatsapp.com/send?phone=${parentPhone}`, 'chat_window');
+        }
+    };
             setCalendarSelectedDate(null);
             return;
         }
@@ -542,9 +583,14 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
 
                     <div className="flex items-center justify-center md:justify-end gap-2 w-full md:w-auto border-t md:border-t-0 pt-2 md:pt-0">
                         {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
-                            <a href={`https://wa.me/${employeePhone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors" title="واتساب">
-                                <WhatsAppIcon className="w-5 h-5" />
-                            </a>
+                            <>
+                                <a href={`https://wa.me/${employeePhone.replace(/[^0-9]/g, '')}`} target="_blank" rel="noopener noreferrer" className="p-2 bg-green-50 text-green-600 rounded-lg hover:bg-green-100 transition-colors" title="واتساب">
+                                    <WhatsAppIcon className="w-5 h-5" />
+                                </a>
+                                <button onClick={handleOpenChatWithParent} className="p-2 bg-cyan-50 text-cyan-600 rounded-lg hover:bg-cyan-100 transition-colors" title="شات مع ولي الأمر">
+                                    <MessageIcon className="w-5 h-5" />
+                                </button>
+                            </>
                         )}
                         <a href={`tel:${employeePhone.replace(/[^0-9]/g, '')}`} className="p-2 bg-blue-50 text-blue-600 rounded-lg hover:bg-blue-100 transition-colors" title="اتصال">
                             <PhoneIcon className="w-5 h-5" />
