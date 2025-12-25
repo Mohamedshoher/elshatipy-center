@@ -4,6 +4,7 @@ import type { Teacher, TeacherAttendanceRecord } from '../types';
 import { TeacherStatus, TeacherAttendanceStatus } from '../types';
 import BriefcaseIcon from './icons/BriefcaseIcon';
 import CalendarUserIcon from './icons/CalendarUserIcon';
+import { getCairoDateString } from '../services/cairoTimeHelper';
 
 interface TeacherAttendancePageProps {
     teachers: Teacher[];
@@ -13,7 +14,7 @@ interface TeacherAttendancePageProps {
 }
 
 const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ teachers, teacherAttendance, onSetTeacherAttendance, onBack }) => {
-    const today = new Date().toISOString().split('T')[0];
+    const today = getCairoDateString();
     const todayFormatted = new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const activeTeachers = teachers.filter(t => t.status === TeacherStatus.ACTIVE);
 

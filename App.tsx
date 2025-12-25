@@ -2,6 +2,7 @@
 import React, { useState, useEffect, useCallback, useMemo } from 'react';
 import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus, Donation, Parent, UserRole } from './types';
 import { ExpenseCategory, TeacherAttendanceStatus, DayOfWeek, TestType as TestTypeEnum, DirectorNotificationType } from './types';
+import { getCairoNow, getCairoDateString, getYesterdayDateString, getCairoTimeInMinutes, isCairoAfterMidnight, isCairoAfter12_05, getCairoDayOfWeek, isCairoWorkday } from './services/cairoTimeHelper';
 import StudentCard from './components/StudentCard';
 import StudentForm from './components/StudentForm';
 import GroupManagerModal from './components/GroupManagerModal';
@@ -293,8 +294,10 @@ const App: React.FC = () => {
         };
 
         const runNotificationChecks = async () => {
-            const today = new Date();
-            const todayString = today.toISOString().split('T')[0];
+            // استخدام توقيت القاهرة بدلاً من التوقيت المحلي
+            const today = getCairoNow();
+            const todayString = getCairoDateString();
+            const yesterdayString = getYesterdayDateString();
 
             // 1. Singleton Execution Guard - لضمان التنفيذ مرة واحدة فقط في اليوم
             const automationRef = doc(db, 'system', 'automation');
@@ -303,28 +306,23 @@ const App: React.FC = () => {
             const lastAbsenceCheck = automationData.lastAbsenceCheck || '';
             const lastDeductionCheck = automationData.lastDeductionCheck || '';
 
-            // الأمس هو اليوم الذي نبحث عن تقاريره
-            const yesterday = new Date(today);
-            yesterday.setDate(today.getDate() - 1);
-            const yesterdayString = yesterday.toISOString().split('T')[0];
-
             const activeTeachersWithStudents = getActiveTeachers();
 
             // فحص اليوم السابق (Yesterday)
-            const dateToCheck = new Date(yesterday);
+            const dateToCheck = new Date(today);
             dateToCheck.setHours(0, 0, 0, 0);
-            const dayOfWeek = dateToCheck.getDay(); // 0=Sunday, ..., 4=Thursday, 5=Friday, 6=Saturday
+            const dayOfWeek = getCairoDayOfWeek(); // 0=Sunday, ..., 4=Thursday, 5=Friday, 6=Saturday
 
             // استثناء يومي الخميس (4) والجمعة (5) - هما اليوم السادس والسابع حسب تقويم المستخدم
-            const isWorkday = ![4, 5].includes(dayOfWeek);
+            const isWorkday = isCairoWorkday();
             const isHoliday = (financialSettings.publicHolidays || []).includes(yesterdayString);
 
             // مصفوفة لتجميع العمليات اليومية
             const dailyPromises: Promise<void>[] = [];
 
-            const now = today.getHours() * 60 + today.getMinutes();
-            const IS_AFTER_MIDNIGHT = now >= 0; // 12:00 AM
-            const IS_AFTER_12_05 = now >= 5;    // 12:05 AM
+            // التحقق من الوقت بتوقيت القاهرة
+            const IS_AFTER_MIDNIGHT = isCairoAfterMidnight(); // 12:00 AM
+            const IS_AFTER_12_05 = isCairoAfter12_05();        // 12:05 AM
 
             // 1. نظام موحد: فحص التقارير المفقودة وتسجيل الخصم (بعد 12:05 ص)
             if (IS_AFTER_12_05 && lastDeductionCheck !== yesterdayString && isWorkday && !isHoliday) {
@@ -360,7 +358,7 @@ const App: React.FC = () => {
                                     date: yesterdayString,
                                     status: TeacherAttendanceStatus.MISSING_REPORT,
                                     reason: 'تلقائي: لم يتم تسليم التقرير اليومي',
-                                    timestamp: new Date().toISOString()
+                                    timestamp: getCairoNow().toISOString()
                                 });
 
                                 const dayName = dateToCheck.toLocaleDateString('ar-EG', { weekday: 'long' });
@@ -368,7 +366,7 @@ const App: React.FC = () => {
                                 // إشعار للمدير
                                 const dirNoteId = `dir-deduct-${teacher.id}-${yesterdayString}`;
                                 await setDoc(doc(db, 'directorNotifications', dirNoteId), {
-                                    date: new Date().toISOString(),
+                                    date: getCairoNow().toISOString(),
                                     forDate: yesterdayString,
                                     content: `⚠️ تم خصم (ربع يوم) للمدرس ${teacher.name} لعدم إرسال تقرير يوم ${dayName}.`,
                                     isRead: false,
@@ -381,7 +379,7 @@ const App: React.FC = () => {
                                 const teacherNoteId = `notif-missed-${teacher.id}-${yesterdayString}`;
                                 await setDoc(doc(db, 'notifications', teacherNoteId), {
                                     id: teacherNoteId,
-                                    date: new Date().toISOString(),
+                                    date: getCairoNow().toISOString(),
                                     content: `⚠️ تنبيه إداري آلي: تم تسجيل خصم (ربع يوم) من راتبك لعدم إرسال تقرير الحضور الخاص بمجموعاتك ليوم ${dayName}. يرجى الالتزام لتجنب الخصومات المتكررة.`,
                                     senderName: "نظام المتابعة الآلي",
                                     target: { type: 'teacher', id: teacher.id },
@@ -421,7 +419,7 @@ const App: React.FC = () => {
                                     const teacherDoc = doc(db, 'notifications', tchAbsNoteId);
                                     if (!(await getDoc(teacherDoc)).exists()) {
                                         await setDoc(teacherDoc, {
-                                            date: new Date().toISOString(),
+                                            date: getCairoNow().toISOString(),
                                             content: `📢 تنبيه غياب: الطالب ${student.name} غاب لمدة 3 أيام متصلة. يرجى التواصل مع ولي الأمر.`,
                                             senderName: "نظام المتابعة",
                                             target: { type: 'teacher', id: group.teacherId },
@@ -434,7 +432,7 @@ const App: React.FC = () => {
                                 const dirDoc = doc(db, 'directorNotifications', dirAbsNoteId);
                                 if (!(await getDoc(dirDoc)).exists()) {
                                     await setDoc(dirDoc, {
-                                        date: new Date().toISOString(),
+                                        date: getCairoNow().toISOString(),
                                         forDate: yesterdayString,
                                         content: `📢 انتباه: الطالب ${student.name} (مجموعة ${group?.name || '...'}) غاب لـ 3 أيام متتالية.`,
                                         isRead: false,
@@ -451,7 +449,7 @@ const App: React.FC = () => {
 
             // --- الفحص الأسبوعي للتحفيز والخصم (السبت - الأربعاء) ---
             const weeklyPromises: Promise<void>[] = [];
-            const todayDay = today.getDay();
+            const todayDay = getCairoDayOfWeek();
 
             // يتم الفحص بدءاً من يوم الخميس (4) لمراجعة الأسبوع المنتهي بالأربعاء
             if (todayDay >= 4 || todayDay === 0) {
@@ -496,13 +494,13 @@ const App: React.FC = () => {
                                     date: wednesdayString,
                                     status: TeacherAttendanceStatus.DEDUCTION_HALF_DAY,
                                     reason: `تلقائي: عدم تسجيل اختبارات للأسبوع (${saturdayString} إلى ${wednesdayString})`,
-                                    timestamp: new Date().toISOString()
+                                    timestamp: getCairoNow().toISOString()
                                 });
 
                                 // إخطار الإدارة بمعرّف ثابت
                                 const noteId = `note-5day-fail-${teacher.id}-${saturdayString}`;
                                 await setDoc(doc(db, 'directorNotifications', noteId), {
-                                    date: new Date().toISOString(),
+                                    date: getCairoNow().toISOString(),
                                     forDate: wednesdayString,
                                     content: `⚠️ خصم تلقائي (نصف يوم) للمدرس ${teacher.name} لعدم تسجيل اختبارات طوال الأسبوع.`,
                                     isRead: false,
@@ -525,13 +523,13 @@ const App: React.FC = () => {
                                     date: wednesdayString,
                                     status: TeacherAttendanceStatus.BONUS_HALF_DAY,
                                     reason: `تلقائي: الالتزام بتسجيل الاختبارات يومياً (${saturdayString} إلى ${wednesdayString})`,
-                                    timestamp: new Date().toISOString()
+                                    timestamp: getCairoNow().toISOString()
                                 });
 
                                 // إخطار عام بمعرّف ثابت
                                 const pubNoteId = `public-bonus-${teacher.id}-${saturdayString}`;
                                 await setDoc(doc(db, 'notifications', pubNoteId), {
-                                    date: new Date().toISOString(),
+                                    date: getCairoNow().toISOString(),
                                     content: `🎉 بطل/ة الأسبوع: حصل المدرس/ة ${teacher.name} على مكافأة (نصف يوم) للالتزام التام بتسجيل الاختبارات يومياً.`,
                                     isRead: false,
                                     recipientId: 'all'
@@ -540,7 +538,7 @@ const App: React.FC = () => {
                                 // إخطار الإدارة
                                 const dirBonusNoteId = `dir-bonus-${teacher.id}-${saturdayString}`;
                                 await setDoc(doc(db, 'directorNotifications', dirBonusNoteId), {
-                                    date: new Date().toISOString(),
+                                    date: getCairoNow().toISOString(),
                                     forDate: wednesdayString,
                                     content: `✅ مكافأة تلقائية (نصف يوم) للمدرس ${teacher.name} للالتزام بتسجيل الاختبارات.`,
                                     isRead: false,
@@ -923,7 +921,7 @@ const App: React.FC = () => {
             await updateDoc(doc(db, 'students', studentId), {
                 isPending: false,
                 approvedBy: currentUser.role === 'director' ? 'director' : currentUser.id,
-                approvalDate: new Date().toISOString().split('T')[0]
+                approvalDate: getCairoDateString()
             });
             // Alert removed as per user request
         } catch (error) {
@@ -953,7 +951,7 @@ const App: React.FC = () => {
                     if (teacher) {
                         const rejectorName = currentUser.role === 'director' ? 'المدير' : `المشرف ${currentUser.name}`;
                         await addDoc(collection(db, 'notifications'), {
-                            date: new Date().toISOString(),
+                            date: getCairoNow().toISOString(),
                             content: `تم رفض الطالب "${student.name}" من قبل ${rejectorName}.\nسبب الرفض: ${rejectionReason.trim()}`,
                             senderName: rejectorName,
                             target: { type: 'teacher', id: student.addedBy },
@@ -974,7 +972,7 @@ const App: React.FC = () => {
     const handleAddTest = useCallback(async (studentId: string, testData: Omit<TestRecord, 'id' | 'date'>) => {
         try {
             await updateDoc(doc(db, 'students', studentId), {
-                tests: arrayUnion({ id: crypto.randomUUID(), date: new Date().toISOString().split('T')[0], ...testData })
+                tests: arrayUnion({ id: crypto.randomUUID(), date: getCairoDateString(), ...testData })
             });
         } catch (error) { console.error("Error adding test: ", error); }
     }, []);
@@ -999,7 +997,7 @@ const App: React.FC = () => {
                 studentId, content,
                 authorId: currentUser.role === 'director' ? 'director' : currentUser.id,
                 authorName: currentUser.role === 'director' ? 'المدير' : (currentUser.role === 'supervisor' ? `المشرف ${currentUser.name}` : currentUser.name),
-                date: new Date().toISOString(),
+                date: getCairoNow().toISOString(),
                 isAcknowledged: false,
             });
         } catch (error) { console.error("Error adding note:", error); }
@@ -1101,7 +1099,7 @@ const App: React.FC = () => {
     const handleMarkWeeklyReportSent = useCallback(async (studentId: string) => {
         try {
             const studentRef = doc(db, 'students', studentId);
-            await updateDoc(studentRef, { lastWeeklyReportDate: new Date().toISOString() });
+            await updateDoc(studentRef, { lastWeeklyReportDate: getCairoNow().toISOString() });
         } catch (error) {
             console.error("Error marking weekly report as sent:", error);
         }
@@ -1163,7 +1161,7 @@ const App: React.FC = () => {
             const updateData: any = {
                 isArchived: true,
                 archivedBy: archivedByValue,
-                archiveDate: new Date().toISOString().split('T')[0],
+                archiveDate: getCairoDateString(),
                 hasDebt: hasDebt,
                 archivedGroupName: currentGroupName, // Save group name for history even if group is deleted
             };
@@ -1253,7 +1251,7 @@ const App: React.FC = () => {
 
             const paymentData = {
                 paid: true,
-                paymentDate: new Date().toISOString(),
+                paymentDate: getCairoNow().toISOString(),
                 amountPaid: details.amountPaid,
                 receiptNumber: details.receiptNumber,
                 collectedBy,
@@ -1307,7 +1305,7 @@ const App: React.FC = () => {
             const feeIndex = fees.findIndex(f => f.month === month);
             const paymentData = {
                 paid: true,
-                paymentDate: new Date().toISOString(),
+                paymentDate: getCairoNow().toISOString(),
                 amountPaid: amount,
                 receiptNumber: 'DEBT_PAYMENT',
                 collectedBy: currentUser?.role === 'director' ? 'director' : currentUser?.id,
@@ -1588,7 +1586,7 @@ const App: React.FC = () => {
             const content = `🎉 خبر سار: حصل المدرس/ة ${teacher?.name || '...'} على مكافأة تشجيعية تقديراً لجهوده المتميزة. بارك الله في عملكم جميعاً.`;
 
             await addDoc(collection(db, "notifications"), {
-                date: new Date().toISOString(),
+                date: getCairoNow().toISOString(),
                 content,
                 senderName: 'المدير',
                 recipientId: 'all', // سيراه جميع المدرسين في الجرس
@@ -1597,7 +1595,7 @@ const App: React.FC = () => {
 
             // إشعار في سجل المدير
             await addDoc(collection(db, "directorNotifications"), {
-                date: new Date().toISOString(),
+                date: getCairoNow().toISOString(),
                 forDate: bonusData.date,
                 content: `✅ تم إضافة مكافأة يدوية للمدرس ${teacher?.name} بمبلغ ${bonusData.amount} جنيه.`,
                 isRead: false,
@@ -1795,13 +1793,13 @@ const App: React.FC = () => {
 
     // ... (Notification Handlers) ...
     const handleSendNotification = useCallback(async (target: Notification['target'], content: string) => {
-        await addDoc(collection(db, "notifications"), { date: new Date().toISOString(), content, senderName: 'المدير', target, readBy: [] });
+        await addDoc(collection(db, "notifications"), { date: getCairoNow().toISOString(), content, senderName: 'المدير', target, readBy: [] });
     }, []);
 
     const handleSendNotificationToTeacher = useCallback(async (teacherId: string, content: string) => {
         const sender = currentUser?.role === 'director' ? 'المدير' : (currentUser?.role === 'supervisor' ? 'المشرف' : 'الإدارة');
         await addDoc(collection(db, "notifications"), {
-            date: new Date().toISOString(),
+            date: getCairoNow().toISOString(),
             content,
             senderName: sender,
             target: { type: 'teacher', id: teacherId },
@@ -1832,7 +1830,7 @@ const App: React.FC = () => {
         targetTeachers.forEach(teacher => {
             const notificationRef = doc(collection(db, "notifications"));
             batch.set(notificationRef, {
-                date: new Date().toISOString(),
+                date: getCairoNow().toISOString(),
                 content,
                 senderName: sender,
                 target: { type: 'teacher', id: teacher.id },
@@ -1843,7 +1841,7 @@ const App: React.FC = () => {
         targetGroups.forEach(group => {
             const notificationRef = doc(collection(db, "notifications"));
             batch.set(notificationRef, {
-                date: new Date().toISOString(),
+                date: getCairoNow().toISOString(),
                 content,
                 senderName: sender,
                 target: { type: 'group', id: group.id, name: group.name },

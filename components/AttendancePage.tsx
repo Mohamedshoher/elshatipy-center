@@ -3,6 +3,7 @@ import React from 'react';
 import type { Student, AttendanceStatus } from '../types';
 import { AttendanceStatus as AttendanceEnum } from '../types';
 import UserIcon from './icons/UserIcon';
+import { getCairoDateString } from '../services/cairoTimeHelper';
 
 interface AttendancePageProps {
   students: Student[];
@@ -11,7 +12,7 @@ interface AttendancePageProps {
 }
 
 const AttendancePage: React.FC<AttendancePageProps> = ({ students, onToggleAttendance, onBack }) => {
-  const today = new Date().toISOString().split('T')[0];
+  const today = getCairoDateString();
   const todayFormatted = new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
 
   return (

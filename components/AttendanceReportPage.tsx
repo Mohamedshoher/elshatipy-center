@@ -5,7 +5,7 @@ import { AttendanceStatus } from '../types';
 import UserIcon from './icons/UserIcon';
 import AbsentStudentsModal from './AbsentStudentsModal';
 import WhatsAppIcon from './icons/WhatsAppIcon';
-
+import { getCairoDateString } from '../services/cairoTimeHelper';
 import ClipboardListIcon from './icons/ClipboardListIcon';
 import ArchiveIcon from './icons/ArchiveIcon';
 
@@ -21,7 +21,7 @@ interface AttendanceReportPageProps {
 const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, groups, onViewStudent, onArchive, onViewDetails, currentUserRole }) => {
   const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
   const [isAbsentModalOpen, setIsAbsentModalOpen] = useState(false);
-  const [selectedDailyDate, setSelectedDailyDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedDailyDate, setSelectedDailyDate] = useState(() => getCairoDateString());
   const [absentDaysFilter, setAbsentDaysFilter] = useState(1);
   const [consecutiveFilter, setConsecutiveFilter] = useState(0);
 
