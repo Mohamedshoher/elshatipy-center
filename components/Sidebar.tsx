@@ -29,9 +29,10 @@ interface SidebarProps {
   onShowSupervisorManager?: () => void;
   onLogout: () => void;
   currentUserRole?: string;
+  unreadMessagesCount?: number;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, onShowFinance, onShowFeeCollection, onShowNotifications, onShowNotes, onShowTeacherManager, onShowArchive, onShowDebtors, onShowSupervisorManager, onLogout, currentUserRole }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, onShowFinance, onShowFeeCollection, onShowNotifications, onShowNotes, onShowTeacherManager, onShowArchive, onShowDebtors, onShowSupervisorManager, onLogout, currentUserRole, unreadMessagesCount }) => {
 
   const handleAction = (action: () => void) => {
     onClose();
@@ -90,9 +91,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, o
             </button>
           </li>
           <li>
-            <button onClick={() => handleAction(onShowNotifications)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-indigo-100 hover:text-indigo-800 transition-colors">
+            <button onClick={() => handleAction(onShowNotifications)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-indigo-100 hover:text-indigo-800 transition-colors relative">
               <MessageIcon className="w-6 h-6 ml-4 text-indigo-600" />
-              <span className="font-semibold">الرسائل والإشعارات</span>
+              <span className="font-semibold flex-1">الرسائل والإشعارات</span>
+              {unreadMessagesCount !== undefined && unreadMessagesCount > 0 && (
+                <span className="bg-red-500 text-white text-[10px] font-bold px-2 py-0.5 rounded-full min-w-[20px] text-center shadow-sm">
+                  {unreadMessagesCount}
+                </span>
+              )}
             </button>
           </li>
 

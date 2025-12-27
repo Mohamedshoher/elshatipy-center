@@ -58,6 +58,7 @@ import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, getDoc, writ
 import UsersIcon from './components/icons/UsersIcon';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import CloudOffIcon from './components/icons/CloudOffIcon';
+import { requestNotificationPermission, playNotificationSound, showLocalNotification, setAppBadge } from './services/notificationService';
 import FilterIcon from './components/icons/FilterIcon';
 
 type ActiveView = 'students' | 'groups' | 'attendance_report' | 'tests_report' | 'financial_report';
@@ -146,12 +147,18 @@ const App: React.FC = () => {
     const [loginMode, setLoginMode] = useState<'staff' | 'parent'>('staff');
     const [selectedParentStudent, setSelectedParentStudent] = useState<Student | null>(null);
 
-    // Listener for unread messages
+    // Listener for unread messages and notifications
     useEffect(() => {
-        if (!currentUser) return;
+        if (!currentUser) {
+            setAppBadge(0);
+            return;
+        }
         const myId = currentUser.role === 'director' ? 'director' : currentUser.id;
 
         if (!myId) return; // Prevent crash if ID is missing
+
+        // Request notification permission once the user is logged in
+        requestNotificationPermission();
 
         const q = query(
             collection(db, 'messages'),
@@ -160,10 +167,32 @@ const App: React.FC = () => {
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
-            setUnreadMessagesCount(snapshot.size);
+            const count = snapshot.size;
+            setUnreadMessagesCount(count);
+            setAppBadge(count);
+
+            // Trigger notification for each NEW incoming unread message
+            snapshot.docChanges().forEach((change) => {
+                if (change.type === 'added') {
+                    const msg = change.doc.data();
+                    const msgTime = msg.timestamp?.toMillis ? msg.timestamp.toMillis() : Date.now();
+
+                    // Only notify for messages sent in the last 1 minute to avoid spamming old unread messages on load
+                    if (Date.now() - msgTime < 60000) {
+                        playNotificationSound();
+                        showLocalNotification(
+                            `رسالة جديدة من ${msg.senderName}`,
+                            msg.content
+                        );
+                    }
+                }
+            });
         });
 
-        return () => unsubscribe();
+        return () => {
+            unsubscribe();
+            setAppBadge(0);
+        };
     }, [currentUser]);
     const [isFormOpen, setIsFormOpen] = useState(false);
     const [studentToEdit, setStudentToEdit] = useState<Student | null>(null);
@@ -2864,6 +2893,7 @@ const App: React.FC = () => {
                         setSelectedParentStudent(null); // إغلاق صفحة التفاصيل
                         setIsChatOpen(true);
                     }}
+                    unreadMessagesCount={unreadMessagesCount}
                 />
             );
         }
@@ -2971,6 +3001,7 @@ const App: React.FC = () => {
                             onShowDebtors={() => openDirectorView(setIsDebtorsView)}
                             onLogout={handleLogout}
                             currentUserRole={currentUser.role}
+                            unreadMessagesCount={unreadMessagesCount}
                         />
                     )}
                 </Suspense>
@@ -3018,52 +3049,50 @@ const App: React.FC = () => {
                                 <FeePaymentModal isOpen={isFeeModalOpen} onClose={() => { setIsFeeModalOpen(false); setPaymentDetails(null); }} onSave={handleSaveFeePayment} paymentDetails={paymentDetails} />
                                 <UnarchiveModal isOpen={!!studentToUnarchiveId} onClose={() => setStudentToUnarchiveId(null)} onConfirm={handleConfirmUnarchive} groups={groupsForUnarchiveModal} studentName={students.find(s => s.id === studentToUnarchiveId)?.name || ''} />
 
-                                {/* Chat System */}
+                                {/* Chat System - Always mounted for instant opening */}
                                 {currentUser && (
                                     <>
-                                        {!isChatOpen && (
-                                            <button
-                                                onClick={() => setIsChatOpen(true)}
-                                                className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl transition-all hover:scale-105 flex items-center gap-2 group border-2 border-white focus:outline-none focus:ring-4 focus:ring-blue-300"
-                                                style={{ position: 'fixed', left: '20px', bottom: '80px', right: 'auto', zIndex: 9999 }}
-                                                title="المحادثات"
-                                            >
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 transform group-hover:rotate-12 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                                                </svg>
-                                                <span className="font-bold hidden md:inline ml-1">المحادثات</span>
-                                                {unreadMessagesCount > 0 && (
-                                                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-white animate-bounce">
-                                                        {unreadMessagesCount > 9 ? '+9' : unreadMessagesCount}
-                                                    </span>
-                                                )}
-                                            </button>
-                                        )}
+                                        <button
+                                            onClick={() => setIsChatOpen(true)}
+                                            className={`bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl transition-all hover:scale-105 flex items-center gap-2 group border-2 border-white focus:outline-none focus:ring-4 focus:ring-blue-300 ${isChatOpen ? 'opacity-0 pointer-events-none' : 'opacity-100'}`}
+                                            style={{ position: 'fixed', left: '20px', bottom: '80px', right: 'auto', zIndex: 9999 }}
+                                            title="المحادثات"
+                                        >
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 transform group-hover:rotate-12 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                            </svg>
+                                            <span className="font-bold hidden md:inline ml-1">المحادثات</span>
+                                            {unreadMessagesCount > 0 && (
+                                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-white animate-bounce">
+                                                    {unreadMessagesCount > 9 ? '+9' : unreadMessagesCount}
+                                                </span>
+                                            )}
+                                        </button>
 
-                                        {isChatOpen && (
-                                            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                                                <div className="w-full max-w-6xl h-full max-h-[85vh] bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                                                    <ChatPage
-                                                        key={currentUser.role === 'director' ? 'director' : (currentUser as any).id || 'unknown'}
-                                                        currentUser={{
-                                                            uid: currentUser.role === 'director' ? 'director' : ((currentUser as any).id || 'unknown'),
-                                                            role: currentUser.role,
-                                                            name: currentUser.role === 'director' ? 'الإدارة' : ((currentUser as any).name || 'Unknown')
-                                                        }}
-                                                        teachers={activeTeachers || []}
-                                                        groups={groups}
-                                                        students={currentUser.role === 'parent' ? students.filter(s => (currentUser as any).studentIds?.includes(s.id)) : students}
-                                                        parents={parents}
-                                                        supervisors={supervisors}
-                                                        initialSelectedUserId={chatInitialUserId}
-                                                        onBack={() => {
-                                                            setIsChatOpen(false);
-                                                            setChatInitialUserId(undefined);
-                                                        }}
-                                                    />
-                                                </div>
+                                        <div
+                                            className={`fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 transition-all duration-300 ${isChatOpen ? 'opacity-100' : 'opacity-0 pointer-events-none'}`}
+                                        >
+                                            <div className={`w-full max-w-6xl h-full max-h-[85vh] bg-white rounded-2xl shadow-2xl overflow-hidden transition-all duration-300 ${isChatOpen ? 'scale-100 translate-y-0' : 'scale-95 translate-y-4'}`}>
+                                                <ChatPage
+                                                    key={currentUser.role === 'director' ? 'director' : (currentUser as any).id || 'unknown'}
+                                                    currentUser={{
+                                                        uid: currentUser.role === 'director' ? 'director' : ((currentUser as any).id || 'unknown'),
+                                                        role: currentUser.role,
+                                                        name: currentUser.role === 'director' ? 'الإدارة' : ((currentUser as any).name || 'Unknown')
+                                                    }}
+                                                    teachers={activeTeachers || []}
+                                                    groups={groups}
+                                                    students={currentUser.role === 'parent' ? students.filter(s => (currentUser as any).studentIds?.includes(s.id)) : students}
+                                                    parents={parents}
+                                                    supervisors={supervisors}
+                                                    initialSelectedUserId={chatInitialUserId}
+                                                    onBack={() => {
+                                                        setIsChatOpen(false);
+                                                        setChatInitialUserId(undefined);
+                                                    }}
+                                                />
                                             </div>
-                                        )}
+                                        </div>
                                     </>
                                 )}
                             </Suspense>

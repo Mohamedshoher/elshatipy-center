@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
-import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, getDoc, setDoc } from 'firebase/firestore';
+import { collection, query, where, orderBy, onSnapshot, addDoc, serverTimestamp, updateDoc, doc, getDoc, setDoc, limit } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { Teacher, ChatMessage, ChatUser, Group, Supervisor, Parent, Student } from '../types'; // Import Parent and Student
 
@@ -254,14 +254,26 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
         const myId = currentUser.role === 'director' ? 'director' : currentUser.uid;
 
         // Listen both for messages sent TO me (for unreads and sorting) and FROM me (for sorting)
+        // Optimized: We limit these to the last 100 messages to populate recent chats list efficiently
         const qTo = query(
             collection(db, 'messages'),
-            where('receiverId', '==', myId)
+            where('receiverId', '==', myId),
+            orderBy('timestamp', 'desc'),
+            limit(100)
         );
 
         const qFrom = query(
             collection(db, 'messages'),
-            where('senderId', '==', myId)
+            where('senderId', '==', myId),
+            orderBy('timestamp', 'desc'),
+            limit(100)
+        );
+
+        // Separate query strictly for unread counts (no limit, but should be small number of docs)
+        const qUnreads = query(
+            collection(db, 'messages'),
+            where('receiverId', '==', myId),
+            where('read', '==', false)
         );
 
         const updateStats = (snapshot: any, isOutgoing: boolean) => {
@@ -271,16 +283,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                     const msg = doc.data() as ChatMessage;
                     const partnerId = isOutgoing ? msg.receiverId : msg.senderId;
 
-                    if (partnerId.startsWith('group-')) return; // Handle groups separately or skip for now
+                    if (partnerId.startsWith('group-')) return;
 
                     if (!newStats[partnerId]) {
                         newStats[partnerId] = { unreadCount: 0, lastTimestamp: null, lastMessage: '' };
-                    }
-
-                    if (!isOutgoing && !msg.read) {
-                        // Count unreads only for incoming messages. 
-                        // But wait, this snapshot has ALL messages ever. 
-                        // We need to re-calculate or just count from scratch in this trigger.
                     }
 
                     const msgTime = msg.timestamp?.toMillis ? msg.timestamp.toMillis() : 0;
@@ -291,32 +297,41 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                         newStats[partnerId].lastMessage = msg.content;
                     }
                 });
+                return newStats;
+            });
+        };
 
-                // Recalculate all unread counts from snapshot for incoming
-                if (!isOutgoing) {
-                    const unreadMap: { [key: string]: number } = {};
-                    snapshot.docs.forEach((doc: any) => {
-                        const msg = doc.data() as ChatMessage;
-                        if (!msg.read) {
-                            unreadMap[msg.senderId] = (unreadMap[msg.senderId] || 0) + 1;
-                        }
-                    });
+        const updateUnreads = (snapshot: any) => {
+            const unreadMap: { [key: string]: number } = {};
+            snapshot.docs.forEach((doc: any) => {
+                const msg = doc.data() as ChatMessage;
+                unreadMap[msg.senderId] = (unreadMap[msg.senderId] || 0) + 1;
+            });
 
-                    Object.keys(newStats).forEach(pid => {
-                        newStats[pid].unreadCount = unreadMap[pid] || 0;
-                    });
-                }
-
+            setUserStats(prev => {
+                const newStats = { ...prev };
+                Object.keys(newStats).forEach(pid => {
+                    newStats[pid].unreadCount = unreadMap[pid] || 0;
+                });
+                // Also ensure we have stats for senders of unread messages even if not in recent 100
+                Object.keys(unreadMap).forEach(sid => {
+                    if (!newStats[sid]) {
+                        newStats[sid] = { unreadCount: unreadMap[sid], lastTimestamp: null, lastMessage: '' };
+                    }
+                    newStats[sid].unreadCount = unreadMap[sid];
+                });
                 return newStats;
             });
         };
 
         const unsubTo = onSnapshot(qTo, (snapshot) => updateStats(snapshot, false));
         const unsubFrom = onSnapshot(qFrom, (snapshot) => updateStats(snapshot, true));
+        const unsubUnreads = onSnapshot(qUnreads, updateUnreads);
 
         return () => {
             unsubTo();
             unsubFrom();
+            unsubUnreads();
         };
     }, [currentUser.uid, currentUser.role]);
 
@@ -371,17 +386,21 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
             });
             unsubs.push(unsub);
         } else {
-            // 1-on-1 Logic (Existing)
+            // 1-on-1 Logic (Optimized with limits)
             const q1 = query(
                 collection(db, 'messages'),
                 where('senderId', '==', myId),
-                where('receiverId', '==', partnerId)
+                where('receiverId', '==', partnerId),
+                orderBy('timestamp', 'desc'),
+                limit(50)
             );
 
             const q2 = query(
                 collection(db, 'messages'),
                 where('senderId', '==', partnerId),
-                where('receiverId', '==', myId)
+                where('receiverId', '==', myId),
+                orderBy('timestamp', 'desc'),
+                limit(50)
             );
 
             const unsub1 = onSnapshot(q1, (snapshot) => {
@@ -580,7 +599,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
         const q = query(
             collection(db, 'messages'),
             where('receiverId', '==', currentUser.role === 'director' ? 'director' : currentUser.uid),
-            orderBy('timestamp', 'desc')
+            orderBy('timestamp', 'desc'),
+            limit(50)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {

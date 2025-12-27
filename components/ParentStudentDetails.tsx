@@ -14,11 +14,12 @@ interface ParentStudentDetailsProps {
     teacher: Teacher | undefined;
     onClose: () => void;
     onOpenChat?: () => void;
+    unreadMessagesCount?: number;
 }
 
 type TabType = 'tests' | 'fees' | 'attendance' | 'progress';
 
-const ParentStudentDetails: React.FC<ParentStudentDetailsProps> = ({ student, group, teacher, onClose, onOpenChat }) => {
+const ParentStudentDetails: React.FC<ParentStudentDetailsProps> = ({ student, group, teacher, onClose, onOpenChat, unreadMessagesCount }) => {
     const [activeTab, setActiveTab] = useState<TabType>('tests');
 
     // Test Type Translation
@@ -332,12 +333,17 @@ const ParentStudentDetails: React.FC<ParentStudentDetailsProps> = ({ student, gr
                                 {onOpenChat && (
                                     <button
                                         onClick={onOpenChat}
-                                        className="bg-teal-500 hover:bg-teal-600 p-1.5 rounded-lg transition-all duration-300 text-white hover:scale-110 active:scale-95 shadow-md shadow-teal-500/30"
+                                        className="bg-teal-500 hover:bg-teal-600 p-1.5 rounded-lg transition-all duration-300 text-white hover:scale-110 active:scale-95 shadow-md shadow-teal-500/30 relative"
                                         title="المحادثة مع المدرس"
                                     >
                                         <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2.5} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
                                         </svg>
+                                        {unreadMessagesCount !== undefined && unreadMessagesCount > 0 && (
+                                            <span className="absolute -top-1.5 -right-1.5 bg-red-500 text-white text-[8px] font-bold w-4 h-4 flex items-center justify-center rounded-full border border-white">
+                                                {unreadMessagesCount}
+                                            </span>
+                                        )}
                                     </button>
                                 )}
                             </div>
