@@ -4,7 +4,7 @@ import type { Teacher, TeacherAttendanceRecord } from '../types';
 import { TeacherStatus, TeacherAttendanceStatus } from '../types';
 import BriefcaseIcon from './icons/BriefcaseIcon';
 import CalendarUserIcon from './icons/CalendarUserIcon';
-import { getCairoDateString } from '../services/cairoTimeHelper';
+import { getCairoDateString, getCairoNow } from '../services/cairoTimeHelper';
 
 interface TeacherAttendancePageProps {
     teachers: Teacher[];
@@ -15,7 +15,7 @@ interface TeacherAttendancePageProps {
 
 const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ teachers, teacherAttendance, onSetTeacherAttendance, onBack }) => {
     const today = getCairoDateString();
-    const todayFormatted = new Date().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
+    const todayFormatted = getCairoNow().toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' });
     const activeTeachers = teachers.filter(t => t.status === TeacherStatus.ACTIVE);
 
     return (
@@ -52,8 +52,8 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ teachers,
                                     <button
                                         onClick={() => onSetTeacherAttendance(teacher.id, today, TeacherAttendanceStatus.PRESENT)}
                                         className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all ${!todayAttendance || todayAttendance.status === TeacherAttendanceStatus.PRESENT
-                                                ? 'bg-green-600 text-white shadow-md'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-green-100'
+                                            ? 'bg-green-600 text-white shadow-md'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-green-100'
                                             }`}
                                         aria-label={`تسجيل حضور لـ ${teacher.name}`}
                                     >
@@ -62,8 +62,8 @@ const TeacherAttendancePage: React.FC<TeacherAttendancePageProps> = ({ teachers,
                                     <button
                                         onClick={() => onSetTeacherAttendance(teacher.id, today, TeacherAttendanceStatus.ABSENT)}
                                         className={`py-2 px-4 rounded-lg font-semibold text-sm transition-all ${todayAttendance?.status === TeacherAttendanceStatus.ABSENT
-                                                ? 'bg-red-600 text-white shadow-md'
-                                                : 'bg-gray-100 text-gray-600 hover:bg-red-100'
+                                            ? 'bg-red-600 text-white shadow-md'
+                                            : 'bg-gray-100 text-gray-600 hover:bg-red-100'
                                             }`}
                                         aria-label={`تسجيل غياب لـ ${teacher.name}`}
                                     >

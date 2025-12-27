@@ -5,6 +5,7 @@ import { TestType as TestTypeEnum } from '../types';
 import UserIcon from './icons/UserIcon';
 import ShareIcon from './icons/ShareIcon';
 import WhatsAppIcon from './icons/WhatsAppIcon';
+import { getCairoDateString, getCairoNow } from '../services/cairoTimeHelper';
 
 
 const testTypeLabels: Record<TestType, string> = {
@@ -81,10 +82,10 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
   const [activeModal, setActiveModal] = useState<'daily' | 'mostTested' | 'notTested' | 'comparison' | null>(null);
 
   // Daily report state
-  const [selectedDailyDate, setSelectedDailyDate] = useState(() => new Date().toISOString().split('T')[0]);
+  const [selectedDailyDate, setSelectedDailyDate] = useState(() => getCairoDateString());
 
   // Monthly report state
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(() => getCairoDateString().substring(0, 7));
 
   // Filters for "Most Tested"
   const [mostTestedGroupFilter, setMostTestedGroupFilter] = useState('all');
@@ -119,7 +120,7 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
   }, [activeModal, onBack]);
 
   const setDateOffset = (offset: number) => {
-    const date = new Date();
+    const date = getCairoNow();
     date.setDate(date.getDate() + offset);
     setSelectedDailyDate(date.toISOString().split('T')[0]);
   };

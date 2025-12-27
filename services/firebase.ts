@@ -13,6 +13,8 @@ const firebaseConfig = {
   measurementId: "G-4RBNQ8TJWV"
 };
 
+import { getMessaging } from "firebase/messaging";
+
 // تهيئة Firebase
 const app = initializeApp(firebaseConfig);
 
@@ -43,5 +45,7 @@ if (typeof window !== 'undefined') {
   db = getFirestore(app);
 }
 
-export { db };
+const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
+
+export { db, messaging };
 

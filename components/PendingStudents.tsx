@@ -2,6 +2,7 @@ import React, { useState } from 'react';
 import type { Student, Group } from '../types';
 import CheckIcon from './icons/CheckIcon';
 import XIcon from './icons/XIcon';
+import EditIcon from './icons/EditIcon';
 import UnarchiveIcon from './icons/UnarchiveIcon';
 import UserPlusIcon from './icons/UserPlusIcon';
 import ChevronDownIcon from './icons/ChevronDownIcon';
@@ -11,9 +12,10 @@ interface PendingStudentsProps {
     groups: Group[];
     onApprove: (studentId: string) => void;
     onReject: (studentId: string) => void;
+    onEdit: (student: Student) => void;
 }
 
-const PendingStudents: React.FC<PendingStudentsProps> = ({ students, groups, onApprove, onReject }) => {
+const PendingStudents: React.FC<PendingStudentsProps> = ({ students, groups, onApprove, onReject, onEdit }) => {
     const [isNewStudentsExpanded, setIsNewStudentsExpanded] = useState(true);
     const [isUnarchivedStudentsExpanded, setIsUnarchivedStudentsExpanded] = useState(true);
 
@@ -60,7 +62,15 @@ const PendingStudents: React.FC<PendingStudentsProps> = ({ students, groups, onA
                     تاريخ الانضمام: {student.joiningDate}
                 </p>
             </div>
-            <div className="flex gap-2 mr-4">
+            <div className="flex gap-2 mr-4 flex-wrap justify-end">
+                <button
+                    onClick={() => onEdit(student)}
+                    className="flex items-center gap-1 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
+                    title="تعديل بيانات الطالب"
+                >
+                    <EditIcon className="w-5 h-5" />
+                    <span className="hidden sm:inline">تعديل</span>
+                </button>
                 <button
                     onClick={() => onApprove(student.id)}
                     className="flex items-center gap-1 px-4 py-2 bg-green-600 text-white rounded-lg hover:bg-green-700 transition-colors"

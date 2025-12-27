@@ -31,6 +31,7 @@ interface GeneralViewPageProps {
     onViewStudent: (studentId: string) => void;
     onApproveStudent: (studentId: string) => void;
     onRejectStudent: (studentId: string) => void;
+    onEditStudent: (student: Student) => void;
 }
 
 const FullScreenSection: React.FC<{
@@ -140,7 +141,7 @@ const GroupedStudentList: React.FC<{
 };
 
 
-const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, groups, teachers, teacherCollections, expenses, donations, onDeleteExpense, onLogExpense, onAddDonation, onDeleteDonation, onToggleAcknowledge, onViewStudent, onApproveStudent, onRejectStudent }) => {
+const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, groups, teachers, teacherCollections, expenses, donations, onDeleteExpense, onLogExpense, onAddDonation, onDeleteDonation, onToggleAcknowledge, onViewStudent, onApproveStudent, onRejectStudent, onEditStudent }) => {
 
     const [expandedNewGroups, setExpandedNewGroups] = useState<Set<string>>(new Set());
     const [expandedArchivedGroups, setExpandedArchivedGroups] = useState<Set<string>>(new Set());
@@ -470,6 +471,7 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
                     groups={groups}
                     onApprove={onApproveStudent}
                     onReject={onRejectStudent}
+                    onEdit={onEditStudent}
                 />
 
                 <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-2 gap-6">

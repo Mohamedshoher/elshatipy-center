@@ -58,7 +58,7 @@ import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, getDoc, writ
 import UsersIcon from './components/icons/UsersIcon';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import CloudOffIcon from './components/icons/CloudOffIcon';
-import { requestNotificationPermission, playNotificationSound, showLocalNotification, setAppBadge } from './services/notificationService';
+import { requestNotificationPermission, playNotificationSound, showLocalNotification, setAppBadge, registerFCMToken, setupOnMessageListener } from './services/notificationService';
 import FilterIcon from './components/icons/FilterIcon';
 
 type ActiveView = 'students' | 'groups' | 'attendance_report' | 'tests_report' | 'financial_report';
@@ -147,6 +147,7 @@ const App: React.FC = () => {
     const [loginMode, setLoginMode] = useState<'staff' | 'parent'>('staff');
     const [selectedParentStudent, setSelectedParentStudent] = useState<Student | null>(null);
 
+
     // Listener for unread messages and notifications
     useEffect(() => {
         if (!currentUser) {
@@ -157,8 +158,11 @@ const App: React.FC = () => {
 
         if (!myId) return; // Prevent crash if ID is missing
 
-        // Request notification permission once the user is logged in
-        requestNotificationPermission();
+        // Request notification permission and register FCM token
+        registerFCMToken(myId);
+
+        // Setup listener for foreground messages (FCM)
+        const unsubscribeFCM = setupOnMessageListener();
 
         const q = query(
             collection(db, 'messages'),
@@ -166,7 +170,7 @@ const App: React.FC = () => {
             where('read', '==', false)
         );
 
-        const unsubscribe = onSnapshot(q, (snapshot) => {
+        const unsubscribeMessages = onSnapshot(q, (snapshot) => {
             const count = snapshot.size;
             setUnreadMessagesCount(count);
             setAppBadge(count);
@@ -179,7 +183,7 @@ const App: React.FC = () => {
 
                     // Only notify for messages sent in the last 1 minute to avoid spamming old unread messages on load
                     if (Date.now() - msgTime < 60000) {
-                        playNotificationSound();
+                        playNotificationSound(true); // Pass true because it's a chat message
                         showLocalNotification(
                             `رسالة جديدة من ${msg.senderName}`,
                             msg.content
@@ -190,7 +194,8 @@ const App: React.FC = () => {
         });
 
         return () => {
-            unsubscribe();
+            unsubscribeMessages();
+            if (typeof unsubscribeFCM === 'function') unsubscribeFCM();
             setAppBadge(0);
         };
     }, [currentUser]);
@@ -2524,7 +2529,7 @@ const App: React.FC = () => {
             />;
             if (isArchiveView) return renderArchiveList();
             if (isDebtorsView) return <DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />;
-            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
+            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} />;
             if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} />;
             if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
             if (isFeeCollectionView) return <FeeCollectionPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} teacherCollections={collections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />;
@@ -2666,7 +2671,7 @@ const App: React.FC = () => {
             />;
             if (isArchiveView) return renderArchiveList();
             if (isDebtorsView) return <DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />;
-            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} />;
+            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} />;
             if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} />;
             if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
             if (isFeeCollectionView) return <FeeCollectionPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} teacherCollections={teacherCollections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />;

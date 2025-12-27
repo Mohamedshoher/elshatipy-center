@@ -12,6 +12,7 @@ import XIcon from './icons/XIcon';
 import ChartBarIcon from './icons/ChartBarIcon';
 import EditIcon from './icons/EditIcon';
 import CheckCircleIcon from './icons/CheckCircleIcon';
+import { getCairoDateString, getCairoNow } from '../services/cairoTimeHelper';
 
 interface DirectorReportsPageProps {
     groups: Group[];
@@ -44,15 +45,15 @@ const Th: React.FC<{ children: React.ReactNode, icon: React.ReactNode, title?: s
 
 const DirectorReportsPage: React.FC<DirectorReportsPageProps> = ({ groups, students, onBack }) => {
     const [activeTab, setActiveTab] = useState<'attendance' | 'fees' | 'unpaid' | 'untested' | 'tests'>('untested');
-    const [selectedMonth, setSelectedMonth] = useState<string>(() => new Date().toISOString().substring(0, 7)); // YYYY-MM
+    const [selectedMonth, setSelectedMonth] = useState<string>(() => getCairoDateString().substring(0, 7)); // YYYY-MM
     const [sortOrder, setSortOrder] = useState<'asc' | 'desc'>('desc');
     const [untestedFilterType, setUntestedFilterType] = useState<TestType>(TestTypeEnum.NEW);
 
 
     const availableMonths = useMemo(() => {
         const months = new Set<string>();
-        const now = new Date();
-        let minDate = now;
+        const now = getCairoNow();
+        let minDate = getCairoNow();
 
         students.forEach(student => {
             const joiningDate = new Date(student.joiningDate);

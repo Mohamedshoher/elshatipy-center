@@ -574,51 +574,71 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
                             </div>
                         </section>
 
-                        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden text-center">
-                            <div className="p-4 border-b bg-gray-50/50">
+                        <section className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
+                            <div className="p-4 border-b bg-gray-50/50 text-center">
                                 <h3 className="text-lg font-bold text-gray-800">سجل المدفوعات التاريخي</h3>
                             </div>
-                            <div className="overflow-x-auto">
-                                <table className="min-w-full divide-y divide-gray-200">
-                                    <thead className="bg-white">
-                                        <tr>
-                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider">الشهر</th>
-                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider text-center">تاريخ الدفع</th>
-                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider text-center">المبلغ</th>
-                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider text-center">رقم الوصل</th>
-                                            <th className="px-6 py-4 text-right text-xs font-bold text-gray-400 uppercase tracking-wider text-center">المحصل</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="bg-white divide-y divide-gray-100">
-                                        {student.fees.filter(f => f.paid).length > 0 ? (
-                                            student.fees.filter(f => f.paid).sort((a, b) => (b.paymentDate || '').localeCompare(a.paymentDate || '')).map((fee, index) => (
-                                                <tr key={index} className="hover:bg-gray-50/50 transition-colors">
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-900 font-bold">
+
+                            {/* Table Header - Desktop Only */}
+                            <div className="hidden sm:grid grid-cols-5 bg-gray-50/50 border-b text-xs font-bold text-gray-400 uppercase tracking-wider text-center py-4">
+                                <div className="text-right px-6">الشهر</div>
+                                <div>تاريخ الدفع</div>
+                                <div>المبلغ</div>
+                                <div>رقم الوصل</div>
+                                <div>المحصل</div>
+                            </div>
+
+                            <div className="divide-y divide-gray-100">
+                                {student.fees.filter(f => f.paid).length > 0 ? (
+                                    student.fees.filter(f => f.paid).sort((a, b) => (b.paymentDate || '').localeCompare(a.paymentDate || '')).map((fee, index) => (
+                                        <div key={index} className="sm:grid sm:grid-cols-5 items-center py-4 hover:bg-gray-50/50 transition-colors px-4 sm:px-0">
+
+                                            {/* Mobile View: Row with 2 columns (Month/Date on right, Amount/Collector on left due to RTL) */}
+                                            <div className="flex sm:block justify-between items-center sm:px-6 w-full">
+                                                <div className="flex flex-col text-right">
+                                                    <span className="text-sm font-bold text-gray-900">
                                                         {new Date(fee.month + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' })}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                                    </span>
+                                                    <span className="text-xs text-gray-500 sm:hidden mt-0.5">
                                                         {fee.paymentDate ? new Date(fee.paymentDate).toLocaleDateString('ar-EG') : '-'}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-green-600 font-bold text-center">
+                                                    </span>
+                                                </div>
+
+                                                <div className="flex flex-col items-start sm:hidden text-left">
+                                                    <span className="text-sm font-bold text-green-600">
                                                         {fee.amountPaid || fee.amount} ج.م
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
-                                                        {fee.receiptNumber || '-'}
-                                                    </td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500 text-center">
+                                                    </span>
+                                                    <span className="text-[10px] text-gray-500 mt-0.5">
                                                         {fee.collectedByName || '-'}
-                                                    </td>
-                                                </tr>
-                                            ))
-                                        ) : (
-                                            <tr>
-                                                <td colSpan={5} className="px-6 py-12 text-center text-gray-500 italic">
-                                                    لا توجد مدفوعات مسجلة بعد.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
+                                                    </span>
+                                                </div>
+                                            </div>
+
+                                            {/* Desktop columns (Hidden on small screens) */}
+                                            <div className="hidden sm:block text-sm text-gray-500 text-center">
+                                                {fee.paymentDate ? new Date(fee.paymentDate).toLocaleDateString('ar-EG') : '-'}
+                                            </div>
+                                            <div className="hidden sm:block text-sm text-green-600 font-bold text-center">
+                                                {fee.amountPaid || fee.amount} ج.م
+                                            </div>
+                                            <div className="hidden sm:block text-sm text-gray-500 text-center">
+                                                {fee.receiptNumber || '-'}
+                                            </div>
+                                            <div className="hidden sm:block text-sm text-gray-500 text-center">
+                                                {fee.collectedByName || '-'}
+                                            </div>
+
+                                            {/* Optional extra info for mobile if needed (like Receipt Number) */}
+                                            <div className="sm:hidden mt-2 pt-2 border-t border-gray-50 flex justify-between items-center text-[10px] text-gray-400">
+                                                <span>رقم الوصل: {fee.receiptNumber || '-'}</span>
+                                            </div>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="px-6 py-12 text-center text-gray-500 italic">
+                                        لا توجد مدفوعات مسجلة بعد.
+                                    </div>
+                                )}
                             </div>
                         </section>
                     </div>

@@ -3,6 +3,7 @@ import type { Student, Group, UserRole } from '../types';
 import ChevronDownIcon from './icons/ChevronDownIcon';
 import UserIcon from './icons/UserIcon';
 import WhatsAppIcon from './icons/WhatsAppIcon';
+import { getCairoDateString } from '../services/cairoTimeHelper';
 
 interface FinancialReportPageProps {
   students: Student[]; // Should be pre-filtered for the current user
@@ -12,7 +13,7 @@ interface FinancialReportPageProps {
 }
 
 const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, groups, onViewStudent, currentUserRole }) => {
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(() => getCairoDateString().substring(0, 7));
   const [expandedPaid, setExpandedPaid] = useState<Set<string>>(new Set());
   const [expandedUnpaid, setExpandedUnpaid] = useState<Set<string>>(new Set());
 

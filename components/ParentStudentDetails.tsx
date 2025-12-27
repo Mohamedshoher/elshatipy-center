@@ -166,6 +166,12 @@ const ParentStudentDetails: React.FC<ParentStudentDetailsProps> = ({ student, gr
                                                     <span className="text-gray-600 tracking-wider">#{fee.receiptNumber}</span>
                                                 </div>
                                             )}
+                                            {fee.collectedByName && (
+                                                <div className="flex items-center gap-2 text-xs font-bold text-gray-400">
+                                                    <span>المُحصّل:</span>
+                                                    <span className="text-gray-600">{fee.collectedByName}</span>
+                                                </div>
+                                            )}
                                         </div>
                                     )}
                                 </div>

@@ -7,6 +7,7 @@ import CurrencyDollarIcon from './icons/CurrencyDollarIcon';
 import CalendarCheckIcon from './icons/CalendarCheckIcon';
 import UsersIcon from './icons/UsersIcon';
 import WhatsAppIcon from './icons/WhatsAppIcon';
+import { getCairoDateString, getCairoNow } from '../services/cairoTimeHelper';
 
 interface TeacherReportPageProps {
   teacher: Teacher;
@@ -47,7 +48,7 @@ const getBonusValue = (status: TeacherAttendanceStatus): number => {
 };
 
 const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, students, teacherAttendance, teacherPayrollAdjustments, financialSettings, onBack, teacherCollections, currentUserRole }) => {
-  const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
+  const [selectedMonth, setSelectedMonth] = useState(() => getCairoDateString().substring(0, 7));
 
   const assignedGroups = useMemo(() => {
     return groups.filter(g => g.teacherId === teacher.id);
@@ -59,11 +60,22 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
   }, [students, assignedGroups]);
 
   const collectedAmount = useMemo(() => {
-    return studentsInAssignedGroups
-      .flatMap(s => s.fees)
-      .filter(f => f.month === selectedMonth && f.paid && f.amountPaid)
-      .reduce((sum, f) => sum + (f.amountPaid || 0), 0);
-  }, [studentsInAssignedGroups, selectedMonth]);
+    const groupIds = assignedGroups.map(g => g.id);
+    return students
+      .flatMap(s => s.fees.map(f => ({ fee: f, studentGroupId: s.groupId })))
+      .filter(({ fee, studentGroupId }) => {
+        const isMatch = fee.month === selectedMonth && fee.paid && fee.amountPaid;
+        if (!isMatch) return false;
+
+        if (fee.collectedBy) {
+          return fee.collectedBy === teacher.id;
+        } else {
+          // Fallback for older data: count if student is CURRENTLY in this teacher's group
+          return groupIds.includes(studentGroupId);
+        }
+      })
+      .reduce((sum, { fee }) => sum + (fee.amountPaid || 0), 0);
+  }, [students, assignedGroups, teacher.id, selectedMonth]);
 
   const collectionData = useMemo(() => {
     const collectionsForMonth = teacherCollections.filter(c => c.teacherId === teacher.id && c.month === selectedMonth);
@@ -122,7 +134,7 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
     [attendanceForMonth]);
 
   const handleSendWhatsAppReport = () => {
-    const monthName = new Date(selectedMonth + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' });
+    const monthName = new Date(selectedMonth + '-02').toLocaleDateString('ar-EG', { month: 'long', year: 'numeric' });
     let message = `*تقرير الأداء والراتب - ${monthName}*\n`;
     message += `*المدرس/ة:* ${teacher.name}\n\n`;
     message += `*--- ملخص الأداء ---*\n`;

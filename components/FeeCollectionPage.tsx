@@ -6,6 +6,7 @@ import { TeacherStatus } from '../types';
 import CashIcon from './icons/CashIcon';
 import BriefcaseIcon from './icons/BriefcaseIcon';
 import TrashIcon from './icons/TrashIcon';
+import { getCairoDateString } from '../services/cairoTimeHelper';
 
 
 interface FeeCollectionPageProps {
@@ -19,7 +20,7 @@ interface FeeCollectionPageProps {
 }
 
 const FeeCollectionPage = React.memo(({ onBack, teachers, groups, students, teacherCollections, onAddTeacherCollection, onDeleteTeacherCollection }: FeeCollectionPageProps) => {
-    const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
+    const [selectedMonth, setSelectedMonth] = useState(() => getCairoDateString().substring(0, 7));
     const [expandedTeacherId, setExpandedTeacherId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'قرآن' | 'نور بيان' | 'تلقين'>('all');
 
@@ -117,12 +118,23 @@ const TeacherFeeCard = React.memo(({ teacher, groups, students, teacherCollectio
 
     const financialData = useMemo(() => {
         const teacherGroupIds = groups.filter(g => g.teacherId === teacher.id).map(g => g.id);
-        const studentsInGroups = students.filter(s => teacherGroupIds.includes(s.groupId));
 
-        const totalCollectedByTeacher = studentsInGroups
-            .flatMap(s => s.fees)
-            .filter(f => f.month === selectedMonth && f.paid && f.amountPaid)
-            .reduce((sum, f) => sum + (f.amountPaid || 0), 0);
+        // Calculate amount collected by this specific teacher
+        // 1. If 'collectedBy' is set, it's the source of truth
+        // 2. If 'collectedBy' is missing (old data), fallback to current group ownership
+        const totalCollectedByTeacher = students
+            .flatMap(s => s.fees.map(f => ({ fee: f, studentGroupId: s.groupId })))
+            .filter(({ fee, studentGroupId }) => {
+                const isMatch = fee.month === selectedMonth && fee.paid && fee.amountPaid;
+                if (!isMatch) return false;
+
+                if (fee.collectedBy) {
+                    return fee.collectedBy === teacher.id;
+                } else {
+                    return teacherGroupIds.includes(studentGroupId);
+                }
+            })
+            .reduce((sum, { fee }) => sum + (fee.amountPaid || 0), 0);
 
         const collectionsForMonth = teacherCollections.filter(c => c.teacherId === teacher.id && c.month === selectedMonth);
 

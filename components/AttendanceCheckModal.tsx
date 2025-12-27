@@ -1,5 +1,6 @@
-import React, { useState, useMemo } from 'react';
+import React, { useState } from 'react';
 import { Teacher, Group, Student, TeacherAttendanceRecord, TeacherAttendanceStatus, Notification, DayOfWeek } from '../types';
+import { getCairoNow, getCairoDateString, getCairoDayOfWeek, isCairoWorkday, getYesterdayDateString } from '../services/cairoTimeHelper';
 
 interface AttendanceCheckModalProps {
     isOpen: boolean;
@@ -21,16 +22,15 @@ const AttendanceCheckModal: React.FC<AttendanceCheckModalProps> = ({
     onApplyDeductions
 }) => {
     const [checkDate, setCheckDate] = useState(() => {
-        const yesterday = new Date();
-        yesterday.setDate(yesterday.getDate() - 1);
-        return yesterday.toISOString().split('T')[0];
+        return getYesterdayDateString();
     });
 
     const [missingTeachers, setMissingTeachers] = useState<{ teacher: Teacher, reason: string }[]>([]);
     const [hasChecked, setHasChecked] = useState(false);
 
     const getDayOfWeek = (dateString: string): DayOfWeek => {
-        const date = new Date(dateString);
+        const [year, month, day] = dateString.split('-').map(Number);
+        const date = new Date(year, month - 1, day);
         const days = [
             DayOfWeek.SUNDAY,
             DayOfWeek.MONDAY,
@@ -124,7 +124,7 @@ const AttendanceCheckModal: React.FC<AttendanceCheckModalProps> = ({
             // Create Notification with deterministic ID to prevent duplicates
             newNotifications.push({
                 id: `notif-missed-${teacher.id}-${checkDate}`,
-                date: new Date().toISOString(),
+                date: getCairoNow().toISOString(),
                 content: `تم خصم ربع يوم من راتبك لعدم تسليم تقرير الحضور والغياب ليوم ${checkDate}.`,
                 senderName: 'الإدارة',
                 target: { type: 'teacher', id: teacher.id },

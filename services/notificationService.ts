@@ -1,6 +1,14 @@
+import { getToken, onMessage } from "firebase/messaging";
+import { messaging, db } from "./firebase";
+import { doc, setDoc } from "firebase/firestore";
 
 // Simple notification sound (Bell)
 const BELL_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-preview.mp3'; // Professional bell sound
+const CHAT_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2357/2357-preview.mp3'; // Sweet message sound
+
+// VAPID مفتاح عام (يجب الحصول عليه من لوحة تحكم Firebase -> Cloud Messaging)
+// هذا مفتاح تجريبي، يرجى استبداله بمفتاحك الحقيقي ليعمل في الإنتاج
+const VAPID_KEY = "BDbX... (Replace with your actual VAPID key)";
 
 export const requestNotificationPermission = async () => {
     if (!('Notification' in window)) {
@@ -12,17 +20,53 @@ export const requestNotificationPermission = async () => {
         return true;
     }
 
-    if (Notification.permission !== 'denied') {
-        const permission = await Notification.requestPermission();
-        return permission === 'granted';
-    }
-
-    return false;
+    const permission = await Notification.requestPermission();
+    return permission === 'granted';
 };
 
-export const playNotificationSound = () => {
+export const registerFCMToken = async (userId: string) => {
+    if (!messaging) return;
+
     try {
-        const audio = new Audio(BELL_SOUND_URL);
+        const hasPermission = await requestNotificationPermission();
+        if (!hasPermission) return;
+
+        const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
+        if (currentToken) {
+            console.log("FCM Token registered:", currentToken);
+            // حفظ التوكن في Firestore لربط المستخدم بالإشعارات
+            await setDoc(doc(db, "fcm_tokens", userId), {
+                token: currentToken,
+                updatedAt: new Date().toISOString()
+            }, { merge: true });
+            return currentToken;
+        } else {
+            console.log('No registration token available. Request permission to generate one.');
+        }
+    } catch (err) {
+        console.log('An error occurred while retrieving token. ', err);
+    }
+};
+
+export const setupOnMessageListener = () => {
+    if (!messaging) return;
+
+    return onMessage(messaging, (payload) => {
+        console.log('Message received while app is in foreground: ', payload);
+        if (payload.notification) {
+            showLocalNotification(
+                payload.notification.title || 'رسالة جديدة',
+                payload.notification.body || '',
+                '/logo.png'
+            );
+            playNotificationSound(payload.data?.type === 'chat');
+        }
+    });
+};
+
+export const playNotificationSound = (isChat = false) => {
+    try {
+        const audio = new Audio(isChat ? CHAT_SOUND_URL : BELL_SOUND_URL);
         audio.play().catch(e => console.error('Error playing sound:', e));
     } catch (err) {
         console.error('Failed to play sound', err);
