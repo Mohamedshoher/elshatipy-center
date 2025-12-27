@@ -83,6 +83,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
     // ... (state remains same)
     const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
     const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [cachedMessages, setCachedMessages] = useState<{ [key: string]: ChatMessage[] }>({});
     const [newMessage, setNewMessage] = useState('');
     const [chatUsers, setChatUsers] = useState<ChatUser[]>([]);
     const [userStats, setUserStats] = useState<{ [key: string]: { unreadCount: number; lastTimestamp: any; lastMessage: string } }>({});
@@ -98,14 +99,32 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
     const messageRefs = useRef<{ [key: string]: HTMLDivElement | null }>({});
     const [currentPinnedIndex, setCurrentPinnedIndex] = useState(0);
 
-    const scrollToBottom = () => {
-        messagesEndRef.current?.scrollIntoView({ behavior: "smooth" });
+    const lastMessageCountRef = useRef(0);
+    const isAtBottomRef = useRef(true);
+
+    const scrollToBottom = (behavior: ScrollBehavior = "smooth") => {
+        messagesEndRef.current?.scrollIntoView({ behavior });
+    };
+
+    // Track scroll position to decide if we should auto-scroll
+    const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
+        const target = e.currentTarget;
+        const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 100;
+        isAtBottomRef.current = isAtBottom;
     };
 
     useEffect(() => {
-        if (!isSearchOpen && messages.length > 0) {
-            scrollToBottom();
-        }
+        if (isSearchOpen || messages.length === 0) return;
+
+        // More aggressive scroll as requested: pull down on any message change
+        const isFirstLoad = lastMessageCountRef.current === 0;
+
+        const timer = setTimeout(() => {
+            scrollToBottom(isFirstLoad ? "auto" : "smooth");
+            lastMessageCountRef.current = messages.length;
+        }, 100);
+
+        return () => clearTimeout(timer);
     }, [messages, isSearchOpen]);
 
     // 1. Setup Data: Map Teachers + Director + Supervisors + PARENTS to ChatUser list 
@@ -352,10 +371,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
         return () => clearInterval(interval);
     }, [currentUser]);
 
-    // 3. Listen for Messages
+    // 3. Listen for Messages (Optimized with Caching)
     useEffect(() => {
         if (!selectedUser) return;
-        setIsSearchOpen(false); // Close search when switching user
+        setIsSearchOpen(false);
         setSearchQuery('');
         setSearchResults([]);
 
@@ -363,35 +382,38 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
         const partnerId = selectedUser.id;
         const isGroup = partnerId.startsWith('group-');
 
-        let q;
-
-        if (isGroup) {
-            q = query(
-                collection(db, 'messages'),
-                where('receiverId', '==', partnerId),
-                // orderBy('timestamp', 'asc') // Requires index, do client side sort if needed
-            );
+        // Show cached messages immediately for instant feedback
+        if (cachedMessages[partnerId]) {
+            setMessages(cachedMessages[partnerId]);
+        } else {
+            setMessages([]);
         }
 
         const unsubs: (() => void)[] = [];
 
         if (isGroup) {
-            const unsub = onSnapshot(q!, (snapshot) => {
+            const q = query(
+                collection(db, 'messages'),
+                where('receiverId', '==', partnerId),
+                limit(100)
+            );
+
+            const unsub = onSnapshot(q, (snapshot) => {
                 const msgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage));
                 setMessages(prev => {
-                    // Filter out duplicates if any (though usually replace entire set for simple query)
-                    // Sort client side
-                    return msgs.sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
+                    const temps = prev.filter(m => m.id.startsWith('temp-'));
+                    const final = [...msgs, ...temps.filter(t => !msgs.some(m => m.content === t.content))].sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
+                    setCachedMessages(c => ({ ...c, [partnerId]: final }));
+                    return final;
                 });
-            });
+            }, (err) => console.error("❌ Group snapshot error:", err));
             unsubs.push(unsub);
         } else {
-            // 1-on-1 Logic (Optimized with limits)
+            // Optimized 1-on-1: Shared state to prevent flickering
             const q1 = query(
                 collection(db, 'messages'),
                 where('senderId', '==', myId),
                 where('receiverId', '==', partnerId),
-                orderBy('timestamp', 'desc'),
                 limit(50)
             );
 
@@ -399,46 +421,52 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                 collection(db, 'messages'),
                 where('senderId', '==', partnerId),
                 where('receiverId', '==', myId),
-                orderBy('timestamp', 'desc'),
                 limit(50)
             );
 
-            const unsub1 = onSnapshot(q1, (snapshot) => {
-                const sentMsgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage));
+            let sentMsgs: ChatMessage[] = [];
+            let receivedMsgs: ChatMessage[] = [];
+
+            const updateCombinedMessages = () => {
                 setMessages(prev => {
-                    const received = prev.filter(m => m.senderId === partnerId || m.receiverId === 'group-' /* keeping group msgs? no, clearing on switch */);
-                    // Filter out old "Sent" messages to replace with new ones, keep "Received"
-                    const others = prev.filter(m => !(m.senderId === myId && m.receiverId === partnerId));
-                    return [...others, ...sentMsgs].sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
+                    const combined = [...sentMsgs, ...receivedMsgs];
+                    const temps = prev.filter(m => m.id.startsWith('temp-'));
+                    const final = [...combined, ...temps.filter(t => !combined.some(m => m.content === t.content && m.senderId === t.senderId))]
+                        .sort((a, b) => {
+                            const tA = a.timestamp?.seconds || (a.id.startsWith('temp-') ? Date.now() / 1000 : 0);
+                            const tB = b.timestamp?.seconds || (b.id.startsWith('temp-') ? Date.now() / 1000 : 0);
+                            return tA - tB;
+                        });
+                    setCachedMessages(c => ({ ...c, [partnerId]: final }));
+                    return final;
                 });
-            });
+            };
+
+            const unsub1 = onSnapshot(q1, (snapshot) => {
+                sentMsgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage));
+                updateCombinedMessages();
+            }, (err) => console.error("❌ unsub1 error:", err));
 
             const unsub2 = onSnapshot(q2, (snapshot) => {
-                const receivedMsgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage));
+                receivedMsgs = snapshot.docs.map(d => ({ id: d.id, ...d.data() } as ChatMessage));
 
+                // Mark received messages as read efficiently
                 receivedMsgs.forEach(msg => {
                     if (!msg.read) {
                         updateDoc(doc(db, 'messages', msg.id), { read: true });
                     }
                 });
 
-                setMessages(prev => {
-                    const others = prev.filter(m => !(m.senderId === partnerId && m.receiverId === myId));
-                    return [...others, ...receivedMsgs].sort((a, b) => (a.timestamp?.seconds || 0) - (b.timestamp?.seconds || 0));
-                });
+                updateCombinedMessages();
             });
-            unsubs.push(unsub1);
-            unsubs.push(unsub2);
+
+            unsubs.push(unsub1, unsub2);
         }
 
-        // Cleanup function
         return () => {
             unsubs.forEach(u => u());
-            setMessages([]); // Clear messages when switching user
-            setSearchResults([]);
-            setSearchQuery('');
         };
-    }, [selectedUser, currentUser]);
+    }, [selectedUser?.id, currentUser.uid]); // Optimized dependency array
 
     // --- SEARCH FUNCTIONALITY ---
     useEffect(() => {
@@ -574,7 +602,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
         setNewMessage('');
 
         try {
-            await addDoc(collection(db, 'messages'), {
+            const docRef = await addDoc(collection(db, 'messages'), {
                 senderId: myId,
                 senderName: senderDisplayName,
                 receiverId: selectedUser.id,
@@ -583,6 +611,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                 read: false,
                 isPinned: false
             });
+
+            // Speed up: replace temp with real one in cache immediately if timestamp is ready
+            // (Actually Firestore will update on next snapshot, but let's keep it simple)
         } catch (error) {
             console.error("Error sending message", error);
             alert("فشل إرسال الرسالة");
@@ -880,7 +911,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                             </div>
                         )}
 
-                        <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 bg-opacity-50" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
+                        <div
+                            onScroll={handleScroll}
+                            className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 bg-opacity-50"
+                            style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px' }}
+                        >
                             {messages.map(msg => (
                                 <MessageItem
                                     key={msg.id}
@@ -895,7 +930,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                                     messageRef={el => messageRefs.current[msg.id] = el}
                                 />
                             ))}
-                            <div ref={messagesEndRef} />
+                            <div ref={messagesEndRef} className="h-8" />
                         </div>
 
                         <div className="p-3 md:p-4 bg-white border-t shrink-0">
