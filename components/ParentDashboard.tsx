@@ -44,7 +44,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ students, groups, onV
                     <div className="flex flex-col md:flex-row items-center justify-between gap-6">
                         <div className="text-center md:text-right">
                             <h1 className="text-4xl font-black text-gray-900 mb-2">مرحباً بك</h1>
-                            <p className="text-gray-500 text-lg font-medium">لوحة تحكم ولي الأمر - مركز الشاطبي</p>
                         </div>
                         <div className="bg-gradient-to-br from-teal-50 to-blue-50 rounded-2xl p-4 border border-teal-100/50 shadow-inner">
                             <div className="flex items-center gap-3 text-teal-700">

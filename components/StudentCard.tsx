@@ -34,6 +34,18 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
     onEdit(student);
   };
 
+  /* Optimistic UI state */
+  const [optimisticStatus, setOptimisticStatus] = React.useState<AttendanceStatus | undefined>(todayAttendance?.status);
+
+  React.useEffect(() => {
+    setOptimisticStatus(todayAttendance?.status);
+  }, [todayAttendance?.status]);
+
+  const handleAttendanceClick = (status: AttendanceStatus) => {
+    setOptimisticStatus(status);
+    onToggleAttendance(student.id, today, status);
+  };
+
   return (
     <div className={`bg-white rounded-xl shadow-md overflow-hidden transition-all duration-300 ease-in-out hover:shadow-lg ${student.isArchived ? 'bg-gray-100' : ''}`}>
       <div
@@ -61,10 +73,10 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
             <div className="flex gap-2 flex-shrink-0">
               {!student.isArchived ? (
                 <>
-                  <button onClick={() => onToggleAttendance(student.id, today, AttendanceStatusEnum.PRESENT)} className={`py-1 px-3 rounded-full font-semibold text-sm transition-all border ${todayAttendance?.status === AttendanceStatusEnum.PRESENT ? 'bg-green-600 text-white border-transparent shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`} aria-label={`تسجيل حضور لـ ${student.name}`}>
+                  <button onClick={() => handleAttendanceClick(AttendanceStatusEnum.PRESENT)} className={`py-1 px-3 rounded-full font-semibold text-sm transition-all border ${optimisticStatus === AttendanceStatusEnum.PRESENT ? 'bg-green-600 text-white border-transparent shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`} aria-label={`تسجيل حضور لـ ${student.name}`}>
                     حاضر
                   </button>
-                  <button onClick={() => onToggleAttendance(student.id, today, AttendanceStatusEnum.ABSENT)} className={`py-1 px-3 rounded-full font-semibold text-sm transition-all border ${todayAttendance?.status === AttendanceStatusEnum.ABSENT ? 'bg-red-600 text-white border-transparent shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`} aria-label={`تسجيل غياب لـ ${student.name}`}>
+                  <button onClick={() => handleAttendanceClick(AttendanceStatusEnum.ABSENT)} className={`py-1 px-3 rounded-full font-semibold text-sm transition-all border ${optimisticStatus === AttendanceStatusEnum.ABSENT ? 'bg-red-600 text-white border-transparent shadow' : 'bg-white text-gray-700 border-gray-300 hover:bg-gray-50'}`} aria-label={`تسجيل غياب لـ ${student.name}`}>
                     غياب
                   </button>
                 </>
