@@ -211,4 +211,4 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
   );
 };
 
-export default StudentCard;
+export default React.memo(StudentCard);

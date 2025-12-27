@@ -172,4 +172,4 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ currentUser, notifi
     );
 };
 
-export default NotificationBell;
+export default React.memo(NotificationBell);

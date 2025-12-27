@@ -828,4 +828,4 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
     );
 };
 
-export default StudentDetailsPage;
+export default React.memo(StudentDetailsPage);

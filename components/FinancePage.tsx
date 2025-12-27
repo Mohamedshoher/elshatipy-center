@@ -825,4 +825,4 @@ const ExpenseForm: React.FC<{ onLogExpense: (expense: Omit<Expense, 'id'>) => vo
     )
 }
 
-export default FinancePage;
+export default React.memo(FinancePage);
