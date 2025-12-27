@@ -143,6 +143,7 @@ export interface Student {
   hasDebt?: boolean; // true if student has unpaid fees and attended 10+ sessions
   debtMonths?: string[]; // Array of months (YYYY-MM) with unpaid fees
   lastWeeklyReportDate?: string;
+  isOrphan?: boolean; // If true, the student is an orphan
 }
 
 export enum TeacherStatus {
@@ -166,7 +167,7 @@ export interface Teacher {
   password?: string;
 }
 
-export type GroupType = 'all' | 'قرآن' | 'نور بيان' | 'تلقين' | 'إقراء';
+export type GroupType = 'all' | 'قرآن' | 'نور بيان' | 'تلقين' | 'إقراء' | 'orphans' | 'invalid_phone';
 
 export interface Supervisor {
   id: string;

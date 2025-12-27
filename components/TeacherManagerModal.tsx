@@ -63,7 +63,7 @@ const TeacherManagerModal: React.FC<TeacherManagerModalProps> = ({
                 setPhone(teacherToEdit.phone);
                 setSalary(teacherToEdit.salary?.toString() || '');
                 setStatus(teacherToEdit.status);
-                setPassword('');
+                setPassword(teacherToEdit.password || '');
                 setPaymentType(teacherToEdit.paymentType || PaymentType.SALARY);
                 setPartnershipPercentage(teacherToEdit.partnershipPercentage?.toString() || '');
             } else {
@@ -214,8 +214,8 @@ const TeacherManagerModal: React.FC<TeacherManagerModalProps> = ({
                                         type="button"
                                         onClick={() => setPaymentType(PaymentType.SALARY)}
                                         className={`flex-1 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 border ${paymentType === PaymentType.SALARY
-                                                ? 'bg-teal-600 text-white border-teal-600 shadow-md transform scale-105'
-                                                : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:bg-teal-50'
+                                            ? 'bg-teal-600 text-white border-teal-600 shadow-md transform scale-105'
+                                            : 'bg-white text-gray-600 border-gray-200 hover:border-teal-300 hover:bg-teal-50'
                                             }`}
                                     >
                                         💰 راتب ثابت
@@ -224,8 +224,8 @@ const TeacherManagerModal: React.FC<TeacherManagerModalProps> = ({
                                         type="button"
                                         onClick={() => setPaymentType(PaymentType.PARTNERSHIP)}
                                         className={`flex-1 px-4 py-3 rounded-lg text-sm font-semibold transition-all duration-200 border ${paymentType === PaymentType.PARTNERSHIP
-                                                ? 'bg-green-600 text-white border-green-600 shadow-md transform scale-105'
-                                                : 'bg-white text-gray-600 border-gray-200 hover:border-green-300 hover:bg-green-50'
+                                            ? 'bg-green-600 text-white border-green-600 shadow-md transform scale-105'
+                                            : 'bg-white text-gray-600 border-gray-200 hover:border-green-300 hover:bg-green-50'
                                             }`}
                                     >
                                         🤝 شراكة

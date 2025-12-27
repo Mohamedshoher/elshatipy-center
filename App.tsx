@@ -74,12 +74,39 @@ const defaultSchedule = (): WeeklySchedule[] => [
 
 const App: React.FC = () => {
     // --- Data from Firestore ---
-    const [students, setStudents] = useState<Student[]>([]);
-    const [groups, setGroups] = useState<Group[]>([]);
-    const [teachers, setTeachers] = useState<Teacher[]>([]);
+    // --- Data from Firestore with Local Caching for Instant Load ---
+    const [students, setStudents] = useState<Student[]>(() => {
+        try {
+            const cached = localStorage.getItem('shatibi_cache_students');
+            return cached ? JSON.parse(cached) : [];
+        } catch { return []; }
+    });
+    const [groups, setGroups] = useState<Group[]>(() => {
+        try {
+            const cached = localStorage.getItem('shatibi_cache_groups');
+            return cached ? JSON.parse(cached) : [];
+        } catch { return []; }
+    });
+    const [teachers, setTeachers] = useState<Teacher[]>(() => {
+        try {
+            const cached = localStorage.getItem('shatibi_cache_teachers');
+            return cached ? JSON.parse(cached) : [];
+        } catch { return []; }
+    });
+    const [supervisors, setSupervisors] = useState<Supervisor[]>(() => {
+        try {
+            const cached = localStorage.getItem('shatibi_cache_supervisors');
+            return cached ? JSON.parse(cached) : [];
+        } catch { return []; }
+    });
+
     const activeTeachers = useMemo(() => teachers.filter(t => t.status === TeacherStatus.ACTIVE), [teachers]);
-    const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
-    const [parents, setParents] = useState<Parent[]>([]);
+    const [parents, setParents] = useState<Parent[]>(() => {
+        try {
+            const cached = localStorage.getItem('shatibi_cache_parents');
+            return cached ? JSON.parse(cached) : [];
+        } catch { return []; }
+    });
     const [notes, setNotes] = useState<Note[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [directorNotifications, setDirectorNotifications] = useState<DirectorNotification[]>([]);
@@ -96,6 +123,18 @@ const App: React.FC = () => {
     const [teacherManualBonuses, setTeacherManualBonuses] = useState<TeacherManualBonus[]>([]);
     const [donations, setDonations] = useState<Donation[]>([]);
     const [financialSettings, setFinancialSettings] = useState<FinancialSettings>({ workingDaysPerMonth: 22, absenceDeductionPercentage: 100 });
+
+    // Helper to persist large cache safely
+    const safePersist = (key: string, data: any) => {
+        try {
+            localStorage.setItem(key, JSON.stringify(data));
+        } catch (e) {
+            console.warn(`Failed to cache ${key}:`, e);
+            if (e instanceof Error && e.name === 'QuotaExceededError') {
+                localStorage.removeItem(key); // Clear if full to prevent broken cache
+            }
+        }
+    };
 
     // --- Error State ---
     const [permissionError, setPermissionError] = useState(false);
@@ -153,7 +192,6 @@ const App: React.FC = () => {
     const [isDirectorReportView, setIsDirectorReportView] = useState(false);
 
     // --- Automatic Missing Reports Check ---
-    // --- Automatic Missing Reports Check ---
 
     const [isDirectorNotesView, setIsDirectorNotesView] = useState(false);
     const [isDirectorNotificationsView, setIsDirectorNotificationsView] = useState(false);
@@ -180,16 +218,55 @@ const App: React.FC = () => {
         return null;
     };
 
-    // Fetch all data from Firestore in real-time
+    // --- 1. Public Data Listeners (Always active for Login) ---
     useEffect(() => {
-        const collections: { name: string, setter: React.Dispatch<any> }[] = [
-            { name: 'students', setter: setStudents },
-            { name: 'groups', setter: setGroups },
-            { name: 'teachers', setter: setTeachers },
-            { name: 'supervisors', setter: setSupervisors },
-            { name: 'parents', setter: setParents },
+        const publicCollections: { name: string, setter: React.Dispatch<any>, cacheKey: string }[] = [
+            { name: 'teachers', setter: setTeachers, cacheKey: 'shatibi_cache_teachers' },
+            { name: 'supervisors', setter: setSupervisors, cacheKey: 'shatibi_cache_supervisors' },
+            { name: 'parents', setter: setParents, cacheKey: 'shatibi_cache_parents' },
+        ];
+
+        const unsubscribers = publicCollections.map(({ name, setter, cacheKey }) =>
+            onSnapshot(collection(db, name), (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                setter(data);
+                safePersist(cacheKey, data);
+            }, (error) => {
+                console.error(`Error fetching public ${name}:`, error.message);
+            })
+        );
+
+        return () => {
+            unsubscribers.forEach(unsub => unsub());
+        };
+    }, []);
+
+    // --- 2. Protected Data Listeners (Only after Login) ---
+    useEffect(() => {
+        if (!currentUser) {
+            // Clear sensitive data on logout
+            setStudents([]);
+            setGroups([]);
+            setNotes([]);
+            setStaff([]);
+            setExpenses([]);
+            setTeacherAttendance([]);
+            setTeacherPayrollAdjustments([]);
+            setTeacherCollections([]);
+            setTeacherManualBonuses([]);
+            setDonations([]);
+
+            // Clear cache on logout to avoid data persistence for next user
+            ['shatibi_cache_students', 'shatibi_cache_groups', 'shatibi_cache_teachers', 'shatibi_cache_supervisors', 'shatibi_cache_parents'].forEach(k => localStorage.removeItem(k));
+            return;
+        }
+
+        console.log("Starting protected data listeners for:", currentUser.role === 'director' ? 'director' : (currentUser as any).name);
+
+        const protectedCollections: { name: string, setter: React.Dispatch<any>, cacheKey?: string }[] = [
+            { name: 'students', setter: setStudents, cacheKey: 'shatibi_cache_students' },
+            { name: 'groups', setter: setGroups, cacheKey: 'shatibi_cache_groups' },
             { name: 'notes', setter: setNotes },
-            // notifications and directorNotifications skipped here
             { name: 'staff', setter: setStaff },
             { name: 'expenses', setter: setExpenses },
             { name: 'teacherAttendance', setter: setTeacherAttendance },
@@ -199,12 +276,13 @@ const App: React.FC = () => {
             { name: 'donations', setter: setDonations },
         ];
 
-        const unsubscribers = collections.map(({ name, setter }) =>
+        const unsubscribers = protectedCollections.map(({ name, setter, cacheKey }) =>
             onSnapshot(collection(db, name), (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                 setter(data);
+                if (cacheKey) safePersist(cacheKey, data);
             }, (error) => {
-                console.error(`Error fetching ${name}:`, error.message);
+                console.error(`Error fetching protected ${name}:`, error.message);
                 if (error.code === 'permission-denied') {
                     setPermissionError(true);
                 }
@@ -228,11 +306,18 @@ const App: React.FC = () => {
         });
         unsubscribers.push(unsubSettings);
 
-        return () => unsubscribers.forEach(unsub => unsub());
-    }, []);
+        return () => {
+            unsubscribers.forEach(unsub => unsub());
+        };
+    }, [currentUser]);
 
     // Optimized Notifications Fetching (Last 30 Days)
     useEffect(() => {
+        if (!currentUser) {
+            setNotifications([]);
+            return;
+        }
+
         const thirtyDaysAgo = new Date();
         thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
         const dateString = thirtyDaysAgo.toISOString();
@@ -253,10 +338,15 @@ const App: React.FC = () => {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [currentUser]);
 
     // Optimized Director Notifications Fetching (Last 60 Days)
     useEffect(() => {
+        if (!currentUser) {
+            setDirectorNotifications([]);
+            return;
+        }
+
         const sixtyDaysAgo = new Date();
         sixtyDaysAgo.setDate(sixtyDaysAgo.getDate() - 60);
         const dateString = sixtyDaysAgo.toISOString();
@@ -277,7 +367,7 @@ const App: React.FC = () => {
         });
 
         return () => unsubscribe();
-    }, []);
+    }, [currentUser]);
 
     // Effect for Director to check for missing teacher reports (daily and weekly)
     useEffect(() => {
@@ -710,12 +800,24 @@ const App: React.FC = () => {
     // Helper to get student count based on current filter
     const getFilteredStudentCount = () => {
         if (!currentUser) return 0;
-        if (currentUser.role === 'supervisor') return supervisorFilteredData?.students.length || 0;
 
-        let targetStudents = currentUser.role === 'director' ? activeStudents : (teacherStudents || []);
+        let targetStudents: Student[] = [];
+        if (currentUser.role === 'director') {
+            targetStudents = activeStudents;
+        } else if (currentUser.role === 'teacher') {
+            targetStudents = teacherStudents;
+        } else if (currentUser.role === 'supervisor') {
+            targetStudents = supervisorFilteredData?.students || [];
+        }
 
         if (studentTypeFilter !== 'all') {
             targetStudents = targetStudents.filter(s => {
+                if (studentTypeFilter === 'orphans') return s.isOrphan === true;
+                if (studentTypeFilter === 'invalid_phone') {
+                    const digits = s.phone ? s.phone.replace(/\D/g, '') : '';
+                    return !s.phone || digits.length < 12;
+                }
+
                 const group = groups.find(g => g.id === s.groupId);
                 if (!group) return false;
                 return getGroupTypeFromName(group.name) === studentTypeFilter;
@@ -2095,7 +2197,9 @@ const App: React.FC = () => {
                             {loginMode === 'staff' ? (
                                 <LocalLoginScreen onLogin={handleLogin} teachers={teachers} supervisors={supervisors} />
                             ) : (
-                                <ParentLoginScreen onLogin={handleParentLogin} parents={parents} />
+                                <Suspense fallback={<div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div></div>}>
+                                    <ParentLoginScreen onLogin={handleParentLogin} parents={parents} />
+                                </Suspense>
                             )}
                         </div>
                     </div>
@@ -2737,7 +2841,7 @@ const App: React.FC = () => {
 
     // عرض محتوى ولي الأمر
     const renderParentContent = () => {
-        if (currentUser?.role !== 'parent') return null;
+        if (!currentUser || currentUser.role !== 'parent') return null;
 
         // جلب طلاب ولي الأمر
         const parentStudents = students.filter(s => currentUser.studentIds.includes(s.id));
@@ -2852,24 +2956,30 @@ const App: React.FC = () => {
                 </div>
             )}
             <div className="flex">
-                {(currentUser.role === 'director' || currentUser.role === 'supervisor') && (
-                    <Sidebar
-                        isOpen={isSidebarOpen}
-                        onClose={() => setIsSidebarOpen(false)}
-                        onShowGeneralView={() => openDirectorView(setIsGeneralView)}
-                        onShowFinance={() => openDirectorView(setIsFinanceView)}
-                        onShowFeeCollection={() => openDirectorView(setIsFeeCollectionView)}
-                        onShowNotifications={() => openDirectorView(setIsDirectorNotificationsView)}
-                        onShowNotes={() => openDirectorView(setIsDirectorNotesView)}
-                        onShowTeacherManager={() => openDirectorView(setIsTeacherManagerView)}
-                        onShowArchive={() => openDirectorView(setIsArchiveView)}
-                        onShowDebtors={() => openDirectorView(setIsDebtorsView)}
-                        onLogout={handleLogout}
-                        currentUserRole={currentUser.role}
-                    />
-                )}
+                <Suspense fallback={null}>
+                    {(currentUser.role === 'director' || currentUser.role === 'supervisor') && (
+                        <Sidebar
+                            isOpen={isSidebarOpen}
+                            onClose={() => setIsSidebarOpen(false)}
+                            onShowGeneralView={() => openDirectorView(setIsGeneralView)}
+                            onShowFinance={() => openDirectorView(setIsFinanceView)}
+                            onShowFeeCollection={() => openDirectorView(setIsFeeCollectionView)}
+                            onShowNotifications={() => openDirectorView(setIsDirectorNotificationsView)}
+                            onShowNotes={() => openDirectorView(setIsDirectorNotesView)}
+                            onShowTeacherManager={() => openDirectorView(setIsTeacherManagerView)}
+                            onShowArchive={() => openDirectorView(setIsArchiveView)}
+                            onShowDebtors={() => openDirectorView(setIsDebtorsView)}
+                            onLogout={handleLogout}
+                            currentUserRole={currentUser.role}
+                        />
+                    )}
+                </Suspense>
+
                 <div className="flex-1 flex flex-col w-full min-w-0">
-                    {renderHeader()}
+                    <Suspense fallback={null}>
+                        {renderHeader()}
+                    </Suspense>
+
                     <main className="flex-1 overflow-y-auto pb-20">
                         <ErrorBoundary>
                             <Suspense fallback={
@@ -2887,33 +2997,84 @@ const App: React.FC = () => {
                                             : (teachers.length > 0 ? renderTeacherContent() : <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>))
                                     )
                                 }
+
+                                {/* Modals & Overlays - Now inside the main Suspense */}
+                                <StudentForm isOpen={isFormOpen} onClose={() => { setIsFormOpen(false); setStudentToEdit(null); }} onSave={addOrUpdateStudent} studentToEdit={studentToEdit} groups={visibleGroups} />
+
+                                {(currentUser.role === 'director' || currentUser.role === 'supervisor') && (
+                                    <>
+                                        <GroupManagerModal isOpen={isGroupManagerOpen} onClose={() => setIsGroupManagerOpen(false)} groups={visibleGroups} students={students} onAddGroup={handleAddGroup} onUpdateGroup={handleUpdateGroup} onDeleteGroup={handleDeleteGroup} teachers={teachers} />
+                                        <TeacherManagerModal
+                                            isOpen={isTeacherFormOpen}
+                                            onClose={() => { setIsTeacherFormOpen(false); setTeacherToEdit(null); setSupervisorToEdit(null); }}
+                                            onSaveTeacher={handleSaveTeacher}
+                                            onSaveSupervisor={handleSaveSupervisor}
+                                            teacherToEdit={teacherToEdit}
+                                            supervisorToEdit={supervisorToEdit}
+                                        />
+                                    </>
+                                )}
+
+                                <FeePaymentModal isOpen={isFeeModalOpen} onClose={() => { setIsFeeModalOpen(false); setPaymentDetails(null); }} onSave={handleSaveFeePayment} paymentDetails={paymentDetails} />
+                                <UnarchiveModal isOpen={!!studentToUnarchiveId} onClose={() => setStudentToUnarchiveId(null)} onConfirm={handleConfirmUnarchive} groups={groupsForUnarchiveModal} studentName={students.find(s => s.id === studentToUnarchiveId)?.name || ''} />
+
+                                {/* Chat System */}
+                                {currentUser && (
+                                    <>
+                                        {!isChatOpen && (
+                                            <button
+                                                onClick={() => setIsChatOpen(true)}
+                                                className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl transition-all hover:scale-105 flex items-center gap-2 group border-2 border-white focus:outline-none focus:ring-4 focus:ring-blue-300"
+                                                style={{ position: 'fixed', left: '20px', bottom: '80px', right: 'auto', zIndex: 9999 }}
+                                                title="المحادثات"
+                                            >
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 transform group-hover:rotate-12 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
+                                                </svg>
+                                                <span className="font-bold hidden md:inline ml-1">المحادثات</span>
+                                                {unreadMessagesCount > 0 && (
+                                                    <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-white animate-bounce">
+                                                        {unreadMessagesCount > 9 ? '+9' : unreadMessagesCount}
+                                                    </span>
+                                                )}
+                                            </button>
+                                        )}
+
+                                        {isChatOpen && (
+                                            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 animate-in fade-in duration-200">
+                                                <div className="w-full max-w-6xl h-full max-h-[85vh] bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
+                                                    <ChatPage
+                                                        key={currentUser.role === 'director' ? 'director' : (currentUser as any).id || 'unknown'}
+                                                        currentUser={{
+                                                            uid: currentUser.role === 'director' ? 'director' : ((currentUser as any).id || 'unknown'),
+                                                            role: currentUser.role,
+                                                            name: currentUser.role === 'director' ? 'الإدارة' : ((currentUser as any).name || 'Unknown')
+                                                        }}
+                                                        teachers={activeTeachers || []}
+                                                        groups={groups}
+                                                        students={currentUser.role === 'parent' ? students.filter(s => (currentUser as any).studentIds?.includes(s.id)) : students}
+                                                        parents={parents}
+                                                        supervisors={supervisors}
+                                                        initialSelectedUserId={chatInitialUserId}
+                                                        onBack={() => {
+                                                            setIsChatOpen(false);
+                                                            setChatInitialUserId(undefined);
+                                                        }}
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
                             </Suspense>
                         </ErrorBoundary>
                     </main>
-                    {currentUser.role !== 'parent' && <BottomNavBar activeView={activeView} onSelectView={handleBottomNavSelect} />}
+                    <Suspense fallback={null}>
+                        {currentUser.role !== 'parent' && <BottomNavBar activeView={activeView} onSelectView={handleBottomNavSelect} />}
+                    </Suspense>
                 </div>
             </div>
 
-            <Suspense fallback={null}>
-                <StudentForm isOpen={isFormOpen} onClose={() => { setIsFormOpen(false); setStudentToEdit(null); }} onSave={addOrUpdateStudent} studentToEdit={studentToEdit} groups={visibleGroups} />
-
-                {(currentUser.role === 'director' || currentUser.role === 'supervisor') && (
-                    <>
-                        <GroupManagerModal isOpen={isGroupManagerOpen} onClose={() => setIsGroupManagerOpen(false)} groups={visibleGroups} students={students} onAddGroup={handleAddGroup} onUpdateGroup={handleUpdateGroup} onDeleteGroup={handleDeleteGroup} teachers={teachers} />
-                        <TeacherManagerModal
-                            isOpen={isTeacherFormOpen}
-                            onClose={() => { setIsTeacherFormOpen(false); setTeacherToEdit(null); setSupervisorToEdit(null); }}
-                            onSaveTeacher={handleSaveTeacher}
-                            onSaveSupervisor={handleSaveSupervisor}
-                            teacherToEdit={teacherToEdit}
-                            supervisorToEdit={supervisorToEdit}
-                        />
-                    </>
-                )}
-
-                <FeePaymentModal isOpen={isFeeModalOpen} onClose={() => { setIsFeeModalOpen(false); setPaymentDetails(null); }} onSave={handleSaveFeePayment} paymentDetails={paymentDetails} />
-                <UnarchiveModal isOpen={!!studentToUnarchiveId} onClose={() => setStudentToUnarchiveId(null)} onConfirm={handleConfirmUnarchive} groups={groupsForUnarchiveModal} studentName={students.find(s => s.id === studentToUnarchiveId)?.name || ''} />
-            </Suspense>
             {studentToArchive && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
                     <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-8 w-full max-w-md">
@@ -2925,54 +3086,6 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 </div>
-            )}
-            {/* Chat System */}
-            {currentUser && (
-                <>
-                    {!isChatOpen && (
-                        <button
-                            onClick={() => setIsChatOpen(true)}
-                            className="bg-blue-600 hover:bg-blue-700 text-white p-4 rounded-full shadow-xl transition-all hover:scale-105 flex items-center gap-2 group border-2 border-white focus:outline-none focus:ring-4 focus:ring-blue-300"
-                            style={{ position: 'fixed', left: '20px', bottom: '80px', right: 'auto', zIndex: 9999 }}
-                            title="المحادثات"
-                        >
-                            <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6 transform group-hover:rotate-12 transition-transform" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 10h.01M12 10h.01M16 10h.01M9 16H5a2 2 0 01-2-2V6a2 2 0 012-2h14a2 2 0 012 2v8a2 2 0 01-2 2h-5l-5 5v-5z" />
-                            </svg>
-                            <span className="font-bold hidden md:inline ml-1">المحادثات</span>
-                            {unreadMessagesCount > 0 && (
-                                <span className="absolute -top-1 -right-1 bg-red-500 text-white text-xs font-bold w-6 h-6 flex items-center justify-center rounded-full border-2 border-white animate-bounce">
-                                    {unreadMessagesCount > 9 ? '+9' : unreadMessagesCount}
-                                </span>
-                            )}
-                        </button>
-                    )}
-
-                    {isChatOpen && (
-                        <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[120] flex items-center justify-center p-4 animate-in fade-in duration-200">
-                            <div className="w-full max-w-6xl h-full max-h-[85vh] bg-white rounded-2xl shadow-2xl overflow-hidden animate-in zoom-in-95 duration-200">
-                                <ChatPage
-                                    key={currentUser.role === 'director' ? 'director' : (currentUser as any).id || 'unknown'}
-                                    currentUser={{
-                                        uid: currentUser.role === 'director' ? 'director' : ((currentUser as any).id || 'unknown'),
-                                        role: currentUser.role,
-                                        name: currentUser.role === 'director' ? 'الإدارة' : ((currentUser as any).name || 'Unknown')
-                                    }}
-                                    teachers={activeTeachers || []}
-                                    groups={groups}
-                                    students={currentUser.role === 'parent' ? students.filter(s => currentUser.studentIds.includes(s.id)) : students}
-                                    parents={parents}
-                                    supervisors={supervisors}
-                                    initialSelectedUserId={chatInitialUserId}
-                                    onBack={() => {
-                                        setIsChatOpen(false);
-                                        setChatInitialUserId(undefined);
-                                    }}
-                                />
-                            </div>
-                        </div>
-                    )}
-                </>
             )}
         </div>
     );

@@ -172,6 +172,14 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                     users.push({ id: teacher.id, name: teacher.name, role: 'teacher', isOnline: false, unreadCount: 0, description: childNames ? `مدرس ابنك ${childNames}` : 'مدرس ابنك' });
                 });
             }
+        } else if (currentUser.role === 'supervisor') {
+            users.push({ id: 'director', name: 'الإدارة', role: 'director', isOnline: true, unreadCount: 0, description: 'إدارة المركز' });
+            teachers.forEach(t => {
+                users.push({ id: t.id, name: t.name, role: 'teacher', isOnline: false, unreadCount: 0 });
+            });
+            SECTIONS.forEach(section => {
+                users.push({ id: section.id, name: section.name, role: 'teacher', isOnline: true, unreadCount: 0 });
+            });
         }
         return users;
     }, [currentUser.role, teachers, currentUser.uid, groups, students, parents, supervisors]);

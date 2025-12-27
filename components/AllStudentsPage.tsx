@@ -37,6 +37,11 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
       )
       .filter(s => {
         if (typeFilter === 'all') return true;
+        if (typeFilter === 'orphans') return s.isOrphan === true;
+        if (typeFilter === 'invalid_phone') {
+          const digits = s.phone ? s.phone.replace(/\D/g, '') : '';
+          return !s.phone || digits.length < 12;
+        }
         const group = groups.find(g => g.id === s.groupId);
         const groupType = getGroupTypeFromName(group?.name);
         return groupType === typeFilter;
@@ -79,6 +84,8 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
                 <option value="نور بيان">نور بيان</option>
                 <option value="تلقين">تلقين</option>
                 <option value="إقراء">إقراء</option>
+                <option value="orphans">أيتام</option>
+                <option value="invalid_phone">أرقام هواتف غير مكتملة</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-700">
                 <svg className="fill-current h-4 w-4" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">

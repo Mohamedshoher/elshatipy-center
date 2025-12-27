@@ -15,15 +15,23 @@ export const createParentAccountIfNeeded = async (
     studentId: string,
     existingParents: Parent[]
 ): Promise<void> => {
-    // التحقق من صحة رقم الهاتف (13 رقم يبدأ بـ 02)
-    if (!studentPhone.startsWith('02') || studentPhone.length !== 13) {
-        console.log('رقم الهاتف غير صالح لإنشاء حساب ولي أمر');
+    // تطبيع رقم الهاتف (تحويل 11 رقم إلى 13 رقم ببادئة 02 إذا كان مصرياً)
+    let processedPhone = studentPhone.replace(/\D/g, '');
+    if (processedPhone.length === 11 && (processedPhone.startsWith('010') || processedPhone.startsWith('011') || processedPhone.startsWith('012') || processedPhone.startsWith('015'))) {
+        processedPhone = '02' + processedPhone;
+    }
+
+    // التحقق من صحة رقم الهاتف النهائي (13 رقم يبدأ بـ 02)
+    if (!processedPhone.startsWith('02') || processedPhone.length !== 13) {
+        console.log('رقم الهاتف غير صالح لإنشاء حساب ولي أمر:', processedPhone);
         return;
     }
 
+    const studentPhoneToUse = processedPhone;
+
     try {
         // التحقق من وجود حساب ولي أمر بهذا الرقم
-        const existingParent = existingParents.find(p => p.phone === studentPhone);
+        const existingParent = existingParents.find(p => p.phone === studentPhoneToUse);
 
         if (existingParent) {
             // تحديث قائمة الطلاب إذا لم يكن الطالب موجوداً
@@ -35,15 +43,15 @@ export const createParentAccountIfNeeded = async (
             }
         } else {
             // إنشاء حساب جديد
-            const password = studentPhone.slice(-6); // آخر 6 أرقام
+            const password = studentPhoneToUse.slice(-6); // آخر 6 أرقام
             await addDoc(collection(db, 'parents'), {
-                phone: studentPhone,
+                phone: studentPhoneToUse,
                 name: `ولي أمر ${studentName}`,
                 password: password,
                 studentIds: [studentId]
             });
             console.log(`✅ تم إنشاء حساب جديد لولي أمر ${studentName}`);
-            console.log(`📱 رقم الهاتف: ${studentPhone}`);
+            console.log(`📱 رقم الهاتف: ${studentPhoneToUse}`);
             console.log(`🔑 كلمة المرور: ${password}`);
         }
     } catch (error) {
