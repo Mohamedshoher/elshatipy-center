@@ -102,10 +102,11 @@ export function getCairoDayOfWeek(): number {
 
 /**
  * التحقق من أن اليوم هو يوم عمل (ليس الخميس أو الجمعة)
+ * @param dateDate اختياري: التاريخ المراد فحصه
  * @returns true إذا كان يوم عمل
  */
-export function isCairoWorkday(): boolean {
-  const dayOfWeek = getCairoDayOfWeek();
+export function isCairoWorkday(date?: Date): boolean {
+  const dayOfWeek = date ? date.getDay() : getCairoDayOfWeek();
   // يوم الخميس = 4، يوم الجمعة = 5
   return ![4, 5].includes(dayOfWeek);
 }

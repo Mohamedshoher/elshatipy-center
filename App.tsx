@@ -311,10 +311,12 @@ const App: React.FC = () => {
             // فحص اليوم السابق (Yesterday)
             const dateToCheck = new Date(today);
             dateToCheck.setHours(0, 0, 0, 0);
-            const dayOfWeek = getCairoDayOfWeek(); // 0=Sunday, ..., 4=Thursday, 5=Friday, 6=Saturday
+            const dayOfWeek = today.getDay(); // 0=Sunday, ..., 6=Saturday
 
-            // استثناء يومي الخميس (4) والجمعة (5) - هما اليوم السادس والسابع حسب تقويم المستخدم
-            const isWorkday = isCairoWorkday();
+            // للحصول على حالة يوم "أمس" (yesterday)
+            const yesterdayDate = new Date(today);
+            yesterdayDate.setDate(today.getDate() - 1);
+            const isWorkday = isCairoWorkday(yesterdayDate);
             const isHoliday = (financialSettings.publicHolidays || []).includes(yesterdayString);
 
             // مصفوفة لتجميع العمليات اليومية
@@ -449,13 +451,11 @@ const App: React.FC = () => {
 
             // --- الفحص الأسبوعي للتحفيز والخصم (السبت - الأربعاء) ---
             const weeklyPromises: Promise<void>[] = [];
-            const todayDay = getCairoDayOfWeek();
-
-            // يتم الفحص بدءاً من يوم الخميس (4) لمراجعة الأسبوع المنتهي بالأربعاء
-            if (todayDay >= 4 || todayDay === 0) {
+            // يتم الفحص يوم الخميس (4) فقط لمراجعة الأسبوع المنتهي بالأربعاء
+            if (dayOfWeek === 4 && IS_AFTER_12_05) {
                 // حساب تاريخ السبت الماضي (بداية الأسبوع المستهدف)
                 // السبت=6، الأحد=0، الاثنين=1، الثلاثاء=2، الأربعاء=3، الخميس=4، الجمعة=5
-                const diff = (todayDay + 1) % 7;
+                const diff = (dayOfWeek + 1) % 7;
                 const lastSaturday = new Date(today);
                 lastSaturday.setDate(today.getDate() - diff);
                 lastSaturday.setHours(0, 0, 0, 0);
