@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useMemo } from 'react';
 import type { Student, Group, TestRecord, AttendanceStatus, Teacher, UserRole } from '../types';
 import StudentCard from './StudentCard';
 import ArrowRightIcon from './icons/ArrowRightIcon';
@@ -21,7 +21,7 @@ interface GroupStudentsPageProps {
     onBack: () => void;
 }
 
-const GroupStudentsPage: React.FC<GroupStudentsPageProps> = ({
+const GroupStudentsPage = React.memo(({
     group,
     students,
     teachers,
@@ -36,11 +36,13 @@ const GroupStudentsPage: React.FC<GroupStudentsPageProps> = ({
     onViewDetails,
     onMarkWeeklyReportSent,
     onBack
-}) => {
+}: GroupStudentsPageProps) => {
     const teacher = teachers.find(t => t.id === group.teacherId);
 
     // Sort students alphabetically by name
-    const sortedStudents = [...students].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    const sortedStudents = useMemo(() => {
+        return [...students].sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+    }, [students]);
 
     return (
         <div className="min-h-screen bg-gray-50 flex flex-col">
@@ -97,6 +99,6 @@ const GroupStudentsPage: React.FC<GroupStudentsPageProps> = ({
             </main>
         </div>
     );
-};
+});
 
 export default GroupStudentsPage;

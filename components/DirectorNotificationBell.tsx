@@ -19,7 +19,7 @@ const DirectorNotificationBell: React.FC<DirectorNotificationBellProps> = ({ not
     const toggleDropdown = () => {
         setIsOpen(prev => !prev);
     };
-    
+
     useEffect(() => {
         if (isOpen && unreadNotifications.length > 0) {
             const idsToMark = unreadNotifications.map(n => n.id);
@@ -45,7 +45,9 @@ const DirectorNotificationBell: React.FC<DirectorNotificationBellProps> = ({ not
     const handleClearAll = () => {
         const allNotificationIds = notifications.map(n => n.id);
         if (allNotificationIds.length > 0) {
-            onDelete(allNotificationIds);
+            if (window.confirm("هل أنت متأكد من مسح جميع الإشعارات؟")) {
+                onDelete(allNotificationIds);
+            }
         }
     };
 
@@ -73,23 +75,23 @@ const DirectorNotificationBell: React.FC<DirectorNotificationBellProps> = ({ not
                 <BellIcon className="w-6 h-6" />
                 {unreadNotifications.length > 0 && (
                     <span className="absolute top-0 right-0 block h-3 w-3 transform -translate-y-1/2 translate-x-1/2 rounded-full bg-red-500 ring-2 ring-white">
-                         <span className="absolute -inset-1.5 animate-ping rounded-full bg-red-500 opacity-75"></span>
+                        <span className="absolute -inset-1.5 animate-ping rounded-full bg-red-500 opacity-75"></span>
                     </span>
                 )}
             </button>
             {isOpen && (
                 <div className="absolute left-0 mt-2 w-[90vw] max-w-sm bg-white rounded-lg shadow-xl z-50 overflow-hidden flex flex-col max-h-[80vh]">
-                   <div className="flex justify-between items-center py-3 px-4 border-b bg-gray-50">
+                    <div className="flex justify-between items-center py-3 px-4 border-b bg-gray-50">
                         <span className="font-bold text-gray-700">الإشعارات</span>
                         {notifications.length > 0 && (
-                            <button 
+                            <button
                                 onClick={handleClearAll}
                                 className="text-xs font-semibold text-red-600 hover:bg-red-100 px-2 py-1 rounded transition-colors"
                             >
                                 مسح الكل
                             </button>
                         )}
-                   </div>
+                    </div>
                     <div className="overflow-y-auto flex-1">
                         {notifications.length > 0 ? (
                             notifications.map(n => (
@@ -97,9 +99,9 @@ const DirectorNotificationBell: React.FC<DirectorNotificationBellProps> = ({ not
                                     <div className="mb-2">
                                         <p className="text-gray-800 text-base break-words">{renderContent(n)}</p>
                                     </div>
-                                    
+
                                     <div className="flex justify-between items-center mt-2">
-                                         <button 
+                                        <button
                                             onClick={(e) => { e.stopPropagation(); onDelete([n.id]); }}
                                             className="p-1 text-gray-400 hover:text-red-600 transition-colors flex items-center gap-1"
                                             title="حذف الإشعار"
@@ -107,7 +109,7 @@ const DirectorNotificationBell: React.FC<DirectorNotificationBellProps> = ({ not
                                             <TrashIcon className="w-4 h-4" />
                                             <span className="text-xs">حذف</span>
                                         </button>
-                                        
+
                                         <div className="text-xs text-gray-500 flex flex-col items-end">
                                             <span>{new Date(n.forDate).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
                                             <span className="text-gray-400">{new Date(n.date).toLocaleTimeString('ar-EG', { hour: 'numeric', minute: '2-digit' })}</span>
@@ -125,4 +127,4 @@ const DirectorNotificationBell: React.FC<DirectorNotificationBellProps> = ({ not
     );
 };
 
-export default DirectorNotificationBell;
+export default React.memo(DirectorNotificationBell);

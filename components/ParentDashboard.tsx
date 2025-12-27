@@ -136,5 +136,5 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ students, groups, onV
     );
 };
 
-export default ParentDashboard;
+export default React.memo(ParentDashboard);
 

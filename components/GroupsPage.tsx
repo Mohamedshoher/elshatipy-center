@@ -61,6 +61,17 @@ const GroupsPage: React.FC<GroupsPageProps> = (props) => {
       });
   }, [groups, searchTerm, typeFilter]);
 
+  // Pre-index students by group for performance O(S)
+  const studentsByGroup = useMemo(() => {
+    const map: Record<string, number> = {};
+    students.forEach(s => {
+      if (!s.isArchived) {
+        map[s.groupId] = (map[s.groupId] || 0) + 1;
+      }
+    });
+    return map;
+  }, [students]);
+
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex justify-center sm:justify-start mb-6">
@@ -91,7 +102,7 @@ const GroupsPage: React.FC<GroupsPageProps> = (props) => {
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         {filteredGroups.length > 0 ? (
           filteredGroups.map(group => {
-            const studentsInGroup = students.filter(s => s.groupId === group.id && !s.isArchived);
+            const studentCount = studentsByGroup[group.id] || 0;
             const teacher = teachers.find(t => t.id === group.teacherId);
 
             return (
@@ -105,7 +116,7 @@ const GroupsPage: React.FC<GroupsPageProps> = (props) => {
                     <div>
                       <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center truncate">
                         <span className="truncate">{group.name}</span>
-                        <span className="text-base font-normal bg-blue-100 text-blue-700 rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0">{studentsInGroup.length}</span>
+                        <span className="text-base font-normal bg-blue-100 text-blue-700 rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0">{studentCount}</span>
                       </h2>
                       {teacher && <p className="text-sm text-gray-500 font-semibold mt-1">{`المدرس: ${teacher.name}`}</p>}
                     </div>
@@ -141,4 +152,4 @@ const GroupsPage: React.FC<GroupsPageProps> = (props) => {
   );
 };
 
-export default GroupsPage;
+export default React.memo(GroupsPage);

@@ -127,4 +127,4 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
   );
 };
 
-export default AllStudentsPage;
+export default React.memo(AllStudentsPage);

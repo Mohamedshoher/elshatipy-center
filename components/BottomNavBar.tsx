@@ -73,4 +73,4 @@ const BottomNavBar: React.FC<BottomNavBarProps> = ({ activeView, onSelectView })
   );
 };
 
-export default BottomNavBar;
+export default React.memo(BottomNavBar);

@@ -432,4 +432,4 @@ const ParentStudentDetails: React.FC<ParentStudentDetailsProps> = ({ student, gr
 };
 
 
-export default ParentStudentDetails;
+export default React.memo(ParentStudentDetails);

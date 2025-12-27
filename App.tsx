@@ -1,34 +1,41 @@
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react';
+import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
 import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus, Donation, Parent, UserRole } from './types';
 import { ExpenseCategory, TeacherAttendanceStatus, DayOfWeek, TestType as TestTypeEnum, DirectorNotificationType } from './types';
 import { getCairoNow, getCairoDateString, getYesterdayDateString, getCairoTimeInMinutes, isCairoAfterMidnight, isCairoAfter12_05, getCairoDayOfWeek, isCairoWorkday } from './services/cairoTimeHelper';
-import StudentCard from './components/StudentCard';
-import StudentForm from './components/StudentForm';
-import GroupManagerModal from './components/GroupManagerModal';
-import FeePaymentModal from './components/FeePaymentModal';
-import TeacherManagerModal from './components/TeacherManagerModal';
-import TeacherManagerPage from './components/TeacherManagerPage';
-import GroupReportPage from './components/GroupReportPage';
-import TeacherReportPage from './components/TeacherReportPage';
-import DirectorReportsPage from './components/DirectorReportsPage';
-import DirectorNotesPage from './components/DirectorNotesPage';
-import GroupStudentsPage from './components/GroupStudentsPage';
-import StudentDetailsPage from './components/StudentDetailsPage';
-import TeacherDetailsPage from './components/TeacherDetailsPage';
-import FinancePage from './components/FinancePage';
-import ChatPage from './components/ChatPage';
-import GeneralViewPage from './components/GeneralViewPage';
-import FeeCollectionPage from './components/FeeCollectionPage';
-import DirectorNotificationsPage from './components/DirectorNotificationsPage';
-import UnpaidStudentsPage from './components/UnpaidStudentsPage';
-import AllStudentsPage from './components/AllStudentsPage';
-import PendingStudents from './components/PendingStudents';
-import GroupsPage from './components/GroupsPage';
-import AttendanceReportPage from './components/AttendanceReportPage';
-import TestsReportPage from './components/TestsReportPage';
-import FinancialReportPage from './components/FinancialReportPage';
-import DebtorsPage from './components/DebtorsPage';
+
+// --- Lazy Load Pages and Modals for Performance ---
+const StudentCard = lazy(() => import('./components/StudentCard'));
+const StudentForm = lazy(() => import('./components/StudentForm'));
+const GroupManagerModal = lazy(() => import('./components/GroupManagerModal'));
+const FeePaymentModal = lazy(() => import('./components/FeePaymentModal'));
+const TeacherManagerModal = lazy(() => import('./components/TeacherManagerModal'));
+const TeacherManagerPage = lazy(() => import('./components/TeacherManagerPage'));
+const GroupReportPage = lazy(() => import('./components/GroupReportPage'));
+const TeacherReportPage = lazy(() => import('./components/TeacherReportPage'));
+const DirectorReportsPage = lazy(() => import('./components/DirectorReportsPage'));
+const DirectorNotesPage = lazy(() => import('./components/DirectorNotesPage'));
+const GroupStudentsPage = lazy(() => import('./components/GroupStudentsPage'));
+const StudentDetailsPage = lazy(() => import('./components/StudentDetailsPage'));
+const TeacherDetailsPage = lazy(() => import('./components/TeacherDetailsPage'));
+const FinancePage = lazy(() => import('./components/FinancePage'));
+const ChatPage = lazy(() => import('./components/ChatPage'));
+const GeneralViewPage = lazy(() => import('./components/GeneralViewPage'));
+const FeeCollectionPage = lazy(() => import('./components/FeeCollectionPage'));
+const DirectorNotificationsPage = lazy(() => import('./components/DirectorNotificationsPage'));
+const UnpaidStudentsPage = lazy(() => import('./components/UnpaidStudentsPage'));
+const AllStudentsPage = lazy(() => import('./components/AllStudentsPage'));
+const PendingStudents = lazy(() => import('./components/PendingStudents'));
+const GroupsPage = lazy(() => import('./components/GroupsPage'));
+const AttendanceReportPage = lazy(() => import('./components/AttendanceReportPage'));
+const TestsReportPage = lazy(() => import('./components/TestsReportPage'));
+const FinancialReportPage = lazy(() => import('./components/FinancialReportPage'));
+const DebtorsPage = lazy(() => import('./components/DebtorsPage'));
+const UnarchiveModal = lazy(() => import('./components/UnarchiveModal'));
+const ParentLoginScreen = lazy(() => import('./components/ParentLoginScreen'));
+const ParentDashboard = lazy(() => import('./components/ParentDashboard'));
+const ParentStudentDetails = lazy(() => import('./components/ParentStudentDetails'));
+
 import NotificationBell from './components/NotificationBell';
 import DirectorNotificationBell from './components/DirectorNotificationBell';
 import Sidebar from './components/Sidebar';
@@ -44,10 +51,6 @@ import SearchIcon from './components/icons/SearchIcon';
 import ArrowRightIcon from './components/icons/ArrowRightIcon';
 import ArchiveIcon from './components/icons/ArchiveIcon';
 import UserPlusIcon from './components/icons/UserPlusIcon';
-import UnarchiveModal from './components/UnarchiveModal';
-import ParentLoginScreen from './components/ParentLoginScreen';
-import ParentDashboard from './components/ParentDashboard';
-import ParentStudentDetails from './components/ParentStudentDetails';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { createParentAccountIfNeeded } from './services/parentHelpers';
 import { db } from './services/firebase';
@@ -1948,17 +1951,9 @@ const App: React.FC = () => {
         let studentsToDisplay = students.filter(s => s.isArchived);
         if (searchTerm) {
             const searchLower = searchTerm.toLowerCase();
-            studentsToDisplay = studentsToDisplay.filter(s => s.name.toLowerCase().includes(searchLower))
-                .sort((a, b) => {
-                    const aName = a.name.toLowerCase();
-                    const bName = b.name.toLowerCase();
-                    const aStartsWith = aName.startsWith(searchLower);
-                    const bStartsWith = bName.startsWith(searchLower);
-                    if (aStartsWith && !bStartsWith) return -1;
-                    if (!aStartsWith && bStartsWith) return 1;
-                    return a.name.localeCompare(b.name, 'ar');
-                });
+            studentsToDisplay = studentsToDisplay.filter(s => s.name.toLowerCase().includes(searchLower));
         }
+
         studentsToDisplay = studentsToDisplay.filter(s => {
             if (currentUser?.role === 'director') return true;
             if (currentUser?.role === 'supervisor') {
@@ -1968,7 +1963,18 @@ const App: React.FC = () => {
                 return s.archivedBy === currentUser.id;
             }
             return false;
-        }).sort((a, b) => a.name.localeCompare(b.name, 'ar'));
+        }).sort((a, b) => {
+            if (searchTerm) {
+                const searchLower = searchTerm.toLowerCase();
+                const aName = a.name.toLowerCase();
+                const bName = b.name.toLowerCase();
+                const aStartsWith = aName.startsWith(searchLower);
+                const bStartsWith = bName.startsWith(searchLower);
+                if (aStartsWith && !bStartsWith) return -1;
+                if (!aStartsWith && bStartsWith) return 1;
+            }
+            return a.name.localeCompare(b.name, 'ar');
+        });
 
         return (
             <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -2866,39 +2872,48 @@ const App: React.FC = () => {
                     {renderHeader()}
                     <main className="flex-1 overflow-y-auto pb-20">
                         <ErrorBoundary>
-                            {currentUser.role === 'director'
-                                ? renderDirectorContent()
-                                : (currentUser.role === 'supervisor'
-                                    ? renderSupervisorContent()
-                                    : (currentUser.role === 'parent'
-                                        ? renderParentContent()
-                                        : (teachers.length > 0 ? renderTeacherContent() : <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>))
-                                )
-                            }
+                            <Suspense fallback={
+                                <div className="flex flex-col items-center justify-center h-full space-y-4">
+                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
+                                    <p className="text-gray-500 font-medium">جاري التحميل...</p>
+                                </div>
+                            }>
+                                {currentUser.role === 'director'
+                                    ? renderDirectorContent()
+                                    : (currentUser.role === 'supervisor'
+                                        ? renderSupervisorContent()
+                                        : (currentUser.role === 'parent'
+                                            ? renderParentContent()
+                                            : (teachers.length > 0 ? renderTeacherContent() : <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>))
+                                    )
+                                }
+                            </Suspense>
                         </ErrorBoundary>
                     </main>
                     {currentUser.role !== 'parent' && <BottomNavBar activeView={activeView} onSelectView={handleBottomNavSelect} />}
                 </div>
             </div>
 
-            <StudentForm isOpen={isFormOpen} onClose={() => { setIsFormOpen(false); setStudentToEdit(null); }} onSave={addOrUpdateStudent} studentToEdit={studentToEdit} groups={visibleGroups} />
+            <Suspense fallback={null}>
+                <StudentForm isOpen={isFormOpen} onClose={() => { setIsFormOpen(false); setStudentToEdit(null); }} onSave={addOrUpdateStudent} studentToEdit={studentToEdit} groups={visibleGroups} />
 
-            {(currentUser.role === 'director' || currentUser.role === 'supervisor') && (
-                <>
-                    <GroupManagerModal isOpen={isGroupManagerOpen} onClose={() => setIsGroupManagerOpen(false)} groups={visibleGroups} students={students} onAddGroup={handleAddGroup} onUpdateGroup={handleUpdateGroup} onDeleteGroup={handleDeleteGroup} teachers={teachers} />
-                    <TeacherManagerModal
-                        isOpen={isTeacherFormOpen}
-                        onClose={() => { setIsTeacherFormOpen(false); setTeacherToEdit(null); setSupervisorToEdit(null); }}
-                        onSaveTeacher={handleSaveTeacher}
-                        onSaveSupervisor={handleSaveSupervisor}
-                        teacherToEdit={teacherToEdit}
-                        supervisorToEdit={supervisorToEdit}
-                    />
-                </>
-            )}
+                {(currentUser.role === 'director' || currentUser.role === 'supervisor') && (
+                    <>
+                        <GroupManagerModal isOpen={isGroupManagerOpen} onClose={() => setIsGroupManagerOpen(false)} groups={visibleGroups} students={students} onAddGroup={handleAddGroup} onUpdateGroup={handleUpdateGroup} onDeleteGroup={handleDeleteGroup} teachers={teachers} />
+                        <TeacherManagerModal
+                            isOpen={isTeacherFormOpen}
+                            onClose={() => { setIsTeacherFormOpen(false); setTeacherToEdit(null); setSupervisorToEdit(null); }}
+                            onSaveTeacher={handleSaveTeacher}
+                            onSaveSupervisor={handleSaveSupervisor}
+                            teacherToEdit={teacherToEdit}
+                            supervisorToEdit={supervisorToEdit}
+                        />
+                    </>
+                )}
 
-            <FeePaymentModal isOpen={isFeeModalOpen} onClose={() => { setIsFeeModalOpen(false); setPaymentDetails(null); }} onSave={handleSaveFeePayment} paymentDetails={paymentDetails} />
-            <UnarchiveModal isOpen={!!studentToUnarchiveId} onClose={() => setStudentToUnarchiveId(null)} onConfirm={handleConfirmUnarchive} groups={groupsForUnarchiveModal} studentName={students.find(s => s.id === studentToUnarchiveId)?.name || ''} />
+                <FeePaymentModal isOpen={isFeeModalOpen} onClose={() => { setIsFeeModalOpen(false); setPaymentDetails(null); }} onSave={handleSaveFeePayment} paymentDetails={paymentDetails} />
+                <UnarchiveModal isOpen={!!studentToUnarchiveId} onClose={() => setStudentToUnarchiveId(null)} onConfirm={handleConfirmUnarchive} groups={groupsForUnarchiveModal} studentName={students.find(s => s.id === studentToUnarchiveId)?.name || ''} />
+            </Suspense>
             {studentToArchive && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
                     <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-8 w-full max-w-md">

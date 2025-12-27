@@ -20,4 +20,4 @@ const Header: React.FC<HeaderProps> = ({ leftContent, centerContent, rightConten
   );
 };
 
-export default Header;
+export default React.memo(Header);

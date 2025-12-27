@@ -18,7 +18,7 @@ interface FeeCollectionPageProps {
     onDeleteTeacherCollection: (collectionId: string) => void;
 }
 
-const FeeCollectionPage: React.FC<FeeCollectionPageProps> = ({ onBack, teachers, groups, students, teacherCollections, onAddTeacherCollection, onDeleteTeacherCollection }) => {
+const FeeCollectionPage = React.memo(({ onBack, teachers, groups, students, teacherCollections, onAddTeacherCollection, onDeleteTeacherCollection }: FeeCollectionPageProps) => {
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
     const [expandedTeacherId, setExpandedTeacherId] = useState<string | null>(null);
     const [activeTab, setActiveTab] = useState<'all' | 'قرآن' | 'نور بيان' | 'تلقين'>('all');
@@ -97,7 +97,7 @@ const FeeCollectionPage: React.FC<FeeCollectionPageProps> = ({ onBack, teachers,
             </div>
         </main>
     );
-};
+});
 
 interface TeacherFeeCardProps {
     teacher: Teacher;
@@ -111,7 +111,7 @@ interface TeacherFeeCardProps {
     onDeleteTeacherCollection: (collectionId: string) => void;
 }
 
-const TeacherFeeCard: React.FC<TeacherFeeCardProps> = ({ teacher, groups, students, teacherCollections, selectedMonth, isExpanded, onToggleExpand, onAddTeacherCollection, onDeleteTeacherCollection }) => {
+const TeacherFeeCard = React.memo(({ teacher, groups, students, teacherCollections, selectedMonth, isExpanded, onToggleExpand, onAddTeacherCollection, onDeleteTeacherCollection }: TeacherFeeCardProps) => {
     const [amount, setAmount] = useState('');
     const [notes, setNotes] = useState('');
 
@@ -267,6 +267,6 @@ const TeacherFeeCard: React.FC<TeacherFeeCardProps> = ({ teacher, groups, studen
             )}
         </div>
     );
-}
+});
 
 export default FeeCollectionPage;

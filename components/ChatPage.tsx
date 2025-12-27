@@ -22,6 +22,63 @@ const SECTIONS = [
     { id: 'group-all', name: '📢 جميع المدرسين', keyword: 'all' },
 ];
 
+const MessageItem = React.memo(({ msg, isMe, searchQuery, searchResultId, isSearchOpen, onPin, currentUserRole, selectedUserId, messageRef }: {
+    msg: ChatMessage,
+    isMe: boolean,
+    searchQuery: string,
+    searchResultId: string | undefined,
+    isSearchOpen: boolean,
+    onPin: (id: string, status: boolean) => void,
+    currentUserRole: string,
+    selectedUserId: string,
+    messageRef: (el: HTMLDivElement | null) => void
+}) => {
+    let contentNode: React.ReactNode = msg.content;
+    if (searchQuery.trim()) {
+        const parts = msg.content.split(new RegExp(`(${searchQuery})`, 'gi'));
+        contentNode = parts.map((part, index) =>
+            part.toLowerCase() === searchQuery.toLowerCase()
+                ? <span key={index} className="bg-yellow-200 text-black font-bold rounded px-0.5">{part}</span>
+                : part
+        );
+    }
+
+    return (
+        <div
+            ref={messageRef}
+            className={`flex ${isMe ? 'justify-end' : 'justify-start'} group relative transition-colors duration-500`}
+        >
+            <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 px-4 shadow-sm break-words relative ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'} ${searchResultId === msg.id && isSearchOpen ? 'ring-4 ring-yellow-300 ring-opacity-50' : ''}`}>
+                {currentUserRole === 'director' && (
+                    <button
+                        onClick={() => onPin(msg.id, !!msg.isPinned)}
+                        className={`absolute -top-2 ${isMe ? '-left-2' : '-right-2'} opacity-0 group-hover:opacity-100 transition-opacity bg-white text-gray-500 rounded-full p-1 shadow-md border hover:text-yellow-500 z-10`}
+                        title={msg.isPinned ? "إلغاء التثبيت" : "تثبيت الرسالة"}
+                    >
+                        <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${msg.isPinned ? 'text-yellow-500 fill-current' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+                        </svg>
+                    </button>
+                )}
+
+                {selectedUserId.startsWith('group-') && !isMe && (
+                    <p className="text-[10px] text-gray-500 mb-1 font-bold">{msg.senderName}</p>
+                )}
+
+                <p className="text-sm md:text-base leading-relaxed whitespace-pre-wrap">{contentNode}</p>
+
+                <div className="flex justify-between items-center mt-1 gap-2">
+                    {msg.isPinned && <span className="text-[10px] text-yellow-300 bg-black/20 px-1 rounded">📌 مثبتة</span>}
+                    <span className={`text-[10px] block text-right ml-auto ${isMe ? 'text-blue-200' : 'text-gray-400'}`}>
+                        {msg.timestamp?.seconds ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '...'}
+                        {isMe && (msg.read ? <span className="mr-1">✓✓</span> : <span className="mr-1">✓</span>)}
+                    </span>
+                </div>
+            </div>
+        </div>
+    );
+});
+
 const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, students, parents, supervisors, onBack, initialSelectedUserId }) => {
     // ... (state remains same)
     const [selectedUser, setSelectedUser] = useState<ChatUser | null>(null);
@@ -52,10 +109,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
     }, [messages, isSearchOpen]);
 
     // 1. Setup Data: Map Teachers + Director + Supervisors + PARENTS to ChatUser list 
-    useEffect(() => {
+    // 1. Memoized Base Users construction
+    const baseUsers = useMemo(() => {
         let users: ChatUser[] = [];
-
-        // Common Helper to format parent description
         const getParentDesc = (p: Parent) => {
             if (!students) return 'ولي أمر';
             const childNames = students
@@ -66,188 +122,80 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
         };
 
         if (currentUser.role === 'director') {
-            // Director sees all groups first
             const groupUsers: ChatUser[] = SECTIONS.map(section => ({
-                id: section.id,
-                name: section.name,
-                role: 'teacher',
-                isOnline: true,
-                unreadCount: 0
+                id: section.id, name: section.name, role: 'teacher', isOnline: true, unreadCount: 0
             }));
-
             const teacherUsers = teachers.map(t => ({
-                id: t.id,
-                name: t.name,
-                role: 'teacher' as const,
-                isOnline: false,
-                unreadCount: 0
+                id: t.id, name: t.name, role: 'teacher' as const, isOnline: false, unreadCount: 0
             }));
-
-            // Director sees ALL Parents
             let parentUsers: ChatUser[] = [];
             if (parents) {
                 parentUsers = parents.map(p => ({
-                    id: p.id, // Use the ID from parent object
-                    name: p.name,
-                    role: 'parent' as const,
-                    isOnline: false, // Default
-                    unreadCount: 0,
-                    description: getParentDesc(p)
+                    id: p.id, name: p.name, role: 'parent' as const, isOnline: false, unreadCount: 0, description: getParentDesc(p)
                 }));
             }
-
             users = [...groupUsers, ...teacherUsers, ...parentUsers];
-        }
-        else if (currentUser.role === 'teacher') {
-            // Teacher sees Director
-            users.push({
-                id: 'director',
-                name: 'الإدارة',
-                role: 'director',
-                isOnline: true,
-                unreadCount: 0
-            });
-
-            // Teacher sees "All Teachers" Group
-            users.push({
-                id: 'group-all',
-                name: '📢 جميع المدرسين',
-                role: 'teacher',
-                isOnline: true,
-                unreadCount: 0
-            });
-
-            // Determine Teacher's Section and show that group
+        } else if (currentUser.role === 'teacher') {
+            users.push({ id: 'director', name: 'الإدارة', role: 'director', isOnline: true, unreadCount: 0 });
+            users.push({ id: 'group-all', name: '📢 جميع المدرسين', role: 'teacher', isOnline: true, unreadCount: 0 });
             const myGroups = groups.filter(g => g.teacherId === currentUser.uid);
             SECTIONS.forEach(section => {
                 if (section.keyword === 'all') return;
                 if (myGroups.some(g => g.name.includes(section.keyword))) {
-                    users.push({
-                        id: section.id,
-                        name: section.name,
-                        role: 'teacher',
-                        isOnline: true,
-                        unreadCount: 0
-                    });
+                    users.push({ id: section.id, name: section.name, role: 'teacher', isOnline: true, unreadCount: 0 });
                 }
             });
-
-            // Teacher sees PARENTS of their students
             if (parents && students) {
-                // 1. Get all student IDs in teacher's groups
-                const myStudentIds = students
-                    .filter(s => myGroups.some(g => g.id === s.groupId))
-                    .map(s => s.id);
-
-                // 2. Find parents who have these students
-                const myParents = parents.filter(p => p.studentIds.some(sid => myStudentIds.includes(sid)));
-
-                myParents.forEach(p => {
-                    users.push({
-                        id: p.id,
-                        name: p.name,
-                        role: 'parent',
-                        isOnline: false,
-                        unreadCount: 0,
-                        description: getParentDesc(p)
-                    });
+                const myStudentIds = students.filter(s => myGroups.some(g => g.id === s.groupId)).map(s => s.id);
+                parents.filter(p => p.studentIds.some(sid => myStudentIds.includes(sid))).forEach(p => {
+                    users.push({ id: p.id, name: p.name, role: 'parent', isOnline: false, unreadCount: 0, description: getParentDesc(p) });
                 });
             }
-        }
-        else if (currentUser.role === 'parent') {
-            // 1. Parent sees Director
-            users.push({
-                id: 'director',
-                name: 'الإدارة',
-                role: 'director',
-                isOnline: true,
-                unreadCount: 0,
-                description: 'إدارة المركز'
-            });
-
-            // 2. Parent sees ACTIVE Supervisors
+        } else if (currentUser.role === 'parent') {
+            users.push({ id: 'director', name: 'الإدارة', role: 'director', isOnline: true, unreadCount: 0, description: 'إدارة المركز' });
             if (supervisors) {
                 supervisors.forEach(s => {
-                    if (s.status !== 'active') return; // Only active supervisors
-
-                    const supervisedChildNames = students
-                        ?.filter(student => {
-                            const studentGroup = groups.find(g => g.id === student.groupId);
-                            if (!studentGroup) return false;
-                            return s.section?.some(sec => {
-                                if (sec === 'all') return true;
-                                return studentGroup.name.includes(sec);
-                            });
-                        })
-                        .map(student => student.name.split(' ')[0])
-                        .filter((val, index, self) => self.indexOf(val) === index) // Unique names
-                        .join(' و ');
-
-                    users.push({
-                        id: s.id,
-                        name: s.name,
-                        role: 'supervisor',
-                        isOnline: false,
-                        unreadCount: 0,
-                        description: supervisedChildNames ? `مشرف ${supervisedChildNames}` : 'مشرف'
-                    });
+                    if (s.status !== 'active') return;
+                    const supervisedChildNames = students?.filter(student => {
+                        const studentGroup = groups.find(g => g.id === student.groupId);
+                        return studentGroup && s.section?.some(sec => sec === 'all' || studentGroup.name.includes(sec));
+                    }).map(student => student.name.split(' ')[0]).filter((val, index, self) => self.indexOf(val) === index).join(' و ');
+                    users.push({ id: s.id, name: s.name, role: 'supervisor', isOnline: false, unreadCount: 0, description: supervisedChildNames ? `مشرف ${supervisedChildNames}` : 'مشرف' });
                 });
             }
-
-            // 3. Parent sees Teachers of their Children
             if (students && students.length > 0) {
                 const myChildrenGroups = groups.filter(g => students.some(s => s.groupId === g.id));
                 const myTeachers = teachers.filter(t => myChildrenGroups.some(g => g.teacherId === t.id));
-
                 myTeachers.forEach(teacher => {
                     const taughtGroups = myChildrenGroups.filter(g => g.teacherId === teacher.id);
-                    const childNames = students
-                        .filter(s => taughtGroups.some(g => g.id === s.groupId))
-                        .map(s => s.name.split(' ')[0]) // Just first name
-                        .join(' و ');
-
-                    users.push({
-                        id: teacher.id,
-                        name: teacher.name,
-                        role: 'teacher',
-                        isOnline: false,
-                        unreadCount: 0,
-                        description: childNames ? `مدرس ابنك ${childNames}` : 'مدرس ابنك'
-                    });
+                    const childNames = students.filter(s => taughtGroups.some(g => g.id === s.groupId)).map(s => s.name.split(' ')[0]).join(' و ');
+                    users.push({ id: teacher.id, name: teacher.name, role: 'teacher', isOnline: false, unreadCount: 0, description: childNames ? `مدرس ابنك ${childNames}` : 'مدرس ابنك' });
                 });
             }
         }
+        return users;
+    }, [currentUser.role, teachers, currentUser.uid, groups, students, parents, supervisors]);
 
+    // 2. Presence Update
+    useEffect(() => {
         const unsubscribe = onSnapshot(collection(db, 'presence'), (snapshot) => {
-            // ... (Presence logic remains)
             const presenceMap = new Map();
-            snapshot.forEach(doc => {
-                presenceMap.set(doc.id, doc.data());
-            });
+            snapshot.forEach(doc => presenceMap.set(doc.id, doc.data()));
 
             setChatUsers(prevUsers => {
-                // Merge initial users (which now includes parents for Director/Teachers) with dynamic updates
-                // BUT wait, prevUsers might have "discovered" users from messages too (from other useEffect).
-                // We should be careful not to overwrite them, OR we say that "pre-populated" list is the source.
-                // The issue: if I use "users" (the static list from above), I might lose "discovered" users if the component re-rendered.
-                // However, "users" array above is rebuilt on every dependency change.
-
-                // Let's use the 'users' list as the base. 
-                // Any 'discovered' logic in the other useEffect pushes to state.
-                // This logic here runs when dependencies change.
-
-                // IMPORTANT: We need to deduplicate.
                 const uniqueUsers = new Map<string, ChatUser>();
-                users.forEach(u => uniqueUsers.set(u.id, u));
+                // Mix in base users and discovered users from state
+                baseUsers.forEach(u => uniqueUsers.set(u.id, u));
+                prevUsers.forEach(u => {
+                    if (!uniqueUsers.has(u.id)) {
+                        uniqueUsers.set(u.id, u);
+                    }
+                });
 
                 const updated = Array.from(uniqueUsers.values()).map(user => {
-                    // ... (Presence mapping)
-                    if (user.id.startsWith('group-')) return user;
-                    if (user.id === 'director') return user;
+                    if (user.id.startsWith('group-') || user.id === 'director') return user;
                     const presence = presenceMap.get(user.id);
                     const isOnline = presence ? (Date.now() - presence.lastSeen?.toMillis()) < 5 * 60 * 1000 : false;
-
-                    // Merge Stats
                     const stats = userStats[user.id];
                     return {
                         ...user,
@@ -260,13 +208,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                 });
 
                 return updated.sort((a, b) => {
-                    // 1. Sort by last message timestamp (Newest first)
                     const timeA = a.lastMessageTimestamp?.toMillis ? a.lastMessageTimestamp.toMillis() : 0;
                     const timeB = b.lastMessageTimestamp?.toMillis ? b.lastMessageTimestamp.toMillis() : 0;
-
                     if (timeA !== timeB) return timeB - timeA;
-
-                    // 2. Sort Order: Director -> Supervisors -> Teachers -> Groups -> Parents
                     const getRank = (u: ChatUser) => {
                         if (u.id === 'director') return 0;
                         if (u.role === 'supervisor') return 1;
@@ -275,10 +219,8 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                         if (u.role === 'parent') return 4;
                         return 5;
                     };
-
                     const rankA = getRank(a);
                     const rankB = getRank(b);
-
                     if (rankA !== rankB) return rankA - rankB;
                     return a.name.localeCompare(b.name, 'ar');
                 });
@@ -286,7 +228,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
         });
 
         return () => unsubscribe();
-    }, [currentUser.role, teachers, currentUser.uid, groups, students, parents, userStats]);
+    }, [baseUsers, userStats]); // Simplified dependencies
 
     // Auto-select initial user if provided
     useEffect(() => {
@@ -911,57 +853,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                         )}
 
                         <div className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 bg-opacity-50" style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px' }}>
-                            {messages.map(msg => {
-                                const isMe = msg.senderId === (currentUser.role === 'director' ? 'director' : currentUser.uid);
-                                // Highlight logic
-                                let contentNode: React.ReactNode = msg.content;
-                                if (searchQuery.trim()) {
-                                    const parts = msg.content.split(new RegExp(`(${searchQuery})`, 'gi'));
-                                    contentNode = parts.map((part, index) =>
-                                        part.toLowerCase() === searchQuery.toLowerCase()
-                                            ? <span key={index} className="bg-yellow-200 text-black font-bold rounded px-0.5">{part}</span>
-                                            : part
-                                    );
-                                }
-
-                                return (
-                                    <div
-                                        key={msg.id}
-                                        ref={el => messageRefs.current[msg.id] = el}
-                                        className={`flex ${isMe ? 'justify-end' : 'justify-start'} group relative transition-colors duration-500`}
-                                    >
-                                        <div className={`max-w-[85%] md:max-w-[70%] rounded-2xl p-3 px-4 shadow-sm break-words relative ${isMe ? 'bg-blue-600 text-white rounded-br-none' : 'bg-white text-gray-800 border border-gray-100 rounded-bl-none'} ${searchResults[currentSearchIndex] === msg.id && isSearchOpen ? 'ring-4 ring-yellow-300 ring-opacity-50' : ''}`}>
-                                            {/* Pin Action for Director */}
-                                            {currentUser.role === 'director' && (
-                                                <button
-                                                    onClick={() => handlePinMessage(msg.id, msg.isPinned)}
-                                                    className={`absolute -top-2 ${isMe ? '-left-2' : '-right-2'} opacity-0 group-hover:opacity-100 transition-opacity bg-white text-gray-500 rounded-full p-1 shadow-md border hover:text-yellow-500 z-10`}
-                                                    title={msg.isPinned ? "إلغاء التثبيت" : "تثبيت الرسالة"}
-                                                >
-                                                    <svg xmlns="http://www.w3.org/2000/svg" className={`h-4 w-4 ${msg.isPinned ? 'text-yellow-500 fill-current' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
-                                                    </svg>
-                                                </button>
-                                            )}
-
-                                            {/* Sender Name for Groups */}
-                                            {selectedUser.id.startsWith('group-') && !isMe && (
-                                                <p className="text-[10px] text-gray-500 mb-1 font-bold">{msg.senderName}</p>
-                                            )}
-
-                                            <p className="text-sm md:text-base leading-relaxed whitespace-pre-wrap">{contentNode}</p>
-
-                                            <div className="flex justify-between items-center mt-1 gap-2">
-                                                {msg.isPinned && <span className="text-[10px] text-yellow-300 bg-black/20 px-1 rounded">📌 مثبتة</span>}
-                                                <span className={`text-[10px] block text-right ml-auto ${isMe ? 'text-blue-200' : 'text-gray-400'}`}>
-                                                    {msg.timestamp?.seconds ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '...'}
-                                                    {isMe && (msg.read ? <span className="mr-1">✓✓</span> : <span className="mr-1">✓</span>)}
-                                                </span>
-                                            </div>
-                                        </div>
-                                    </div>
-                                );
-                            })}
+                            {messages.map(msg => (
+                                <MessageItem
+                                    key={msg.id}
+                                    msg={msg}
+                                    isMe={msg.senderId === (currentUser.role === 'director' ? 'director' : currentUser.uid)}
+                                    searchQuery={searchQuery}
+                                    searchResultId={searchResults[currentSearchIndex]}
+                                    isSearchOpen={isSearchOpen}
+                                    onPin={handlePinMessage}
+                                    currentUserRole={currentUser.role}
+                                    selectedUserId={selectedUser.id}
+                                    messageRef={el => messageRefs.current[msg.id] = el}
+                                />
+                            ))}
                             <div ref={messagesEndRef} />
                         </div>
 
@@ -1002,4 +907,4 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
     );
 };
 
-export default ChatPage;
+export default React.memo(ChatPage);

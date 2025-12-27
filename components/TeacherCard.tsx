@@ -12,13 +12,13 @@ interface TeacherCardProps {
   onClick: () => void;
 }
 
-const TeacherCard: React.FC<TeacherCardProps> = ({
+const TeacherCard = React.memo(({
   teacher,
   teacherAttendance,
   onSetTeacherAttendance,
   onDeductionClick,
   onClick,
-}) => {
+}: TeacherCardProps) => {
   const today = new Date().toISOString().split('T')[0];
   const todayAttendance = useMemo(() => {
     return teacherAttendance.find(a => a.teacherId === teacher.id && a.date === today);
@@ -83,6 +83,6 @@ const TeacherCard: React.FC<TeacherCardProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export default TeacherCard;

@@ -45,7 +45,7 @@ interface TeacherManagerPageProps {
     onToggleFilter: () => void;
 }
 
-const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
+const TeacherManagerPage = React.memo((props: TeacherManagerPageProps) => {
     const { teachers, supervisors, groups, onViewTeacherDetails, onViewSupervisorDetails, isFilterVisible, searchTerm, financialSettings, onUpdateFinancialSettings, onAddHoliday } = props;
 
     const [activeTab, setActiveTab] = useState<GroupType | 'الإشراف' | 'all'>('all');
@@ -223,7 +223,7 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                             <option value="إقراء">إقراء</option>
                             <option value="الإشراف">الإشراف</option>
                         </select>
-                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500">
+                        <div className="pointer-events-none inset-y-0 left-0 flex items-center px-2 text-gray-500 absolute">
                             <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                                 <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
                             </svg>
@@ -240,7 +240,7 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
                             <option value="active">نشط</option>
                             <option value="inactive">غير نشط</option>
                         </select>
-                        <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-500">
+                        <div className="pointer-events-none inset-y-0 left-0 flex items-center px-2 text-gray-500 absolute">
                             <svg className="fill-current h-3 w-3" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 20 20">
                                 <path d="M9.293 12.95l.707.707L15.657 8l-1.414-1.414L10 10.828 5.757 6.586 4.343 8z" />
                             </svg>
@@ -497,6 +497,6 @@ const TeacherManagerPage: React.FC<TeacherManagerPageProps> = (props) => {
             )}
         </main >
     );
-};
+});
 
 export default TeacherManagerPage;

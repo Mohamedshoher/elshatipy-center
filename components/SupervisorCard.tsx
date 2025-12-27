@@ -12,13 +12,13 @@ interface SupervisorCardProps {
   onClick: () => void;
 }
 
-const SupervisorCard: React.FC<SupervisorCardProps> = ({
+const SupervisorCard = React.memo(({
   supervisor,
   teacherAttendance,
   onSetTeacherAttendance,
   onDeductionClick,
   onClick,
-}) => {
+}: SupervisorCardProps) => {
   const today = new Date().toISOString().split('T')[0];
   const todayAttendance = useMemo(() => {
     return teacherAttendance.find(a => a.teacherId === supervisor.id && a.date === today);
@@ -54,8 +54,8 @@ const SupervisorCard: React.FC<SupervisorCardProps> = ({
             <button
               onClick={() => onSetTeacherAttendance(supervisor.id, today, TeacherAttendanceStatus.PRESENT)}
               className={`py-2 px-6 rounded-lg font-semibold text-sm transition-all flex-1 ${!todayAttendance || todayAttendance.status === TeacherAttendanceStatus.PRESENT
-                  ? 'bg-green-600 text-white shadow'
-                  : 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
+                ? 'bg-green-600 text-white shadow'
+                : 'bg-green-50 text-green-700 border border-green-200 hover:bg-green-100'
                 }`}
             >
               ✓ حاضر
@@ -63,8 +63,8 @@ const SupervisorCard: React.FC<SupervisorCardProps> = ({
             <button
               onClick={() => onSetTeacherAttendance(supervisor.id, today, TeacherAttendanceStatus.ABSENT)}
               className={`py-2 px-6 rounded-lg font-semibold text-sm transition-all flex-1 ${todayAttendance?.status === TeacherAttendanceStatus.ABSENT
-                  ? 'bg-red-600 text-white shadow'
-                  : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
+                ? 'bg-red-600 text-white shadow'
+                : 'bg-red-50 text-red-700 border border-red-200 hover:bg-red-100'
                 }`}
             >
               ✗ غائب
@@ -74,6 +74,6 @@ const SupervisorCard: React.FC<SupervisorCardProps> = ({
       </div>
     </div>
   );
-};
+});
 
 export default SupervisorCard;
