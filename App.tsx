@@ -35,6 +35,7 @@ const UnarchiveModal = lazy(() => import('./components/UnarchiveModal'));
 const ParentLoginScreen = lazy(() => import('./components/ParentLoginScreen'));
 const ParentDashboard = lazy(() => import('./components/ParentDashboard'));
 const ParentView = lazy(() => import('./components/ParentView'));
+const ArchivePage = lazy(() => import('./components/ArchivePage'));
 
 import NotificationBell from './components/NotificationBell';
 import DirectorNotificationBell from './components/DirectorNotificationBell';
@@ -62,8 +63,11 @@ import UsersIcon from './components/icons/UsersIcon';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useAutomationChecks } from './hooks/useAutomationChecks';
 import CloudOffIcon from './components/icons/CloudOffIcon';
+import { useNavigate, useLocation, Routes, Route, Navigate } from 'react-router-dom';
 import { requestNotificationPermission, playNotificationSound, showLocalNotification, setAppBadge, registerFCMToken, setupOnMessageListener } from './services/notificationService';
+import { HeaderSkeleton, SidebarSkeleton, ListSkeleton } from './components/Skeleton';
 import FilterIcon from './components/icons/FilterIcon';
+import { getGroupTypeFromName, filterSupervisorData, filterTeacherStudents, getVisibleGroups, getFilteredStudents } from './services/dataService';
 
 type ActiveView = 'students' | 'groups' | 'attendance_report' | 'tests_report' | 'financial_report';
 
@@ -78,14 +82,18 @@ const defaultSchedule = (): WeeklySchedule[] => [
 ];
 
 const App: React.FC = () => {
+    const navigate = useNavigate();
+    const location = useLocation();
     // --- Data from Firestore ---
     // --- Data from Firestore with Local Caching for Instant Load ---
-    const [students, setStudents] = useState<Student[]>(() => {
+    const [activeStudentsRaw, setActiveStudentsRaw] = useState<Student[]>(() => {
         try {
-            const cached = localStorage.getItem('shatibi_cache_students');
+            const cached = localStorage.getItem('shatibi_cache_students_active');
             return cached ? JSON.parse(cached) : [];
         } catch { return []; }
     });
+    const [archivedStudentsRaw, setArchivedStudentsRaw] = useState<Student[]>([]);
+    const students = useMemo(() => [...activeStudentsRaw, ...archivedStudentsRaw], [activeStudentsRaw, archivedStudentsRaw]);
     const [groups, setGroups] = useState<Group[]>(() => {
         try {
             const cached = localStorage.getItem('shatibi_cache_groups');
@@ -245,15 +253,6 @@ const App: React.FC = () => {
     // Filter State for Student View (Lifted up)
     const [studentTypeFilter, setStudentTypeFilter] = useState<GroupType>('all');
 
-    const getGroupTypeFromName = (name: string | undefined): GroupType | null => {
-        if (!name) return null;
-        const lowerName = name.toLowerCase();
-        if (lowerName.includes('قرآن')) return 'قرآن';
-        if (lowerName.includes('نور بيان')) return 'نور بيان';
-        if (lowerName.includes('تلقين') || lowerName.includes('تقلين')) return 'تلقين';
-        if (lowerName.includes('إقراء') || lowerName.includes('اقراء')) return 'إقراء';
-        return null;
-    };
 
     // --- 1. Public Data Listeners (Always active for Login) ---
     useEffect(() => {
@@ -281,8 +280,8 @@ const App: React.FC = () => {
     // --- 2. Protected Data Listeners (Only after Login) ---
     useEffect(() => {
         if (!currentUser) {
-            // Clear sensitive data on logout
-            setStudents([]);
+            setActiveStudentsRaw([]);
+            setArchivedStudentsRaw([]);
             setGroups([]);
             setNotes([]);
             setStaff([]);
@@ -292,61 +291,106 @@ const App: React.FC = () => {
             setTeacherCollections([]);
             setTeacherManualBonuses([]);
             setDonations([]);
-
-            // Clear cache on logout to avoid data persistence for next user
-            ['shatibi_cache_students', 'shatibi_cache_groups', 'shatibi_cache_teachers', 'shatibi_cache_supervisors', 'shatibi_cache_parents'].forEach(k => localStorage.removeItem(k));
+            ['shatibi_cache_students_active', 'shatibi_cache_groups', 'shatibi_cache_teachers', 'shatibi_cache_supervisors', 'shatibi_cache_parents'].forEach(k => localStorage.removeItem(k));
             return;
         }
 
-        console.log("Starting protected data listeners for:", currentUser.role === 'director' ? 'director' : (currentUser as any).name);
+        const unsubscribers: (() => void)[] = [];
 
-        const protectedCollections: { name: string, setter: React.Dispatch<any>, cacheKey?: string }[] = [
-            { name: 'students', setter: setStudents, cacheKey: 'shatibi_cache_students' },
-            { name: 'groups', setter: setGroups, cacheKey: 'shatibi_cache_groups' },
+        // 2a. Groups Listener (Role Scoped)
+        let groupsQuery = query(collection(db, 'groups'));
+        if (currentUser.role === 'teacher') {
+            groupsQuery = query(collection(db, 'groups'), where('teacherId', '==', currentUser.id));
+        } else if (currentUser.role === 'parent') {
+            // Parents don't really need all groups, maybe only those their children are in
+            // But for now, we'll keep it simple to not break ParentView
+        }
+        const unsubGroups = onSnapshot(groupsQuery, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Group));
+            setGroups(data);
+            safePersist('shatibi_cache_groups', data);
+        });
+        unsubscribers.push(unsubGroups);
+
+        // 2b. Active Students (Role Scoped + Fragmented)
+        const fetchStudents = () => {
+            let activeStudentsQuery = query(collection(db, 'students'), where('isArchived', '==', false));
+
+            if (currentUser.role === 'parent') {
+                if (currentUser.studentIds && currentUser.studentIds.length > 0) {
+                    activeStudentsQuery = query(collection(db, 'students'), where('id', 'in', currentUser.studentIds.slice(0, 30)));
+                } else {
+                    setActiveStudentsRaw([]);
+                    return () => { };
+                }
+            } else if (currentUser.role === 'teacher') {
+                // If they have groups, we could scope by groupId. 
+                // However, teachers usually have < 10 groups, so if we have them we can use them.
+                // For now, to keep it robust against group changes, we use the active filter.
+            }
+
+            return onSnapshot(activeStudentsQuery, (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
+                setActiveStudentsRaw(data);
+                safePersist('shatibi_cache_students_active', data);
+            });
+        };
+        const unsubActiveStudents = fetchStudents();
+        unsubscribers.push(unsubActiveStudents);
+
+        // 2c. Other Collections (Role Scoped for Teachers)
+        const collectionsToFetch = [
             { name: 'notes', setter: setNotes },
-            { name: 'staff', setter: setStaff },
-            { name: 'expenses', setter: setExpenses },
+            { name: 'staff', setter: setStaff, directorOnly: true },
+            { name: 'expenses', setter: setExpenses, directorOnly: true },
             { name: 'teacherAttendance', setter: setTeacherAttendance },
             { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments },
             { name: 'teacherCollections', setter: setTeacherCollections },
             { name: 'teacherManualBonuses', setter: setTeacherManualBonuses },
-            { name: 'donations', setter: setDonations },
+            { name: 'donations', setter: setDonations, directorOnly: true },
         ];
 
-        const unsubscribers = protectedCollections.map(({ name, setter, cacheKey }) =>
-            onSnapshot(collection(db, name), (snapshot) => {
+        collectionsToFetch.forEach(({ name, setter, directorOnly }) => {
+            if (directorOnly && currentUser.role !== 'director' && currentUser.role !== 'supervisor') return;
+
+            let q = query(collection(db, name));
+            if (currentUser.role === 'teacher' && ['teacherAttendance', 'teacherPayrollAdjustments', 'teacherCollections', 'teacherManualBonuses'].includes(name)) {
+                q = query(collection(db, name), where('teacherId', '==', currentUser.id));
+            }
+
+            const unsub = onSnapshot(q, (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                 setter(data);
-                if (cacheKey) safePersist(cacheKey, data);
-            }, (error) => {
-                console.error(`Error fetching protected ${name}:`, error.message);
-                if (error.code === 'permission-denied') {
-                    setPermissionError(true);
-                }
-            })
-        );
+            });
+            unsubscribers.push(unsub);
+        });
 
-        // Listener for single settings document
+        // Settings
         const settingsDocRef = doc(db, 'settings', 'financial');
         const unsubSettings = onSnapshot(settingsDocRef, (docSnap) => {
-            if (docSnap.exists()) {
-                setFinancialSettings(docSnap.data() as FinancialSettings);
-            } else {
-                const defaultSettings: FinancialSettings = { workingDaysPerMonth: 22, absenceDeductionPercentage: 100 };
-                setDoc(settingsDocRef, defaultSettings).catch(e => console.error("Error creating settings doc:", e));
-            }
-        }, (error) => {
-            console.error(`Error fetching settings:`, error.message);
-            if (error.code === 'permission-denied') {
-                setPermissionError(true);
-            }
+            if (docSnap.exists()) setFinancialSettings(docSnap.data() as FinancialSettings);
         });
         unsubscribers.push(unsubSettings);
 
-        return () => {
-            unsubscribers.forEach(unsub => unsub());
-        };
+        return () => unsubscribers.forEach(unsub => unsub());
     }, [currentUser]);
+
+    // 2d. Fragmented Snapshot for Archived Students (Lazy Loaded)
+    useEffect(() => {
+        if (!currentUser || location.pathname !== '/archive') {
+            setArchivedStudentsRaw([]);
+            return;
+        }
+
+        console.log("Loading archived students snapshot...");
+        const archivedQuery = query(collection(db, 'students'), where('isArchived', '==', true));
+        const unsub = onSnapshot(archivedQuery, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
+            setArchivedStudentsRaw(data);
+        });
+
+        return () => unsub();
+    }, [currentUser, location.pathname]);
 
     // Optimized Notifications Fetching (Last 30 Days)
     useEffect(() => {
@@ -492,63 +536,19 @@ const App: React.FC = () => {
     const archivedStudents = useMemo(() => students.filter(s => s.isArchived), [students]);
 
     // FILTER LOGIC FOR SUPERVISOR
-    const supervisorFilteredData = useMemo(() => {
-        if (currentUser?.role !== 'supervisor') return null;
-
-        const sections = currentUser.section;
-
-        // 1. Groups in these sections
-        const filteredGroups = groups.filter(g => {
-            const groupType = getGroupTypeFromName(g.name);
-            return groupType && sections.includes(groupType);
-        });
-        const filteredGroupIds = filteredGroups.map(g => g.id);
-
-        // 2. Students in those groups
-        const filteredStudents = activeStudents.filter(s => filteredGroupIds.includes(s.groupId));
-
-        // 3. Teachers who teach those groups
-        const filteredTeacherIds = filteredGroups.map(g => g.teacherId).filter(id => id);
-        const filteredTeachers = teachers.filter(t => filteredTeacherIds.includes(t.id));
-
-        // 4. Expenses (Salaries of these teachers + Bonus)
-        const filteredExpenses = expenses.filter(e => {
-            if (e.category === ExpenseCategory.TEACHER_SALARY || e.category === ExpenseCategory.TEACHER_BONUS) {
-                return filteredTeachers.some(t => e.description.includes(t.name));
-            }
-            return false;
-        });
-
-        // 5. Collections from these teachers
-        const filteredCollections = teacherCollections.filter(c => filteredTeacherIds.includes(c.teacherId));
-
-        // 6. Attendance/Payroll
-        const filteredTeacherAttendance = teacherAttendance.filter(a => filteredTeacherIds.includes(a.teacherId));
-        const filteredPayroll = teacherPayrollAdjustments.filter(p => filteredTeacherIds.includes(p.teacherId));
-
-        return {
-            groups: filteredGroups,
-            students: filteredStudents,
-            teachers: filteredTeachers,
-            expenses: filteredExpenses,
-            collections: filteredCollections,
-            teacherAttendance: filteredTeacherAttendance,
-            teacherPayrollAdjustments: filteredPayroll
-        };
-    }, [currentUser, groups, activeStudents, teachers, expenses, teacherCollections, teacherAttendance, teacherPayrollAdjustments]);
+    // FILTER LOGIC FOR SUPERVISOR
+    const supervisorFilteredData = useMemo(() =>
+        filterSupervisorData(currentUser, activeStudents, groups, teachers, expenses, teacherCollections, teacherAttendance, teacherPayrollAdjustments),
+        [currentUser, groups, activeStudents, teachers, expenses, teacherCollections, teacherAttendance, teacherPayrollAdjustments]);
 
 
-    const visibleGroups = useMemo(() => {
-        if (currentUser?.role === 'director') return groups;
-        if (currentUser?.role === 'supervisor') return supervisorFilteredData?.groups || [];
-        return groups.filter(g => g.teacherId === currentUser?.id);
-    }, [groups, currentUser, supervisorFilteredData]);
+    const visibleGroups = useMemo(() =>
+        getVisibleGroups(currentUser, groups, supervisorFilteredData?.groups),
+        [groups, currentUser, supervisorFilteredData]);
 
-    const teacherStudents = useMemo(() => {
-        if (currentUser?.role !== 'teacher') return [];
-        const teacherGroupIds = groups.filter(g => g.teacherId === currentUser.id).map(g => g.id);
-        return activeStudents.filter(s => teacherGroupIds.includes(s.groupId));
-    }, [currentUser, groups, activeStudents]);
+    const teacherStudents = useMemo(() =>
+        filterTeacherStudents(currentUser, activeStudents, groups),
+        [currentUser, groups, activeStudents]);
 
     const groupsForUnarchiveModal = useMemo(() => {
         if (currentUser?.role === 'director') return groups;
@@ -559,31 +559,7 @@ const App: React.FC = () => {
 
     // Helper to get student count based on current filter
     const getFilteredStudentCount = () => {
-        if (!currentUser) return 0;
-
-        let targetStudents: Student[] = [];
-        if (currentUser.role === 'director') {
-            targetStudents = activeStudents;
-        } else if (currentUser.role === 'teacher') {
-            targetStudents = teacherStudents;
-        } else if (currentUser.role === 'supervisor') {
-            targetStudents = supervisorFilteredData?.students || [];
-        }
-
-        if (studentTypeFilter !== 'all') {
-            targetStudents = targetStudents.filter(s => {
-                if (studentTypeFilter === 'orphans') return s.isOrphan === true;
-                if (studentTypeFilter === 'invalid_phone') {
-                    const digits = s.phone ? s.phone.replace(/\D/g, '') : '';
-                    return !s.phone || digits.length < 12;
-                }
-
-                const group = groups.find(g => g.id === s.groupId);
-                if (!group) return false;
-                return getGroupTypeFromName(group.name) === studentTypeFilter;
-            });
-        }
-        return targetStudents.length;
+        return getFilteredStudents(currentUser, activeStudents, teacherStudents, supervisorFilteredData?.students, studentTypeFilter, groups).length;
     };
 
     // ... (Event Handlers) ...
@@ -1780,7 +1756,10 @@ const App: React.FC = () => {
         setIsTeacherFilterVisible(false);
         setIsSearchVisible(false);
         setSearchTerm('');
-    }, []);
+        if (location.pathname !== '/' && !['/students', '/groups', '/attendance_report', '/tests_report', '/financial_report'].includes(location.pathname)) {
+            // navigate('/students');
+        }
+    }, [location.pathname]);
 
     const handleViewGroupReport = (groupId: string) => {
         const group = groups.find(g => g.id === groupId);
@@ -1789,9 +1768,10 @@ const App: React.FC = () => {
         }
     };
 
-    const openDirectorView = (viewSetter: React.Dispatch<React.SetStateAction<boolean>>) => {
+    const openDirectorView = (viewSetter: React.Dispatch<React.SetStateAction<boolean>>, path: string) => {
         handleBackToMain();
         viewSetter(true);
+        navigate(path);
     };
 
     const handleViewStudent = (studentId: string) => {
@@ -1806,63 +1786,51 @@ const App: React.FC = () => {
     const handleBottomNavSelect = (view: ActiveView) => {
         handleBackToMain();
         setActiveView(view);
+        navigate('/' + view);
     };
 
-    const renderArchiveList = () => {
-        let studentsToDisplay = students.filter(s => s.isArchived);
-        if (searchTerm) {
-            const searchLower = searchTerm.toLowerCase();
-            studentsToDisplay = studentsToDisplay.filter(s => s.name.toLowerCase().includes(searchLower));
+    // Effect to sync URL with internal state
+    useEffect(() => {
+        const path = location.pathname;
+        if (currentUser) {
+            if (path === '/' || path === '') {
+                navigate('/students', { replace: true });
+                setActiveView('students');
+            } else if (path === '/students' || path === '/groups' || path === '/attendance_report' || path === '/tests_report' || path === '/financial_report') {
+                setActiveView(path.slice(1) as ActiveView);
+                handleBackToMain();
+            } else {
+                // Secondary views - these are switched by their own components or logic
+                // but we map them here for browser history/navigation
+                if (path === '/finance') setIsFinanceView(true);
+                else if (path === '/fee-collection') setIsFeeCollectionView(true);
+                else if (path === '/directornotifications') setIsDirectorNotificationsView(true);
+                else if (path === '/notes') setIsDirectorNotesView(true);
+                else if (path === '/teacher-manager') setIsTeacherManagerView(true);
+                else if (path === '/archive') setIsArchiveView(true);
+                else if (path === '/debtors') setIsDebtorsView(true);
+                else if (path === '/general-view') setIsGeneralView(true);
+                else if (path === '/reports') setIsDirectorReportView(true);
+                else if (path === '/unpaid') setIsUnpaidStudentsView(true);
+            }
         }
+    }, [location.pathname, currentUser]);
 
-        studentsToDisplay = studentsToDisplay.filter(s => {
-            if (currentUser?.role === 'director') return true;
-            if (currentUser?.role === 'supervisor') {
-                return supervisorFilteredData?.students.some(sf => sf.id === s.id) || false;
-            }
-            if (currentUser?.role === 'teacher') {
-                return s.archivedBy === currentUser.id;
-            }
-            return false;
-        }).sort((a, b) => {
-            if (searchTerm) {
-                const searchLower = searchTerm.toLowerCase();
-                const aName = a.name.toLowerCase();
-                const bName = b.name.toLowerCase();
-                const aStartsWith = aName.startsWith(searchLower);
-                const bStartsWith = bName.startsWith(searchLower);
-                if (aStartsWith && !bStartsWith) return -1;
-                if (!aStartsWith && bStartsWith) return 1;
-            }
-            return a.name.localeCompare(b.name, 'ar');
-        });
-
+    const renderArchiveList = () => {
         return (
-            <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-                <div className="space-y-6">
-                    {studentsToDisplay.length > 0 ? (
-                        studentsToDisplay.map(student => (
-                            <StudentCard
-                                key={student.id}
-                                student={student}
-                                groupName={student.archivedGroupName || groups.find(g => g.id === student.groupId)?.name}
-                                onOpenFeeModal={handleOpenFeeModal}
-                                onEdit={handleEditStudent}
-                                onToggleAttendance={handleToggleAttendance}
-                                onArchive={handleArchiveStudent}
-                                currentUserRole={currentUser!.role as any}
-                                onViewDetails={handleOpenStudentDetails}
-                                onDeletePermanently={handleDeleteStudentPermanently}
-                            />
-                        ))
-                    ) : (
-                        <div className="text-center py-20 bg-white rounded-xl shadow">
-                            <h2 className="text-2xl font-semibold text-gray-600">الأرشيف فارغ</h2>
-                            <p className="text-gray-400 mt-2">لا يوجد طلاب مؤرشفون لعرضهم.</p>
-                        </div>
-                    )}
-                </div>
-            </div>
+            <ArchivePage
+                students={students}
+                groups={groups}
+                searchTerm={searchTerm}
+                currentUser={currentUser!}
+                onOpenFeeModal={handleOpenFeeModal}
+                onEditStudent={handleEditStudent}
+                onToggleAttendance={handleToggleAttendance}
+                onArchiveStudent={handleArchiveStudent}
+                onOpenStudentDetails={handleOpenStudentDetails}
+                onDeleteStudentPermanently={handleDeleteStudentPermanently}
+                supervisorFilteredData={supervisorFilteredData}
+            />
         );
     };
 
@@ -2197,393 +2165,373 @@ const App: React.FC = () => {
         if (!supervisorFilteredData) return null;
         const { students, groups, teachers, expenses, collections, teacherAttendance, teacherPayrollAdjustments } = supervisorFilteredData;
 
-        const subViewContent = (() => {
-            if (teacherForDetails || supervisorForDetails) return <TeacherDetailsPage
-                teacher={teacherForDetails}
-                supervisor={supervisorForDetails}
-                groups={groups}
-                students={students}
-                teacherAttendance={teacherAttendance}
-                teacherPayrollAdjustments={teacherPayrollAdjustments}
-                financialSettings={financialSettings}
-                onEditTeacherClick={handleEditTeacher}
-                onEditSupervisorClick={handleEditSupervisor}
-                onDeleteTeacher={handleDeleteTeacher}
-                onDeleteSupervisor={handleDeleteSupervisor}
-                onSetTeacherAttendance={handleSetTeacherAttendance}
-                onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments}
-                onLogExpense={handleLogExpense}
-                onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
-                onSendNotificationToAll={handleSendNotificationToAll}
-                teacherCollections={collections}
-                teacherManualBonuses={teacherManualBonuses}
-                currentUserRole={currentUser?.role}
-                onAddTeacherCollection={handleAddTeacherCollection}
-                onAddManualBonus={handleAddManualBonus}
-                onDeleteManualBonus={handleDeleteManualBonus}
-                onDeleteTeacherAttendance={handleDeleteTeacherAttendance}
-                onResetPayment={handleResetTeacherPayment}
-                onBack={() => handleBackButton()}
-            />;
-            if (detailsModalState) return <StudentDetailsPage
-                student={detailsModalState.student}
-                initialTab={detailsModalState.initialTab}
-                currentUser={currentUser}
-                notes={notes.filter(n => n.studentId === detailsModalState.student.id)}
-                onOpenFeeModal={handleOpenFeeModal}
-                onAddTest={handleAddTest}
-                onDeleteTest={handleDeleteTest}
-                onAddNote={handleAddNote}
-                onSaveProgressPlan={handleSaveStudentProgressPlan}
-                onUpdatePlanRecord={handleUpdatePlanRecord}
-                onTogglePlanCompletion={handleTogglePlanCompletion}
-                onDeletePlanRecord={handleDeletePlanRecord}
-                onCancelFeePayment={handleCancelFeePayment}
-                onBack={() => handleBackButton()}
-            />;
-            if (isArchiveView) return renderArchiveList();
-            if (isDebtorsView) return <DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />;
-            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} />;
-            if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} />;
-            if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
-            if (isFeeCollectionView) return <FeeCollectionPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} teacherCollections={collections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />;
-            if (viewingTeacherReportId) return <TeacherReportPage teacher={teachers.find(t => t.id === viewingTeacherReportId)!} groups={groups} students={students} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={() => handleBackButton()} teacherCollections={collections} currentUserRole={currentUser?.role} />;
-            if (isTeacherManagerView) return <TeacherManagerPage
-                onBack={() => handleBackButton()}
-                teachers={teachers}
-                supervisors={supervisors}
-                groups={groups}
-                students={activeStudents}
-                teacherAttendance={teacherAttendance}
-                teacherPayrollAdjustments={teacherPayrollAdjustments}
-                onAddTeacherClick={handleOpenAddTeacherForm}
-                onEditTeacherClick={handleEditTeacher}
-                onEditSupervisorClick={handleEditSupervisor}
-                onDeleteTeacher={handleDeleteTeacher}
-                onDeleteSupervisor={handleDeleteSupervisor}
-                onSetTeacherAttendance={handleSetTeacherAttendance}
-                onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments}
-                onLogExpense={handleLogExpense}
-                financialSettings={financialSettings}
-                onUpdateFinancialSettings={handleUpdateFinancialSettings}
-                onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
-                onSendNotificationToAll={handleSendNotificationToAll}
-                onSendNotificationToTeacher={handleSendNotificationToTeacher}
-                onViewTeacherDetails={handleOpenTeacherDetails}
-                onViewSupervisorDetails={handleOpenSupervisorDetails}
-                searchTerm={searchTerm}
-                isFilterVisible={isTeacherFilterVisible}
-                onToggleFilter={() => setIsTeacherFilterVisible(!isTeacherFilterVisible)}
-            />;
-            if (isDirectorNotesView) return <DirectorNotesPage onBack={() => handleBackButton()} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />;
-            if (isFinanceView) return <FinancePage onBack={() => handleBackButton()} students={students} teachers={teachers} staff={[]} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onDeleteExpense={handleDeleteExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={collections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={[]} onApplyDeductions={handleApplyDeductions} donations={donations} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} />;
-            if (isDirectorReportView) return <DirectorReportsPage groups={groups} students={students} onBack={() => handleBackButton()} />;
-            if (viewingGroup) return <GroupReportPage group={viewingGroup} students={students.filter(s => s.groupId === viewingGroup.id)} teacher={teachers.find(t => t.id === viewingGroup.teacherId)} onBack={() => handleBackButton()} currentUserRole={currentUser?.role} />;
-            if (viewingGroupStudents) return <GroupStudentsPage
-                group={viewingGroupStudents}
-                students={students.filter(s => s.groupId === viewingGroupStudents.id)}
-                teachers={teachers}
-                onOpenFeeModal={handleOpenFeeModal}
-                onAddTest={handleAddTest}
-                onDeleteTest={handleDeleteTest}
-                onAddNote={handleAddNote}
-                onEdit={handleEditStudent}
-                onToggleAttendance={handleToggleAttendance}
-                onArchive={handleArchiveStudent}
-                currentUserRole={currentUser?.role}
-                onViewDetails={handleOpenStudentDetails}
-                onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
-                onBack={() => handleBackButton()}
-            />;
-            return null;
-        })();
-
-        // ... (Rest of renderSupervisorContent)
-        if (subViewContent) {
-            return subViewContent;
-        }
-
         return (
-            <div>
-                {(() => {
-                    switch (activeView) {
-                        case 'students':
-                            return <AllStudentsPage
-                                students={students}
-                                searchTerm={searchTerm}
-                                groups={groups}
-                                onOpenFeeModal={handleOpenFeeModal}
-                                onEdit={handleEditStudent}
-                                onToggleAttendance={handleToggleAttendance}
-                                onArchive={handleArchiveStudent}
-                                currentUserRole="supervisor"
-                                onViewDetails={handleOpenStudentDetails}
-                                typeFilter={studentTypeFilter}
-                                onTypeFilterChange={setStudentTypeFilter}
-                                onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
-                            />;
-                        case 'groups':
-                            return <GroupsPage students={students} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onViewStudents={setViewingGroupStudents} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="supervisor" onViewDetails={handleOpenStudentDetails} onMarkWeeklyReportSent={handleMarkWeeklyReportSent} />;
-                        case 'attendance_report':
-                            return <AttendanceReportPage students={students} groups={groups} onViewStudent={handleViewStudent} onArchive={handleArchiveStudent} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role} />;
-                        case 'tests_report':
-                            return <TestsReportPage students={students} groups={groups} onViewStudent={handleViewStudent} onBack={() => handleBackButton()} />;
-                        case 'financial_report':
-                            return <FinancialReportPage students={students} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />;
-                        default:
-                            return null;
-                    }
-                })()}
-            </div>
-        )
+            <Routes>
+                {/* Main Views */}
+                <Route path="/students" element={
+                    <AllStudentsPage
+                        students={students}
+                        searchTerm={searchTerm}
+                        groups={groups}
+                        onOpenFeeModal={handleOpenFeeModal}
+                        onEdit={handleEditStudent}
+                        onToggleAttendance={handleToggleAttendance}
+                        onArchive={handleArchiveStudent}
+                        currentUserRole="supervisor"
+                        onViewDetails={handleOpenStudentDetails}
+                        typeFilter={studentTypeFilter}
+                        onTypeFilterChange={setStudentTypeFilter}
+                        onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
+                    />
+                } />
+                <Route path="/groups" element={
+                    <GroupsPage students={students} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onViewStudents={setViewingGroupStudents} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="supervisor" onViewDetails={handleOpenStudentDetails} onMarkWeeklyReportSent={handleMarkWeeklyReportSent} />
+                } />
+                <Route path="/attendance_report" element={
+                    <AttendanceReportPage students={students} groups={groups} onViewStudent={handleViewStudent} onArchive={handleArchiveStudent} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role} />
+                } />
+                <Route path="/tests_report" element={
+                    <TestsReportPage students={students} groups={groups} onViewStudent={handleViewStudent} onBack={() => handleBackButton()} />
+                } />
+                <Route path="/financial_report" element={
+                    <FinancialReportPage students={students} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />
+                } />
+
+                {/* Sidebar Views */}
+                <Route path="/finance" element={<FinancePage onBack={() => handleBackButton()} students={students} teachers={teachers} staff={[]} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onDeleteExpense={handleDeleteExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={collections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={[]} onApplyDeductions={handleApplyDeductions} donations={donations} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} />} />
+                <Route path="/teacher-manager" element={<TeacherManagerPage
+                    onBack={() => handleBackButton()}
+                    teachers={teachers}
+                    supervisors={supervisors}
+                    groups={groups}
+                    students={activeStudents}
+                    teacherAttendance={teacherAttendance}
+                    teacherPayrollAdjustments={teacherPayrollAdjustments}
+                    onAddTeacherClick={handleOpenAddTeacherForm}
+                    onEditTeacherClick={handleEditTeacher}
+                    onEditSupervisorClick={handleEditSupervisor}
+                    onDeleteTeacher={handleDeleteTeacher}
+                    onDeleteSupervisor={handleDeleteSupervisor}
+                    onSetTeacherAttendance={handleSetTeacherAttendance}
+                    onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments}
+                    onLogExpense={handleLogExpense}
+                    financialSettings={financialSettings}
+                    onUpdateFinancialSettings={handleUpdateFinancialSettings}
+                    onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
+                    onSendNotificationToAll={handleSendNotificationToAll}
+                    onSendNotificationToTeacher={handleSendNotificationToTeacher}
+                    onViewTeacherDetails={handleOpenTeacherDetails}
+                    onViewSupervisorDetails={handleOpenSupervisorDetails}
+                    searchTerm={searchTerm}
+                    isFilterVisible={isTeacherFilterVisible}
+                    onToggleFilter={() => setIsTeacherFilterVisible(!isTeacherFilterVisible)}
+                />} />
+                <Route path="/directornotifications" element={<DirectorNotificationsPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />} />
+                <Route path="/notes" element={<DirectorNotesPage onBack={() => handleBackButton()} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />} />
+                <Route path="/archive" element={renderArchiveList()} />
+                <Route path="/debtors" element={<DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />} />
+                <Route path="/general-view" element={<GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} />} />
+                <Route path="/reports" element={<DirectorReportsPage groups={groups} students={students} onBack={() => handleBackButton()} />} />
+                <Route path="/unpaid" element={<UnpaidStudentsPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} />} />
+                <Route path="/fee-collection" element={<FeeCollectionPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} teacherCollections={collections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />} />
+
+                {/* Catch-all for sub-views that aren't yet routed */}
+                <Route path="*" element={
+                    (() => {
+                        if (teacherForDetails || supervisorForDetails) return <TeacherDetailsPage
+                            teacher={teacherForDetails}
+                            supervisor={supervisorForDetails}
+                            groups={groups}
+                            students={students}
+                            teacherAttendance={teacherAttendance}
+                            teacherPayrollAdjustments={teacherPayrollAdjustments}
+                            financialSettings={financialSettings}
+                            onEditTeacherClick={handleEditTeacher}
+                            onEditSupervisorClick={handleEditSupervisor}
+                            onDeleteTeacher={handleDeleteTeacher}
+                            onDeleteSupervisor={handleDeleteSupervisor}
+                            onSetTeacherAttendance={handleSetTeacherAttendance}
+                            onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments}
+                            onLogExpense={handleLogExpense}
+                            onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
+                            onSendNotificationToAll={handleSendNotificationToAll}
+                            teacherCollections={collections}
+                            teacherManualBonuses={teacherManualBonuses}
+                            currentUserRole={currentUser?.role}
+                            onAddTeacherCollection={handleAddTeacherCollection}
+                            onAddManualBonus={handleAddManualBonus}
+                            onDeleteManualBonus={handleDeleteManualBonus}
+                            onDeleteTeacherAttendance={handleDeleteTeacherAttendance}
+                            onResetPayment={handleResetTeacherPayment}
+                            onBack={() => handleBackButton()}
+                        />;
+                        if (detailsModalState) return <StudentDetailsPage
+                            student={detailsModalState.student}
+                            initialTab={detailsModalState.initialTab}
+                            currentUser={currentUser}
+                            notes={notes.filter(n => n.studentId === detailsModalState.student.id)}
+                            onOpenFeeModal={handleOpenFeeModal}
+                            onAddTest={handleAddTest}
+                            onDeleteTest={handleDeleteTest}
+                            onAddNote={handleAddNote}
+                            onSaveProgressPlan={handleSaveStudentProgressPlan}
+                            onUpdatePlanRecord={handleUpdatePlanRecord}
+                            onTogglePlanCompletion={handleTogglePlanCompletion}
+                            onDeletePlanRecord={handleDeletePlanRecord}
+                            onCancelFeePayment={handleCancelFeePayment}
+                            onBack={() => handleBackButton()}
+                        />;
+                        if (viewingTeacherReportId) {
+                            const reportTeacher = teachers.find(t => t.id === viewingTeacherReportId);
+                            if (reportTeacher) {
+                                return <TeacherReportPage teacher={reportTeacher} groups={groups} students={students} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={() => handleBackButton()} teacherCollections={collections} currentUserRole={currentUser?.role} />;
+                            }
+                        }
+                        if (viewingGroup) return <GroupReportPage group={viewingGroup} students={students.filter(s => s.groupId === viewingGroup.id)} teacher={teachers.find(t => t.id === viewingGroup.teacherId)} onBack={() => handleBackButton()} currentUserRole={currentUser?.role} />;
+                        if (viewingGroupStudents) return <GroupStudentsPage
+                            group={viewingGroupStudents}
+                            students={students.filter(s => s.groupId === viewingGroupStudents.id)}
+                            teachers={teachers}
+                            onOpenFeeModal={handleOpenFeeModal}
+                            onAddTest={handleAddTest}
+                            onDeleteTest={handleDeleteTest}
+                            onAddNote={handleAddNote}
+                            onEdit={handleEditStudent}
+                            onToggleAttendance={handleToggleAttendance}
+                            onArchive={handleArchiveStudent}
+                            currentUserRole={currentUser?.role}
+                            onViewDetails={handleOpenStudentDetails}
+                            onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
+                            onBack={() => handleBackButton()}
+                        />;
+                        return <Navigate to="/students" replace />;
+                    })()
+                } />
+            </Routes>
+        );
     }
 
     const renderDirectorContent = () => {
-        const subViewContent = (() => {
-            if (teacherForDetails || supervisorForDetails) return <TeacherDetailsPage
-                teacher={teacherForDetails}
-                supervisor={supervisorForDetails}
-                groups={groups}
-                students={activeStudents}
-                teacherAttendance={teacherAttendance}
-                teacherPayrollAdjustments={teacherPayrollAdjustments}
-                financialSettings={financialSettings}
-                onEditTeacherClick={handleEditTeacher}
-                onEditSupervisorClick={handleEditSupervisor}
-                onDeleteTeacher={handleDeleteTeacher}
-                onDeleteSupervisor={handleDeleteSupervisor}
-                onSetTeacherAttendance={handleSetTeacherAttendance}
-                onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments}
-                onLogExpense={handleLogExpense}
-                onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
-                onSendNotificationToAll={handleSendNotificationToAll}
-                teacherCollections={teacherCollections}
-                teacherManualBonuses={teacherManualBonuses}
-                currentUserRole={currentUser?.role}
-                onAddTeacherCollection={handleAddTeacherCollection}
-                onAddManualBonus={handleAddManualBonus}
-                onDeleteManualBonus={handleDeleteManualBonus}
-                onDeleteTeacherAttendance={handleDeleteTeacherAttendance}
-                onResetPayment={handleResetTeacherPayment}
-                onBack={() => handleBackButton()}
-            />;
-            if (detailsModalState) return <StudentDetailsPage
-                student={detailsModalState.student}
-                initialTab={detailsModalState.initialTab}
-                currentUser={currentUser}
-                notes={notes.filter(n => n.studentId === detailsModalState.student.id)}
-                onOpenFeeModal={handleOpenFeeModal}
-                onAddTest={handleAddTest}
-                onDeleteTest={handleDeleteTest}
-                onAddNote={handleAddNote}
-                onSaveProgressPlan={handleSaveStudentProgressPlan}
-                onUpdatePlanRecord={handleUpdatePlanRecord}
-                onTogglePlanCompletion={handleTogglePlanCompletion}
-                onDeletePlanRecord={handleDeletePlanRecord}
-                onCancelFeePayment={handleCancelFeePayment}
-                onBack={() => handleBackButton()}
-            />;
-            if (isArchiveView) return renderArchiveList();
-            if (isDebtorsView) return <DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />;
-            if (isGeneralView) return <GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} />;
-            if (isUnpaidStudentsView) return <UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} />;
-            if (isDirectorNotificationsView) return <DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />;
-            if (isFeeCollectionView) return <FeeCollectionPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} teacherCollections={teacherCollections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />;
-
-            if (viewingTeacherReportId) {
-                const reportTeacher = teachers.find(t => t.id === viewingTeacherReportId);
-                if (!reportTeacher) {
-                    setViewingTeacherReportId(null);
-                    return null;
-                }
-                return <TeacherReportPage teacher={reportTeacher} groups={groups} students={activeStudents} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={handleBackToMain} teacherCollections={teacherCollections} currentUserRole={currentUser?.role} />;
-            }
-            if (isTeacherManagerView) return <TeacherManagerPage
-                onBack={handleBackToMain}
-                teachers={teachers}
-                supervisors={supervisors}
-                groups={groups}
-                students={activeStudents}
-                teacherAttendance={teacherAttendance}
-                teacherPayrollAdjustments={teacherPayrollAdjustments}
-                onAddTeacherClick={handleOpenAddTeacherForm}
-                onEditTeacherClick={handleEditTeacher}
-                onEditSupervisorClick={handleEditSupervisor}
-                onDeleteTeacher={handleDeleteTeacher}
-                onDeleteSupervisor={handleDeleteSupervisor}
-                onSetTeacherAttendance={handleSetTeacherAttendance}
-                onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments}
-                onLogExpense={handleLogExpense}
-                financialSettings={financialSettings}
-                onUpdateFinancialSettings={handleUpdateFinancialSettings}
-                onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
-                onSendNotificationToAll={handleSendNotificationToAll}
-                onSendNotificationToTeacher={handleSendNotificationToTeacher}
-                onViewTeacherDetails={handleOpenTeacherDetails}
-                onViewSupervisorDetails={handleOpenSupervisorDetails}
-                searchTerm={searchTerm}
-                isFilterVisible={isTeacherFilterVisible}
-                onToggleFilter={() => setIsTeacherFilterVisible(!isTeacherFilterVisible)}
-            />;
-            if (isDirectorNotesView) return <DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />;
-            if (isFinanceView) return <FinancePage onBack={handleBackToMain} students={activeStudents} teachers={teachers} staff={staff} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onDeleteExpense={handleDeleteExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={teacherCollections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={supervisors} onApplyDeductions={handleApplyDeductions} donations={donations} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} />;
-            if (isDirectorReportView) return <DirectorReportsPage groups={groups} students={activeStudents} onBack={handleBackToMain} />;
-            if (viewingGroup) return <GroupReportPage group={viewingGroup} students={activeStudents.filter(s => s.groupId === viewingGroup.id)} teacher={teachers.find(t => t.id === viewingGroup.teacherId)} onBack={handleBackToMain} currentUserRole={currentUser?.role} />;
-            if (viewingGroupStudents) return <GroupStudentsPage
-                group={viewingGroupStudents}
-                students={activeStudents.filter(s => s.groupId === viewingGroupStudents.id)}
-                teachers={teachers}
-                onOpenFeeModal={handleOpenFeeModal}
-                onAddTest={handleAddTest}
-                onDeleteTest={handleDeleteTest}
-                onAddNote={handleAddNote}
-                onEdit={handleEditStudent}
-                onToggleAttendance={handleToggleAttendance}
-                onArchive={handleArchiveStudent}
-                currentUserRole={currentUser?.role}
-                onViewDetails={handleOpenStudentDetails}
-                onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
-                onBack={handleBackToMain}
-            />;
-            return null;
-        })();
-
-        if (subViewContent) {
-            return subViewContent;
-        }
-
         return (
-            <div>
-                {(() => {
-                    switch (activeView) {
-                        case 'students':
-                            return <AllStudentsPage
-                                students={activeStudents}
-                                searchTerm={searchTerm}
-                                groups={groups}
-                                onOpenFeeModal={handleOpenFeeModal}
-                                onEdit={handleEditStudent}
-                                onToggleAttendance={handleToggleAttendance}
-                                onArchive={handleArchiveStudent}
-                                currentUserRole="director"
-                                onViewDetails={handleOpenStudentDetails}
-                                typeFilter={studentTypeFilter}
-                                onTypeFilterChange={setStudentTypeFilter}
-                                onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
-                            />;
-                        case 'groups':
-                            return <GroupsPage students={activeStudents} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onViewStudents={setViewingGroupStudents} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="director" onViewDetails={handleOpenStudentDetails} onMarkWeeklyReportSent={handleMarkWeeklyReportSent} />;
-                        case 'attendance_report':
-                            return <AttendanceReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} onArchive={handleArchiveStudent} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role} />;
-                        case 'tests_report':
-                            return <TestsReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} onBack={() => handleBackButton()} />;
-                        case 'financial_report':
-                            return <FinancialReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />;
-                        default:
-                            return null;
-                    }
-                })()}
-            </div>
-        )
+            <Routes>
+                {/* Main Views */}
+                <Route path="/students" element={
+                    <AllStudentsPage
+                        students={activeStudents}
+                        searchTerm={searchTerm}
+                        groups={groups}
+                        onOpenFeeModal={handleOpenFeeModal}
+                        onEdit={handleEditStudent}
+                        onToggleAttendance={handleToggleAttendance}
+                        onArchive={handleArchiveStudent}
+                        currentUserRole="director"
+                        onViewDetails={handleOpenStudentDetails}
+                        typeFilter={studentTypeFilter}
+                        onTypeFilterChange={setStudentTypeFilter}
+                        onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
+                    />
+                } />
+                <Route path="/groups" element={
+                    <GroupsPage students={activeStudents} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onViewStudents={setViewingGroupStudents} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="director" onViewDetails={handleOpenStudentDetails} onMarkWeeklyReportSent={handleMarkWeeklyReportSent} />
+                } />
+                <Route path="/attendance_report" element={
+                    <AttendanceReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} onArchive={handleArchiveStudent} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role} />
+                } />
+                <Route path="/tests_report" element={
+                    <TestsReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} onBack={() => handleBackButton()} />
+                } />
+                <Route path="/financial_report" element={
+                    <FinancialReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />
+                } />
+
+                {/* Sidebar Views */}
+                <Route path="/finance" element={<FinancePage onBack={handleBackToMain} students={activeStudents} teachers={teachers} staff={staff} expenses={expenses} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} onAddStaff={handleAddStaff} onUpdateStaff={handleUpdateStaff} onDeleteStaff={handleDeleteStaff} onLogExpense={handleLogExpense} onDeleteExpense={handleDeleteExpense} onSetTeacherAttendance={handleSetTeacherAttendance} onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments} financialSettings={financialSettings} onUpdateFinancialSettings={handleUpdateFinancialSettings} groups={groups} onResetTeacherPayment={handleResetTeacherPayment} onResetStaffPayment={handleResetStaffPayment} teacherCollections={teacherCollections} onViewTeacherDetails={handleOpenTeacherDetails} supervisors={supervisors} onApplyDeductions={handleApplyDeductions} donations={donations} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} />} />
+                <Route path="/teacher-manager" element={<TeacherManagerPage
+                    onBack={handleBackToMain}
+                    teachers={teachers}
+                    supervisors={supervisors}
+                    groups={groups}
+                    students={activeStudents}
+                    teacherAttendance={teacherAttendance}
+                    teacherPayrollAdjustments={teacherPayrollAdjustments}
+                    onAddTeacherClick={handleOpenAddTeacherForm}
+                    onEditTeacherClick={handleEditTeacher}
+                    onEditSupervisorClick={handleEditSupervisor}
+                    onDeleteTeacher={handleDeleteTeacher}
+                    onDeleteSupervisor={handleDeleteSupervisor}
+                    onSetTeacherAttendance={handleSetTeacherAttendance}
+                    onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments}
+                    onLogExpense={handleLogExpense}
+                    financialSettings={financialSettings}
+                    onUpdateFinancialSettings={handleUpdateFinancialSettings}
+                    onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
+                    onSendNotificationToAll={handleSendNotificationToAll}
+                    onSendNotificationToTeacher={handleSendNotificationToTeacher}
+                    onViewTeacherDetails={handleOpenTeacherDetails}
+                    onViewSupervisorDetails={handleOpenSupervisorDetails}
+                    searchTerm={searchTerm}
+                    isFilterVisible={isTeacherFilterVisible}
+                    onToggleFilter={() => setIsTeacherFilterVisible(!isTeacherFilterVisible)}
+                />} />
+                <Route path="/directornotifications" element={<DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />} />
+                <Route path="/notes" element={<DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />} />
+                <Route path="/archive" element={renderArchiveList()} />
+                <Route path="/debtors" element={<DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />} />
+                <Route path="/general-view" element={<GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} />} />
+                <Route path="/reports" element={<DirectorReportsPage groups={groups} students={activeStudents} onBack={handleBackToMain} />} />
+                <Route path="/unpaid" element={<UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} />} />
+                <Route path="/fee-collection" element={<FeeCollectionPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={activeStudents} teacherCollections={teacherCollections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />} />
+
+                {/* Catch-all for sub-views that aren't yet routed */}
+                <Route path="*" element={
+                    (() => {
+                        if (teacherForDetails || supervisorForDetails) return <TeacherDetailsPage
+                            teacher={teacherForDetails}
+                            supervisor={supervisorForDetails}
+                            groups={groups}
+                            students={activeStudents}
+                            teacherAttendance={teacherAttendance}
+                            teacherPayrollAdjustments={teacherPayrollAdjustments}
+                            financialSettings={financialSettings}
+                            onEditTeacherClick={handleEditTeacher}
+                            onEditSupervisorClick={handleEditSupervisor}
+                            onDeleteTeacher={handleDeleteTeacher}
+                            onDeleteSupervisor={handleDeleteSupervisor}
+                            onSetTeacherAttendance={handleSetTeacherAttendance}
+                            onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments}
+                            onLogExpense={handleLogExpense}
+                            onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
+                            onSendNotificationToAll={handleSendNotificationToAll}
+                            teacherCollections={teacherCollections}
+                            teacherManualBonuses={teacherManualBonuses}
+                            currentUserRole={currentUser?.role}
+                            onAddTeacherCollection={handleAddTeacherCollection}
+                            onAddManualBonus={handleAddManualBonus}
+                            onDeleteManualBonus={handleDeleteManualBonus}
+                            onDeleteTeacherAttendance={handleDeleteTeacherAttendance}
+                            onResetPayment={handleResetTeacherPayment}
+                            onBack={() => handleBackButton()}
+                        />;
+                        if (detailsModalState) return <StudentDetailsPage
+                            student={detailsModalState.student}
+                            initialTab={detailsModalState.initialTab}
+                            currentUser={currentUser}
+                            notes={notes.filter(n => n.studentId === detailsModalState.student.id)}
+                            onOpenFeeModal={handleOpenFeeModal}
+                            onAddTest={handleAddTest}
+                            onDeleteTest={handleDeleteTest}
+                            onAddNote={handleAddNote}
+                            onSaveProgressPlan={handleSaveStudentProgressPlan}
+                            onUpdatePlanRecord={handleUpdatePlanRecord}
+                            onTogglePlanCompletion={handleTogglePlanCompletion}
+                            onDeletePlanRecord={handleDeletePlanRecord}
+                            onCancelFeePayment={handleCancelFeePayment}
+                            onBack={() => handleBackButton()}
+                        />;
+                        if (viewingTeacherReportId) {
+                            const reportTeacher = teachers.find(t => t.id === viewingTeacherReportId);
+                            if (reportTeacher) {
+                                return <TeacherReportPage teacher={reportTeacher} groups={groups} students={activeStudents} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={handleBackToMain} teacherCollections={teacherCollections} currentUserRole={currentUser?.role} />;
+                            }
+                        }
+                        if (viewingGroup) return <GroupReportPage group={viewingGroup} students={activeStudents.filter(s => s.groupId === viewingGroup.id)} teacher={teachers.find(t => t.id === viewingGroup.teacherId)} onBack={handleBackToMain} currentUserRole={currentUser?.role} />;
+                        if (viewingGroupStudents) return <GroupStudentsPage
+                            group={viewingGroupStudents}
+                            students={activeStudents.filter(s => s.groupId === viewingGroupStudents.id)}
+                            teachers={teachers}
+                            onOpenFeeModal={handleOpenFeeModal}
+                            onAddTest={handleAddTest}
+                            onDeleteTest={handleDeleteTest}
+                            onAddNote={handleAddNote}
+                            onEdit={handleEditStudent}
+                            onToggleAttendance={handleToggleAttendance}
+                            onArchive={handleArchiveStudent}
+                            currentUserRole={currentUser?.role}
+                            onViewDetails={handleOpenStudentDetails}
+                            onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
+                            onBack={handleBackToMain}
+                        />;
+                        return <Navigate to="/students" replace />;
+                    })()
+                } />
+            </Routes>
+        );
     }
 
     // ... (renderTeacherContent - No Changes)
     const renderTeacherContent = () => {
-        if (isArchiveView) return renderArchiveList();
-        if (viewingGroup) {
-            return <GroupReportPage
-                group={viewingGroup}
-                students={activeStudents.filter(s => s.groupId === viewingGroup.id)}
-                teacher={teachers.find(t => t.id === viewingGroup.teacherId)}
-                onBack={() => handleBackButton()}
-                currentUserRole={currentUser?.role}
-            />;
-        }
-        if (viewingGroupStudents) {
-            return <GroupStudentsPage
-                group={viewingGroupStudents}
-                students={activeStudents.filter(s => s.groupId === viewingGroupStudents.id)}
-                teachers={teachers}
-                onOpenFeeModal={handleOpenFeeModal}
-                onAddTest={handleAddTest}
-                onDeleteTest={handleDeleteTest}
-                onAddNote={handleAddNote}
-                onEdit={handleEditStudent}
-                onToggleAttendance={handleToggleAttendance}
-                onArchive={handleArchiveStudent}
-                currentUserRole={currentUser?.role}
-                onViewDetails={handleOpenStudentDetails}
-                onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
-                onBack={() => handleBackButton()}
-            />;
-        }
-        if (detailsModalState) {
-            return <StudentDetailsPage
-                student={detailsModalState.student}
-                initialTab={detailsModalState.initialTab}
-                currentUser={currentUser}
-                notes={notes.filter(n => n.studentId === detailsModalState.student.id)}
-                onOpenFeeModal={handleOpenFeeModal}
-                onAddTest={handleAddTest}
-                onDeleteTest={handleDeleteTest}
-                onAddNote={handleAddNote}
-                onSaveProgressPlan={handleSaveStudentProgressPlan}
-                onUpdatePlanRecord={handleUpdatePlanRecord}
-                onTogglePlanCompletion={handleTogglePlanCompletion}
-                onDeletePlanRecord={handleDeletePlanRecord}
-                onCancelFeePayment={handleCancelFeePayment}
-                onBack={() => handleBackButton()}
-            />;
-        }
-
         return (
-            <div>
-                {(() => {
-                    switch (activeView) {
-                        case 'students':
-                            return <AllStudentsPage
-                                students={teacherStudents}
-                                searchTerm={searchTerm}
-                                groups={visibleGroups}
-                                onOpenFeeModal={handleOpenFeeModal}
-                                onEdit={handleEditStudent}
-                                onToggleAttendance={handleToggleAttendance}
-                                onArchive={handleArchiveStudent}
-                                currentUserRole="teacher"
-                                onViewDetails={handleOpenStudentDetails}
-                                typeFilter={studentTypeFilter}
-                                onTypeFilterChange={setStudentTypeFilter}
-                            />;
-                        case 'groups':
-                            return <GroupsPage
-                                students={teacherStudents}
-                                searchTerm={searchTerm}
-                                groups={visibleGroups}
-                                teachers={teachers}
-                                notes={notes}
-                                onViewGroupReport={handleViewGroupReport}
-                                onViewStudents={setViewingGroupStudents}
-                                onOpenFeeModal={handleOpenFeeModal}
-                                onAddTest={handleAddTest}
-                                onDeleteTest={handleDeleteTest}
-                                onAddNote={handleAddNote}
-                                onEdit={handleEditStudent}
-                                onToggleAttendance={handleToggleAttendance}
-                                onArchive={handleArchiveStudent}
-                                currentUserRole="teacher"
-                                onViewDetails={handleOpenStudentDetails}
-                            />;
-                        case 'attendance_report':
-                            return <AttendanceReportPage students={teacherStudents} groups={visibleGroups} onViewStudent={handleViewStudent} onArchive={handleArchiveStudent} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role} />;
-                        case 'tests_report':
-                            return <TestsReportPage students={teacherStudents} groups={visibleGroups} onViewStudent={handleViewStudent} onBack={() => handleBackButton()} />;
-                        case 'financial_report':
-                            return <FinancialReportPage students={teacherStudents} groups={visibleGroups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />;
-                        default:
-                            return null;
-                    }
-                })()}
-            </div>
+            <Routes>
+                {/* Main Views */}
+                <Route path="/students" element={
+                    <AllStudentsPage
+                        students={teacherStudents}
+                        searchTerm={searchTerm}
+                        groups={visibleGroups}
+                        onOpenFeeModal={handleOpenFeeModal}
+                        onEdit={handleEditStudent}
+                        onToggleAttendance={handleToggleAttendance}
+                        onArchive={handleArchiveStudent}
+                        currentUserRole="teacher"
+                        onViewDetails={handleOpenStudentDetails}
+                        typeFilter={studentTypeFilter}
+                        onTypeFilterChange={setStudentTypeFilter}
+                    />
+                } />
+                <Route path="/groups" element={
+                    <GroupsPage students={teacherStudents} searchTerm={searchTerm} groups={visibleGroups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onViewStudents={setViewingGroupStudents} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="teacher" onViewDetails={handleOpenStudentDetails} />
+                } />
+                <Route path="/attendance_report" element={
+                    <AttendanceReportPage students={teacherStudents} groups={visibleGroups} onViewStudent={handleViewStudent} onArchive={handleArchiveStudent} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role} />
+                } />
+                <Route path="/tests_report" element={
+                    <TestsReportPage students={teacherStudents} groups={visibleGroups} onViewStudent={handleViewStudent} onBack={() => handleBackButton()} />
+                } />
+                <Route path="/financial_report" element={
+                    <FinancialReportPage students={teacherStudents} groups={visibleGroups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />
+                } />
+
+                {/* Sub-views as Route wrappers or catch-all */}
+                <Route path="/archive" element={renderArchiveList()} />
+                <Route path="*" element={
+                    (() => {
+                        if (viewingGroup) return <GroupReportPage group={viewingGroup} students={activeStudents.filter(s => s.groupId === viewingGroup.id)} teacher={teachers.find(t => t.id === viewingGroup.teacherId)} onBack={() => handleBackButton()} currentUserRole={currentUser?.role} />;
+                        if (viewingGroupStudents) return <GroupStudentsPage
+                            group={viewingGroupStudents}
+                            students={activeStudents.filter(s => s.groupId === viewingGroupStudents.id)}
+                            teachers={teachers}
+                            onOpenFeeModal={handleOpenFeeModal}
+                            onAddTest={handleAddTest}
+                            onDeleteTest={handleDeleteTest}
+                            onAddNote={handleAddNote}
+                            onEdit={handleEditStudent}
+                            onToggleAttendance={handleToggleAttendance}
+                            onArchive={handleArchiveStudent}
+                            currentUserRole={currentUser?.role}
+                            onViewDetails={handleOpenStudentDetails}
+                            onMarkWeeklyReportSent={handleMarkWeeklyReportSent}
+                            onBack={() => handleBackButton()}
+                        />;
+                        if (detailsModalState) return <StudentDetailsPage
+                            student={detailsModalState.student}
+                            initialTab={detailsModalState.initialTab}
+                            currentUser={currentUser}
+                            notes={notes.filter(n => n.studentId === detailsModalState.student.id)}
+                            onOpenFeeModal={handleOpenFeeModal}
+                            onAddTest={handleAddTest}
+                            onDeleteTest={handleDeleteTest}
+                            onAddNote={handleAddNote}
+                            onSaveProgressPlan={handleSaveStudentProgressPlan}
+                            onUpdatePlanRecord={handleUpdatePlanRecord}
+                            onTogglePlanCompletion={handleTogglePlanCompletion}
+                            onDeletePlanRecord={handleDeletePlanRecord}
+                            onCancelFeePayment={handleCancelFeePayment}
+                            onBack={() => handleBackButton()}
+                        />;
+                        return <Navigate to="/students" replace />;
+                    })()
+                } />
+            </Routes>
         );
     };
 
@@ -2612,19 +2560,19 @@ const App: React.FC = () => {
                 </div>
             )}
             <div className="flex">
-                <Suspense fallback={null}>
+                <Suspense fallback={<SidebarSkeleton />}>
                     {(currentUser.role === 'director' || currentUser.role === 'supervisor') && (
                         <Sidebar
                             isOpen={isSidebarOpen}
                             onClose={() => setIsSidebarOpen(false)}
-                            onShowGeneralView={() => openDirectorView(setIsGeneralView)}
-                            onShowFinance={() => openDirectorView(setIsFinanceView)}
-                            onShowFeeCollection={() => openDirectorView(setIsFeeCollectionView)}
-                            onShowNotifications={() => openDirectorView(setIsDirectorNotificationsView)}
-                            onShowNotes={() => openDirectorView(setIsDirectorNotesView)}
-                            onShowTeacherManager={() => openDirectorView(setIsTeacherManagerView)}
-                            onShowArchive={() => openDirectorView(setIsArchiveView)}
-                            onShowDebtors={() => openDirectorView(setIsDebtorsView)}
+                            onShowGeneralView={() => openDirectorView(setIsGeneralView, '/general-view')}
+                            onShowFinance={() => openDirectorView(setIsFinanceView, '/finance')}
+                            onShowFeeCollection={() => openDirectorView(setIsFeeCollectionView, '/fee-collection')}
+                            onShowNotifications={() => openDirectorView(setIsDirectorNotificationsView, '/directornotifications')}
+                            onShowNotes={() => openDirectorView(setIsDirectorNotesView, '/notes')}
+                            onShowTeacherManager={() => openDirectorView(setIsTeacherManagerView, '/teacher-manager')}
+                            onShowArchive={() => openDirectorView(setIsArchiveView, '/archive')}
+                            onShowDebtors={() => openDirectorView(setIsDebtorsView, '/debtors')}
                             onLogout={handleLogout}
                             currentUserRole={currentUser.role}
                             unreadMessagesCount={unreadMessagesCount}
@@ -2633,18 +2581,13 @@ const App: React.FC = () => {
                 </Suspense>
 
                 <div className="flex-1 flex flex-col w-full min-w-0">
-                    <Suspense fallback={null}>
+                    <Suspense fallback={<HeaderSkeleton />}>
                         {renderHeader()}
                     </Suspense>
 
                     <main className="flex-1 overflow-y-auto pb-20">
                         <ErrorBoundary>
-                            <Suspense fallback={
-                                <div className="flex flex-col items-center justify-center h-full space-y-4">
-                                    <div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div>
-                                    <p className="text-gray-500 font-medium">جاري التحميل...</p>
-                                </div>
-                            }>
+                            <Suspense fallback={<ListSkeleton />}>
                                 {currentUser.role === 'director'
                                     ? renderDirectorContent()
                                     : (currentUser.role === 'supervisor'

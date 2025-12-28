@@ -25,15 +25,7 @@ interface GroupsPageProps {
 }
 
 type GroupType = 'all' | 'قرآن' | 'نور بيان' | 'تلقين' | 'إقراء';
-
-const getGroupTypeFromName = (name: string): GroupType | null => {
-  const lowerName = name.toLowerCase();
-  if (lowerName.includes('قرآن')) return 'قرآن';
-  if (lowerName.includes('نور بيان')) return 'نور بيان';
-  if (lowerName.includes('تلقين') || lowerName.includes('تقلين')) return 'تلقين';
-  if (lowerName.includes('إقراء') || lowerName.includes('اقراء')) return 'إقراء';
-  return null;
-};
+import { getGroupTypeFromName } from '../services/dataService';
 
 const GroupsPage: React.FC<GroupsPageProps> = (props) => {
   const { students, groups, teachers, searchTerm, onViewGroupReport, onViewStudents, onViewDetails } = props;
