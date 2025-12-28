@@ -58,7 +58,7 @@ import { db } from './services/firebase';
 import { applyDeductions } from './services/deductionService';
 import { generateAllParents } from './services/parentGenerationService';
 const LoginScreen = lazy(() => import('./components/LoginScreen'));
-import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, getDoc, writeBatch, query, where, getDocs, arrayUnion, setDoc, deleteField, orderBy, limit } from 'firebase/firestore';
+import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, getDoc, writeBatch, query, where, getDocs, arrayUnion, setDoc, deleteField, orderBy, limit, documentId } from 'firebase/firestore';
 import UsersIcon from './components/icons/UsersIcon';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
 import { useAutomationChecks } from './hooks/useAutomationChecks';
@@ -177,12 +177,13 @@ const App: React.FC = () => {
 
         const q = query(
             collection(db, 'messages'),
-            where('receiverId', '==', myId),
-            where('read', '==', false)
+            where('receiverId', '==', myId)
         );
 
         const unsubscribeMessages = onSnapshot(q, (snapshot) => {
-            const count = snapshot.size;
+            const allMessages = snapshot.docs.map(d => ({ ...d.data(), id: d.id }));
+            const unreadMessages = allMessages.filter((m: any) => !m.read);
+            const count = unreadMessages.length;
             setUnreadMessagesCount(count);
             setAppBadge(count);
 
@@ -303,8 +304,12 @@ const App: React.FC = () => {
             let activeStudentsQuery = query(collection(db, 'students'), where('isArchived', '==', false));
 
             if (currentUser.role === 'parent') {
-                if (currentUser.studentIds && currentUser.studentIds.length > 0) {
-                    activeStudentsQuery = query(collection(db, 'students'), where('id', 'in', currentUser.studentIds.slice(0, 30)));
+                // Use the latest studentIds from the live parents state if available
+                const liveParent = parents.find(p => p.id === (currentUser as any).id);
+                const studentIds = liveParent ? liveParent.studentIds : (currentUser as any).studentIds;
+
+                if (studentIds && studentIds.length > 0) {
+                    activeStudentsQuery = query(collection(db, 'students'), where(documentId(), 'in', studentIds.slice(0, 30)));
                 } else {
                     setActiveStudentsRaw([]);
                     return () => { };
@@ -607,13 +612,34 @@ const App: React.FC = () => {
     };
 
     const handleLogout = () => {
-        handleBackToMain();
-        setIsSidebarOpen(false);
-        setIsChatOpen(false);
-        setLoginMode('staff'); // Default back to staff for next use
         setCurrentUser(null);
+        navigate('/');
     };
-    const handleOpenMenu = () => { setIsSidebarOpen(true); if (isSearchVisible) { setIsSearchVisible(false); setSearchTerm(''); } };
+
+    // Effect to sync parent currentUser with live parents data
+    useEffect(() => {
+        if (currentUser?.role === 'parent') {
+            const liveParent = parents.find(p => p.id === (currentUser as any).id);
+            if (liveParent) {
+                // Only update if studentIds have changed to avoid loops
+                if (JSON.stringify(liveParent.studentIds) !== JSON.stringify((currentUser as any).studentIds)) {
+                    setCurrentUser({
+                        ...currentUser,
+                        studentIds: liveParent.studentIds,
+                        name: liveParent.name
+                    } as any);
+                }
+            }
+        }
+    }, [parents, (currentUser as any)?.id]);
+
+    const handleOpenMenu = () => {
+        setIsSidebarOpen(true);
+        if (isSearchVisible) {
+            setIsSearchVisible(false);
+            setSearchTerm('');
+        }
+    };
 
     const toggleSearch = () => {
         const newVisibility = !isSearchVisible;

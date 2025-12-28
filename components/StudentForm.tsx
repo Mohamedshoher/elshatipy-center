@@ -1,4 +1,4 @@
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Student, Group } from '../types';
 
 interface StudentFormProps {
@@ -23,6 +23,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ isOpen, onClose, onSave, stud
   const [monthlyFee, setMonthlyFee] = useState('');
   const [joiningDate, setJoiningDate] = useState(getTodayDateString());
   const [groupId, setGroupId] = useState('');
+  const scrollableRef = useRef<HTMLDivElement>(null);
 
   const [isOrphan, setIsOrphan] = useState(false);
 
@@ -30,6 +31,9 @@ const StudentForm: React.FC<StudentFormProps> = ({ isOpen, onClose, onSave, stud
   useEffect(() => {
     if (isOpen) {
       console.log("StudentForm mounted - Version with Orphan Checkbox Moved");
+      if (scrollableRef.current) {
+        scrollableRef.current.scrollTop = 0;
+      }
     }
   }, [isOpen]);
 
@@ -80,7 +84,7 @@ const StudentForm: React.FC<StudentFormProps> = ({ isOpen, onClose, onSave, stud
 
   return (
     <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-8 w-full max-w-lg overflow-y-auto max-h-[90vh]">
+      <div ref={scrollableRef} className="bg-white rounded-lg shadow-2xl p-6 sm:p-8 w-full max-w-lg overflow-y-auto max-h-[90vh]">
         <h2 className="text-2xl font-bold mb-6 text-gray-700">{studentToEdit ? 'تعديل بيانات الطالب' : 'إضافة طالب جديد'}</h2>
         <form onSubmit={handleSubmit}>
           <div className="mb-4">

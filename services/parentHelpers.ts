@@ -15,9 +15,17 @@ export const createParentAccountIfNeeded = async (
     studentId: string,
     existingParents: Parent[]
 ): Promise<void> => {
-    // تطبيع رقم الهاتف (تحويل 11 رقم إلى 13 رقم ببادئة 02 إذا كان مصرياً)
+    // تطبيع رقم الهاتف (تحويل الأرقام إلى 13 رقم ببادئة 02)
     let processedPhone = studentPhone.replace(/\D/g, '');
-    if (processedPhone.length === 11 && (processedPhone.startsWith('010') || processedPhone.startsWith('011') || processedPhone.startsWith('012') || processedPhone.startsWith('015'))) {
+
+    // التعامل مع البادئة الدولية 20 أو 0020 أو +20
+    if (processedPhone.startsWith('0020')) {
+        processedPhone = processedPhone.slice(2); // تصبح تبدأ بـ 20
+    }
+
+    if (processedPhone.startsWith('20') && processedPhone.length === 12) {
+        processedPhone = '0' + processedPhone; // تصبح تبدأ بـ 020
+    } else if (processedPhone.length === 11 && (processedPhone.startsWith('010') || processedPhone.startsWith('011') || processedPhone.startsWith('012') || processedPhone.startsWith('015'))) {
         processedPhone = '02' + processedPhone;
     }
 

@@ -66,6 +66,7 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
     const [editingPlanData, setEditingPlanData] = useState<ProgressPlan>({});
 
     useEffect(() => {
+        window.scrollTo(0, 0);
         setActiveTab(initialTab);
         setNewPlan({ [TestTypeEnum.NEW]: '', [TestTypeEnum.RECENT_PAST]: '', [TestTypeEnum.DISTANT_PAST]: '' });
         setEditingPlanId(null);

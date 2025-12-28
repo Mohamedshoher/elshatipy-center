@@ -1,5 +1,5 @@
 
-import React, { useState, useEffect } from 'react';
+import React, { useState, useEffect, useRef } from 'react';
 import type { Teacher, Supervisor, GroupType } from '../types';
 import { TeacherStatus, PaymentType } from '../types';
 import UserIcon from './icons/UserIcon';
@@ -45,9 +45,14 @@ const TeacherManagerModal: React.FC<TeacherManagerModalProps> = ({
 
     const sectionOptions: GroupType[] = ['قرآن', 'نور بيان', 'تلقين'];
 
+    const scrollableRef = useRef<HTMLDivElement>(null);
+
     // Reset and populate form when modal opens
     useEffect(() => {
         if (isOpen) {
+            if (scrollableRef.current) {
+                scrollableRef.current.scrollTop = 0;
+            }
             if (supervisorToEdit) {
                 setRole('supervisor');
                 setName(supervisorToEdit.name);
@@ -158,7 +163,7 @@ const TeacherManagerModal: React.FC<TeacherManagerModalProps> = ({
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600 text-2xl font-bold">&times;</button>
                 </div>
 
-                <div className="p-6 overflow-y-auto">
+                <div ref={scrollableRef} className="p-6 overflow-y-auto">
                     {/* Role Switcher - Only visible when adding new */}
                     {!teacherToEdit && !supervisorToEdit && (
                         <div className="flex mb-6 bg-gray-100 p-1 rounded-lg">

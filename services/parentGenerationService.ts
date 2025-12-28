@@ -29,7 +29,14 @@ export const generateAllParents = async (students: Student[], parents: Parent[])
 
             let phoneToProcess = student.phone.replace(/\D/g, '');
 
-            if (phoneToProcess.length === 11 && (phoneToProcess.startsWith('010') || phoneToProcess.startsWith('011') || phoneToProcess.startsWith('012') || phoneToProcess.startsWith('015'))) {
+            // التعامل مع البادئة الدولية 20 أو 0020 أو +20
+            if (phoneToProcess.startsWith('0020')) {
+                phoneToProcess = phoneToProcess.slice(2); // تصبح تبدأ بـ 20
+            }
+
+            if (phoneToProcess.startsWith('20') && phoneToProcess.length === 12) {
+                phoneToProcess = '0' + phoneToProcess; // تصبح تبدأ بـ 020
+            } else if (phoneToProcess.length === 11 && (phoneToProcess.startsWith('010') || phoneToProcess.startsWith('011') || phoneToProcess.startsWith('012') || phoneToProcess.startsWith('015'))) {
                 phoneToProcess = '02' + phoneToProcess;
             }
 

@@ -1,4 +1,4 @@
-import React, { useState, useMemo, useEffect } from 'react';
+import React, { useState, useMemo, useEffect, useRef } from 'react';
 import type { Student, TestRecord, TestType, TestGrade, AttendanceStatus, FeePayment, Note, WeeklySchedule, DayOfWeek, ProgressPlan, CurrentUser, ProgressPlanRecord } from '../types';
 import { TestType as TestTypeEnum, TestGrade as TestGradeEnum, AttendanceStatus as AttendanceStatusEnum } from '../types';
 import DocumentReportIcon from './icons/DocumentReportIcon';
@@ -67,12 +67,16 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
 
     const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
     const [editingPlanData, setEditingPlanData] = useState<ProgressPlan>({});
+    const scrollableRef = useRef<HTMLDivElement>(null);
 
     useEffect(() => {
         if (isOpen) {
             setActiveTab(initialTab);
             setNewPlan({ [TestTypeEnum.NEW]: '', [TestTypeEnum.RECENT_PAST]: '', [TestTypeEnum.DISTANT_PAST]: '' });
             setEditingPlanId(null);
+            if (scrollableRef.current) {
+                scrollableRef.current.scrollTop = 0;
+            }
         }
     }, [isOpen, initialTab]);
 
@@ -408,7 +412,7 @@ const StudentDetailsModal: React.FC<StudentDetailsModalProps> = (props) => {
                         <XIcon className="w-6 h-6" />
                     </button>
                 </div>
-                <div className="flex-grow overflow-y-auto bg-gray-50">
+                <div ref={scrollableRef} className="flex-grow overflow-y-auto bg-gray-50">
                     <div className="flex border-b border-gray-200 overflow-x-auto bg-white">
                         <button onClick={() => setActiveTab('attendanceLog')} className={getTabClass('attendanceLog')} title="سجل الحضور">
                             <CalendarCheckIcon className="w-5 h-5" />

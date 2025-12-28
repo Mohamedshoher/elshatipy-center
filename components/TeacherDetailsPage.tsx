@@ -116,6 +116,7 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
     useEffect(() => {
         // Reset state when employee changes
         if (employee) {
+            window.scrollTo(0, 0);
             setActiveTab('collections');
         }
     }, [employee?.id]);

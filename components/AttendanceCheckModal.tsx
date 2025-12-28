@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useEffect } from 'react';
 import { Teacher, Group, Student, TeacherAttendanceRecord, TeacherAttendanceStatus, Notification, DayOfWeek } from '../types';
 import { getCairoNow, getCairoDateString, getCairoDayOfWeek, isCairoWorkday, getYesterdayDateString } from '../services/cairoTimeHelper';
 
@@ -27,6 +27,13 @@ const AttendanceCheckModal: React.FC<AttendanceCheckModalProps> = ({
 
     const [missingTeachers, setMissingTeachers] = useState<{ teacher: Teacher, reason: string }[]>([]);
     const [hasChecked, setHasChecked] = useState(false);
+    const scrollableRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        if (isOpen && scrollableRef.current) {
+            scrollableRef.current.scrollTop = 0;
+        }
+    }, [isOpen]);
 
     const getDayOfWeek = (dateString: string): DayOfWeek => {
         const [year, month, day] = dateString.split('-').map(Number);
@@ -143,7 +150,7 @@ const AttendanceCheckModal: React.FC<AttendanceCheckModalProps> = ({
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50 p-4">
-            <div className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
+            <div ref={scrollableRef} className="bg-white rounded-xl shadow-2xl w-full max-w-2xl max-h-[90vh] overflow-y-auto">
                 <div className="p-6 border-b border-gray-100 flex justify-between items-center bg-gray-50 rounded-t-xl">
                     <h2 className="text-xl font-bold text-gray-800">التحقق من تسليم التقارير اليومية</h2>
                     <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
