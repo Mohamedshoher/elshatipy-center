@@ -34,7 +34,7 @@ const DebtorsPage = lazy(() => import('./components/DebtorsPage'));
 const UnarchiveModal = lazy(() => import('./components/UnarchiveModal'));
 const ParentLoginScreen = lazy(() => import('./components/ParentLoginScreen'));
 const ParentDashboard = lazy(() => import('./components/ParentDashboard'));
-const ParentStudentDetails = lazy(() => import('./components/ParentStudentDetails'));
+const ParentView = lazy(() => import('./components/ParentView'));
 
 import NotificationBell from './components/NotificationBell';
 import DirectorNotificationBell from './components/DirectorNotificationBell';
@@ -54,10 +54,13 @@ import UserPlusIcon from './components/icons/UserPlusIcon';
 import { useLocalStorage } from './hooks/useLocalStorage';
 import { createParentAccountIfNeeded } from './services/parentHelpers';
 import { db } from './services/firebase';
+import { applyDeductions } from './services/deductionService';
+import { generateAllParents } from './services/parentGenerationService';
 const LoginScreen = lazy(() => import('./components/LoginScreen'));
 import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, getDoc, writeBatch, query, where, getDocs, arrayUnion, setDoc, deleteField, orderBy, limit } from 'firebase/firestore';
 import UsersIcon from './components/icons/UsersIcon';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
+import { useAutomationChecks } from './hooks/useAutomationChecks';
 import CloudOffIcon from './components/icons/CloudOffIcon';
 import { requestNotificationPermission, playNotificationSound, showLocalNotification, setAppBadge, registerFCMToken, setupOnMessageListener } from './services/notificationService';
 import FilterIcon from './components/icons/FilterIcon';
@@ -146,7 +149,6 @@ const App: React.FC = () => {
 
     // --- Parent UI States ---
     const [loginMode, setLoginMode] = useState<'staff' | 'parent'>('staff');
-    const [selectedParentStudent, setSelectedParentStudent] = useState<Student | null>(null);
 
 
     // Listener for unread messages and notifications
@@ -404,292 +406,15 @@ const App: React.FC = () => {
         return () => unsubscribe();
     }, [currentUser]);
 
-    // Effect for Director to check for missing teacher reports (daily and weekly)
-    useEffect(() => {
-        // تشغيل الفحص لجميع الموظفين (مدير، مشرف، مدرس) لضمان التنفيذ التلقائي، مع استبعاد أولياء الأمور
-        if (!currentUser || currentUser.role === 'parent' || !students.length || !teachers.length || !groups.length) return;
-
-        const getActiveTeachers = () => {
-            return teachers
-                .filter(t => t.status === TeacherStatus.ACTIVE)
-                .map(teacher => {
-                    const teacherGroups = groups.filter(g => g.teacherId === teacher.id);
-                    const teacherGroupIds = teacherGroups.map(g => g.id);
-                    const teacherStudents = students.filter(s => teacherGroupIds.includes(s.groupId) && !s.isArchived);
-                    return { ...teacher, students: teacherStudents };
-                })
-                .filter(t => t.students.length > 0);
-        };
-
-        const runNotificationChecks = async () => {
-            // استخدام توقيت القاهرة بدلاً من التوقيت المحلي
-            const today = getCairoNow();
-            const todayString = getCairoDateString();
-            const yesterdayString = getYesterdayDateString();
-
-            // 1. Singleton Execution Guard - لضمان التنفيذ مرة واحدة فقط في اليوم
-            const automationRef = doc(db, 'system', 'automation');
-            const automationSnap = await getDoc(automationRef);
-            const automationData = automationSnap.exists() ? automationSnap.data() : {};
-            const lastAbsenceCheck = automationData.lastAbsenceCheck || '';
-            const lastDeductionCheck = automationData.lastDeductionCheck || '';
-
-            const activeTeachersWithStudents = getActiveTeachers();
-
-            // فحص اليوم السابق (Yesterday)
-            const dateToCheck = new Date(today);
-            dateToCheck.setHours(0, 0, 0, 0);
-            const dayOfWeek = today.getDay(); // 0=Sunday, ..., 6=Saturday
-
-            // للحصول على حالة يوم "أمس" (yesterday)
-            const yesterdayDate = new Date(today);
-            yesterdayDate.setDate(today.getDate() - 1);
-            const isWorkday = isCairoWorkday(yesterdayDate);
-            const isHoliday = (financialSettings.publicHolidays || []).includes(yesterdayString);
-
-            // مصفوفة لتجميع العمليات اليومية
-            const dailyPromises: Promise<void>[] = [];
-
-            // التحقق من الوقت بتوقيت القاهرة
-            const IS_AFTER_MIDNIGHT = isCairoAfterMidnight(); // 12:00 AM
-            const IS_AFTER_12_05 = isCairoAfter12_05();        // 12:05 AM
-
-            // 1. نظام موحد: فحص التقارير المفقودة وتسجيل الخصم (بعد 12:05 ص)
-            if (IS_AFTER_12_05 && lastDeductionCheck !== yesterdayString && isWorkday && !isHoliday) {
-                // تحديث علامة الخصم فوراً
-                dailyPromises.push(setDoc(automationRef, { lastDeductionCheck: yesterdayString }, { merge: true }));
-
-                for (const teacher of activeTeachersWithStudents) {
-                    if (!teacher.students.some(s => new Date(s.joiningDate) <= dateToCheck)) continue;
-
-                    // Check if deduction already exists (Manual check or previous run)
-                    const alreadyHasDeduction = teacherAttendance.some(r =>
-                        r.teacherId === teacher.id &&
-                        r.date === yesterdayString &&
-                        r.status === TeacherAttendanceStatus.MISSING_REPORT
-                    );
-
-                    if (alreadyHasDeduction) continue;
-
-                    const hasAttendanceRecord = teacher.students.some(s => s.attendance.some(r => r.date === yesterdayString));
-
-                    if (!hasAttendanceRecord) {
-                        const deductionId = `auto-missed-${teacher.id}-${yesterdayString}`;
-                        const deductionRef = doc(db, 'teacherAttendance', deductionId);
-
-                        dailyPromises.push((async () => {
-                            const dedSnap = await getDoc(deductionRef);
-                            // Double check inside async in case of race/snapshot latency, though the outer check catches most
-                            if (!dedSnap.exists()) {
-                                // تسجيل الخصم المالي
-                                await setDoc(deductionRef, {
-                                    teacherId: teacher.id,
-                                    teacherName: teacher.name,
-                                    date: yesterdayString,
-                                    status: TeacherAttendanceStatus.MISSING_REPORT,
-                                    reason: 'تلقائي: لم يتم تسليم التقرير اليومي',
-                                    timestamp: getCairoNow().toISOString()
-                                });
-
-                                const dayName = dateToCheck.toLocaleDateString('ar-EG', { weekday: 'long' });
-
-                                // إشعار للمدير
-                                const dirNoteId = `dir-deduct-${teacher.id}-${yesterdayString}`;
-                                await setDoc(doc(db, 'directorNotifications', dirNoteId), {
-                                    date: getCairoNow().toISOString(),
-                                    forDate: yesterdayString,
-                                    content: `⚠️ تم خصم (ربع يوم) للمدرس ${teacher.name} لعدم إرسال تقرير يوم ${dayName}.`,
-                                    isRead: false,
-                                    type: 'teacher_absent_report',
-                                    teacherId: teacher.id,
-                                    teacherName: teacher.name,
-                                });
-
-                                // ج - إخطار المدرس نفسه بوقوع الخصم
-                                const teacherNoteId = `notif-missed-${teacher.id}-${yesterdayString}`;
-                                await setDoc(doc(db, 'notifications', teacherNoteId), {
-                                    id: teacherNoteId,
-                                    date: getCairoNow().toISOString(),
-                                    content: `⚠️ تنبيه إداري آلي: تم تسجيل خصم (ربع يوم) من راتبك لعدم إرسال تقرير الحضور الخاص بمجموعاتك ليوم ${dayName}. يرجى الالتزام لتجنب الخصومات المتكررة.`,
-                                    senderName: "نظام المتابعة الآلي",
-                                    target: { type: 'teacher', id: teacher.id },
-                                    readBy: [],
-                                    deletedBy: []
-                                });
-                            }
-                        })());
-                    }
-                }
-            }
-
-            // 2. فحص الغياب المتصل - 3 أيام (بعد 12:00 ص)
-            if (IS_AFTER_MIDNIGHT && lastAbsenceCheck !== yesterdayString && isWorkday && !isHoliday) {
-                // تحديث علامة غياب الطلاب فوراً
-                dailyPromises.push(setDoc(automationRef, { lastAbsenceCheck: yesterdayString }, { merge: true }));
-
-                for (const student of students) {
-                    if (student.isArchived || student.isPending) continue;
-
-                    const sortedAtt = [...student.attendance].sort((a, b) => b.date.localeCompare(a.date));
-
-                    // نتحقق من آخر 3 سجلات حضور
-                    if (sortedAtt.length >= 3) {
-                        const last3 = sortedAtt.slice(0, 3);
-                        const isThreeDaysConsecutive = last3.every(r => r.status === AttendanceEnum.ABSENT);
-                        const isEndingYesterday = last3[0].date === yesterdayString;
-
-                        if (isThreeDaysConsecutive && isEndingYesterday) {
-                            const absNoteId = `abs-3day-${student.id}-${yesterdayString}`;
-                            const group = groups.find(g => g.id === student.groupId);
-
-                            dailyPromises.push((async () => {
-                                // إشعار للمدرس والمدير
-                                if (group && group.teacherId) {
-                                    const tchAbsNoteId = `tch-abs-${student.id}-${yesterdayString}`;
-                                    const teacherDoc = doc(db, 'notifications', tchAbsNoteId);
-                                    if (!(await getDoc(teacherDoc)).exists()) {
-                                        await setDoc(teacherDoc, {
-                                            date: getCairoNow().toISOString(),
-                                            content: `📢 تنبيه غياب: الطالب ${student.name} غاب لمدة 3 أيام متصلة. يرجى التواصل مع ولي الأمر.`,
-                                            senderName: "نظام المتابعة",
-                                            target: { type: 'teacher', id: group.teacherId },
-                                            readBy: [],
-                                        });
-                                    }
-                                }
-
-                                const dirAbsNoteId = `dir-abs-${student.id}-${yesterdayString}`;
-                                const dirDoc = doc(db, 'directorNotifications', dirAbsNoteId);
-                                if (!(await getDoc(dirDoc)).exists()) {
-                                    await setDoc(dirDoc, {
-                                        date: getCairoNow().toISOString(),
-                                        forDate: yesterdayString,
-                                        content: `📢 انتباه: الطالب ${student.name} (مجموعة ${group?.name || '...'}) غاب لـ 3 أيام متتالية.`,
-                                        isRead: false,
-                                        type: 'student_consecutive_absence',
-                                        teacherId: group?.teacherId || '',
-                                        teacherName: teachers.find(t => t.id === group?.teacherId)?.name || 'غير محدد'
-                                    });
-                                }
-                            })());
-                        }
-                    }
-                }
-            }
-
-            // --- الفحص الأسبوعي للتحفيز والخصم (السبت - الأربعاء) ---
-            const weeklyPromises: Promise<void>[] = [];
-            // يتم الفحص يوم الخميس (4) فقط لمراجعة الأسبوع المنتهي بالأربعاء
-            if (dayOfWeek === 4 && IS_AFTER_12_05) {
-                // حساب تاريخ السبت الماضي (بداية الأسبوع المستهدف)
-                // السبت=6، الأحد=0، الاثنين=1، الثلاثاء=2، الأربعاء=3، الخميس=4، الجمعة=5
-                const diff = (dayOfWeek + 1) % 7;
-                const lastSaturday = new Date(today);
-                lastSaturday.setDate(today.getDate() - diff);
-                lastSaturday.setHours(0, 0, 0, 0);
-                const saturdayString = lastSaturday.toISOString().split('T')[0];
-
-                const lastWeeklyCheck = automationData.lastWeeklyCheck || '';
-
-                if (lastWeeklyCheck !== saturdayString) {
-                    await setDoc(automationRef, { lastWeeklyCheck: saturdayString }, { merge: true });
-
-                    const workdays: string[] = [];
-                    for (let i = 0; i < 5; i++) { // من السبت إلى الأربعاء
-                        const d = new Date(lastSaturday);
-                        d.setDate(lastSaturday.getDate() + i);
-                        workdays.push(d.toISOString().split('T')[0]);
-                    }
-                    const wednesdayString = workdays[4];
-
-                    for (const teacher of activeTeachersWithStudents) {
-                        if (!teacher.students.some(s => new Date(s.joiningDate) <= new Date(wednesdayString))) continue;
-
-                        const daysWithTests = workdays.filter(dateStr =>
-                            teacher.students.some(s => s.tests.some(t => t.date === dateStr))
-                        );
-
-                        // حالة 1: لا توجد اختبارات طوال الـ 5 أيام -> خصم نصف يوم
-                        if (daysWithTests.length === 0) {
-                            const deductionId = `auto-5day-no-tests-${teacher.id}-${saturdayString}`;
-                            const attRef = doc(db, 'teacherAttendance', deductionId);
-                            const attSnap = await getDoc(attRef);
-
-                            if (!attSnap.exists()) {
-                                await setDoc(attRef, {
-                                    teacherId: teacher.id,
-                                    teacherName: teacher.name,
-                                    date: wednesdayString,
-                                    status: TeacherAttendanceStatus.DEDUCTION_HALF_DAY,
-                                    reason: `تلقائي: عدم تسجيل اختبارات للأسبوع (${saturdayString} إلى ${wednesdayString})`,
-                                    timestamp: getCairoNow().toISOString()
-                                });
-
-                                // إخطار الإدارة بمعرّف ثابت
-                                const noteId = `note-5day-fail-${teacher.id}-${saturdayString}`;
-                                await setDoc(doc(db, 'directorNotifications', noteId), {
-                                    date: getCairoNow().toISOString(),
-                                    forDate: wednesdayString,
-                                    content: `⚠️ خصم تلقائي (نصف يوم) للمدرس ${teacher.name} لعدم تسجيل اختبارات طوال الأسبوع.`,
-                                    isRead: false,
-                                    type: 'teacher_5day_no_tests_deduction',
-                                    teacherId: teacher.id,
-                                    teacherName: teacher.name
-                                });
-                            }
-                        }
-                        // حالة 2: اختبارات يومية -> مكافأة نصف يوم
-                        else if (daysWithTests.length === 5) {
-                            const bonusId = `auto-5day-bonus-${teacher.id}-${saturdayString}`;
-                            const attRef = doc(db, 'teacherAttendance', bonusId);
-                            const attSnap = await getDoc(attRef);
-
-                            if (!attSnap.exists()) {
-                                await setDoc(attRef, {
-                                    teacherId: teacher.id,
-                                    teacherName: teacher.name,
-                                    date: wednesdayString,
-                                    status: TeacherAttendanceStatus.BONUS_HALF_DAY,
-                                    reason: `تلقائي: الالتزام بتسجيل الاختبارات يومياً (${saturdayString} إلى ${wednesdayString})`,
-                                    timestamp: getCairoNow().toISOString()
-                                });
-
-                                // إخطار عام بمعرّف ثابت
-                                const pubNoteId = `public-bonus-${teacher.id}-${saturdayString}`;
-                                await setDoc(doc(db, 'notifications', pubNoteId), {
-                                    date: getCairoNow().toISOString(),
-                                    content: `🎉 بطل/ة الأسبوع: حصل المدرس/ة ${teacher.name} على مكافأة (نصف يوم) للالتزام التام بتسجيل الاختبارات يومياً.`,
-                                    isRead: false,
-                                    recipientId: 'all'
-                                });
-
-                                // إخطار الإدارة
-                                const dirBonusNoteId = `dir-bonus-${teacher.id}-${saturdayString}`;
-                                await setDoc(doc(db, 'directorNotifications', dirBonusNoteId), {
-                                    date: getCairoNow().toISOString(),
-                                    forDate: wednesdayString,
-                                    content: `✅ مكافأة تلقائية (نصف يوم) للمدرس ${teacher.name} للالتزام بتسجيل الاختبارات.`,
-                                    isRead: false,
-                                    type: 'teacher_weekly_bonus',
-                                    teacherId: teacher.id,
-                                    teacherName: teacher.name
-                                });
-                            }
-                        }
-                    }
-                }
-            }
-
-            try {
-                await Promise.all([...dailyPromises, ...weeklyPromises]);
-            } catch (error) {
-                console.error("Error creating notifications:", error);
-            }
-        };
-
-        const timer = setTimeout(runNotificationChecks, 3000);
-        return () => clearTimeout(timer);
-    }, [students, teachers, groups, currentUser, directorNotifications, teacherCollections, financialSettings, teacherAttendance]);
+    // --- Automatic Missing Reports Check (Extracted to Hook) ---
+    useAutomationChecks({
+        currentUser,
+        students,
+        teachers,
+        groups,
+        financialSettings,
+        teacherAttendance
+    });
 
     // Effect for cleaning up old, read notifications
     useEffect(() => {
@@ -2051,7 +1776,6 @@ const App: React.FC = () => {
         setIsGeneralView(false);
         setIsDebtorsView(false);
 
-        setSelectedParentStudent(null);
 
         setIsTeacherFilterVisible(false);
         setIsSearchVisible(false);
@@ -2460,27 +2184,14 @@ const App: React.FC = () => {
     };
 
     const handleApplyDeductions = async (records: TeacherAttendanceRecord[], notifications: Notification[]) => {
-        const batch = writeBatch(db);
-
-        records.forEach(record => {
-            // Use the provided ID if it exists, otherwise generate one (though Bradley, we've made them fixed in the modal)
-            const ref = record.id ? doc(db, 'teacherAttendance', record.id) : doc(collection(db, 'teacherAttendance'));
-            batch.set(ref, record);
-        });
-
-        notifications.forEach(notification => {
-            const ref = notification.id ? doc(db, 'notifications', notification.id) : doc(collection(db, 'notifications'));
-            batch.set(ref, notification);
-        });
-
         try {
-            await batch.commit();
+            await applyDeductions(records, notifications);
             alert('تم تطبيق الخصومات وإرسال الإشعارات بنجاح.');
         } catch (error) {
-            console.error("Error applying deductions: ", error);
             alert('حدث خطأ أثناء تطبيق الخصومات.');
         }
     };
+
 
     const renderSupervisorContent = () => {
         if (!supervisorFilteredData) return null;
@@ -2876,112 +2587,19 @@ const App: React.FC = () => {
         );
     };
 
-    // عرض محتوى ولي الأمر
-    const renderParentContent = () => {
-        if (!currentUser || currentUser.role !== 'parent') return null;
+    // عرض محتوى ولي الأمر (تم نقله إلى ParentView)
 
-        // جلب طلاب ولي الأمر
-        const parentStudents = students.filter(s => currentUser.studentIds.includes(s.id));
-
-        // إذا كان هناك طالب محدد، عرض تفاصيله
-        if (selectedParentStudent) {
-            const group = groups.find(g => g.id === selectedParentStudent.groupId);
-            const teacher = teachers.find(t => t.id === group?.teacherId);
-
-            return (
-                <ParentStudentDetails
-                    student={selectedParentStudent}
-                    group={group}
-                    teacher={teacher}
-                    onClose={() => setSelectedParentStudent(null)}
-                    onOpenChat={() => {
-                        if (teacher) {
-                            setChatInitialUserId(teacher.id);
-                        }
-                        setSelectedParentStudent(null); // إغلاق صفحة التفاصيل
-                        setIsChatOpen(true);
-                    }}
-                    unreadMessagesCount={unreadMessagesCount}
-                />
-            );
-        }
-
-        // عرض لوحة التحكم
-        return (
-            <ParentDashboard
-                students={parentStudents}
-                groups={groups}
-                onViewStudent={setSelectedParentStudent}
-                parentPhone={currentUser.phone}
-            />
-        );
-    };
-
+    // دالة إنشاء حسابات لجميع الطلاب القدامى
     // دالة إنشاء حسابات لجميع الطلاب القدامى
     const handleGenerateAllParents = async () => {
         if (!window.confirm('هل أنت متأكد من رغبتك في إنشاء حسابات أولياء أمور لجميع الطلاب الحاليين؟\nسيتم استخدام أرقام الهواتف المسجلة.\nقد تستغرق هذه العملية بعض الوقت.')) return;
 
-        let createdCount = 0;
-        let validSkipped = 0;
-        let invalidCount = 0;
-
         try {
-            // إظهار رسالة بدء
-            const tempDiv = document.createElement('div');
-            tempDiv.id = 'temp-loading-msg';
-            tempDiv.style.position = 'fixed';
-            tempDiv.style.top = '20px';
-            tempDiv.style.left = '50%';
-            tempDiv.style.transform = 'translateX(-50%)';
-            tempDiv.style.backgroundColor = '#fbbf24';
-            tempDiv.style.padding = '10px 20px';
-            tempDiv.style.borderRadius = '8px';
-            tempDiv.style.zIndex = '9999';
-            tempDiv.style.fontWeight = 'bold';
-            tempDiv.textContent = 'جاري معالجة بيانات الطلاب... يرجى الانتظار';
-            document.body.appendChild(tempDiv);
-
-            for (const student of students) {
-                if (!student.phone) {
-                    invalidCount++;
-                    continue;
-                }
-
-                let phoneToProcess = student.phone.replace(/\D/g, ''); // أرقام فقط
-
-                // تصحيح الأرقام المصرية (11 رقم) لتصبح (13 رقم ببادئة 02)
-                if (phoneToProcess.length === 11 && (phoneToProcess.startsWith('010') || phoneToProcess.startsWith('011') || phoneToProcess.startsWith('012') || phoneToProcess.startsWith('015'))) {
-                    phoneToProcess = '02' + phoneToProcess;
-                }
-
-                // قبول الرقم فقط إذا كان 13 رقم ويبدأ بـ 02
-                if (phoneToProcess.length === 13 && phoneToProcess.startsWith('02')) {
-                    // التحقق مما إذا كان الحساب موجوداً بالفعل لتجنب التكرار غير الضروري في الـ Logs
-                    const existingParent = parents.find(p => p.phone === phoneToProcess);
-                    if (existingParent && existingParent.studentIds.includes(student.id)) {
-                        validSkipped++; // موجود بالفعل
-                    } else {
-                        await createParentAccountIfNeeded(phoneToProcess, student.name, student.id, parents);
-                        createdCount++;
-                    }
-                } else {
-                    invalidCount++;
-                }
-            }
-
-            // إزالة رسالة التحميل
-            if (document.getElementById('temp-loading-msg')) {
-                document.body.removeChild(document.getElementById('temp-loading-msg')!);
-            }
-
-            alert(`تمت العملية بنجاح! \n\n✅ تم التحديث/الإنشاء: ${createdCount}\n⏭️ تم التخطي (موجود مسبقاً): ${validSkipped}\n❌ أرقام غير صالحة: ${invalidCount}`);
-
+            const result = await generateAllParents(students, parents);
+            alert(`تمت العملية بنجاح! \n\n✅ تم التحديث/الإنشاء: ${result.createdCount}\n⏭️ تم التخطي (موجود مسبقاً): ${result.validSkipped}\n❌ أرقام غير صالحة: ${result.invalidCount}`);
         } catch (error) {
             console.error("Error generating parents:", error);
             alert("حدث خطأ أثناء المعالجة.");
-            if (document.getElementById('temp-loading-msg')) {
-                document.body.removeChild(document.getElementById('temp-loading-msg')!);
-            }
         }
     };
 
@@ -3032,7 +2650,7 @@ const App: React.FC = () => {
                                     : (currentUser.role === 'supervisor'
                                         ? renderSupervisorContent()
                                         : (currentUser.role === 'parent'
-                                            ? renderParentContent()
+                                            ? <ParentView currentUser={currentUser} students={students} groups={groups} teachers={teachers} unreadMessagesCount={unreadMessagesCount} setIsChatOpen={setIsChatOpen} setChatInitialUserId={setChatInitialUserId} />
                                             : (teachers.length > 0 ? renderTeacherContent() : <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>))
                                     )
                                 }
