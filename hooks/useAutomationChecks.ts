@@ -23,8 +23,8 @@ export const useAutomationChecks = ({
 }: UseAutomationChecksProps) => {
 
     useEffect(() => {
-        // تشغيل الفحص لجميع الموظفين (مدير، مشرف، مدرس) لضمان التنفيذ التلقائي، مع استبعاد أولياء الأمور
-        if (!currentUser || currentUser.role === 'parent' || !students.length || !teachers.length || !groups.length) return;
+        // تشغيل الفحص فقط للمدير لضمان التنفيذ التلقائي من جهة واحدة وتوفير الموارد
+        if (!currentUser || currentUser.role !== 'director' || !students.length || !teachers.length || !groups.length) return;
 
         const getActiveTeachers = () => {
             return teachers

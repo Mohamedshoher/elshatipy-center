@@ -22,6 +22,8 @@ import { getGroupTypeFromName } from '../services/dataService';
 const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
   const { students, searchTerm, groups, currentUserRole, onViewDetails, typeFilter, onTypeFilterChange } = props;
 
+  const [visibleCount, setVisibleCount] = React.useState(20);
+
   const filteredAndSortedStudents = useMemo(() => {
     let filtered = students
       .filter(s =>
@@ -57,6 +59,26 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
 
     return filtered;
   }, [students, searchTerm, groups, typeFilter]);
+
+  // Infinite Scroll logic
+  React.useEffect(() => {
+    const handleScroll = () => {
+      if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 500) {
+        setVisibleCount(prev => Math.min(prev + 20, filteredAndSortedStudents.length));
+      }
+    };
+    window.addEventListener('scroll', handleScroll);
+    return () => window.removeEventListener('scroll', handleScroll);
+  }, [filteredAndSortedStudents.length]);
+
+  // Reset visibleCount when filters change
+  React.useEffect(() => {
+    setVisibleCount(20);
+  }, [searchTerm, typeFilter]);
+
+  const displayedStudents = useMemo(() => {
+    return filteredAndSortedStudents.slice(0, visibleCount);
+  }, [filteredAndSortedStudents, visibleCount]);
 
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
@@ -100,8 +122,8 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
       )}
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
-        {filteredAndSortedStudents.length > 0 ? (
-          filteredAndSortedStudents.map(student => (
+        {displayedStudents.length > 0 ? (
+          displayedStudents.map(student => (
             <StudentCard
               key={student.id}
               student={student}

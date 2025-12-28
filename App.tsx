@@ -292,31 +292,32 @@ const App: React.FC = () => {
         unsubscribers.push(unsubActiveStudents);
 
         // 2c. Other Collections (Role Scoped for Teachers)
-        const collectionsToFetch = [
+        const essentialCollections = [
             { name: 'notes', setter: setNotes },
-            { name: 'staff', setter: setStaff, directorOnly: true },
-            { name: 'expenses', setter: setExpenses, directorOnly: true },
-            { name: 'teacherAttendance', setter: setTeacherAttendance },
-            { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments },
-            { name: 'teacherCollections', setter: setTeacherCollections },
-            { name: 'teacherManualBonuses', setter: setTeacherManualBonuses },
-            { name: 'donations', setter: setDonations, directorOnly: true },
         ];
 
-        collectionsToFetch.forEach(({ name, setter, directorOnly }) => {
-            if (directorOnly && currentUser.role !== 'director' && currentUser.role !== 'supervisor') return;
-
-            let q = query(collection(db, name));
-            if (currentUser.role === 'teacher' && ['teacherAttendance', 'teacherPayrollAdjustments', 'teacherCollections', 'teacherManualBonuses'].includes(name)) {
-                q = query(collection(db, name), where('teacherId', '==', currentUser.id));
-            }
-
-            const unsub = onSnapshot(q, (snapshot) => {
+        essentialCollections.forEach(({ name, setter }) => {
+            const unsub = onSnapshot(query(collection(db, name)), (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 setter(data);
             });
             unsubscribers.push(unsub);
         });
+
+        // Add teacherAttendance for Director (needed for automation checks)
+        if (currentUser.role === 'director' || currentUser.role === 'supervisor') {
+            const unsub = onSnapshot(query(collection(db, 'teacherAttendance')), (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
+                setTeacherAttendance(data);
+            });
+            unsubscribers.push(unsub);
+        } else if (currentUser.role === 'teacher') {
+            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('teacherId', '==', currentUser.id)), (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
+                setTeacherAttendance(data);
+            });
+            unsubscribers.push(unsub);
+        }
 
         // Settings
         const settingsDocRef = doc(db, 'settings', 'financial');
@@ -327,6 +328,44 @@ const App: React.FC = () => {
 
         return () => unsubscribers.forEach(unsub => unsub());
     }, [currentUser]);
+
+    // 2e. Defer heavy finance listeners to only run when on relevant pages
+    useEffect(() => {
+        if (!currentUser) return;
+
+        const isFinanceRelatedPage = ['/finance', '/director-reports', '/financial-report', '/teacher-manager'].includes(location.pathname);
+        if (!isFinanceRelatedPage) {
+            // We don't clear the state here to avoid flickering, but we don't start new listeners
+            return;
+        }
+
+        const unsubscribers: (() => void)[] = [];
+        const financeCollections = [
+            { name: 'staff', setter: setStaff, directorOnly: true },
+            { name: 'expenses', setter: setExpenses, directorOnly: true },
+            { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments },
+            { name: 'teacherCollections', setter: setTeacherCollections },
+            { name: 'teacherManualBonuses', setter: setTeacherManualBonuses },
+            { name: 'donations', setter: setDonations, directorOnly: true },
+        ];
+
+        financeCollections.forEach(({ name, setter, directorOnly }) => {
+            if (directorOnly && currentUser.role !== 'director' && currentUser.role !== 'supervisor') return;
+
+            let q = query(collection(db, name));
+            if (currentUser.role === 'teacher') {
+                q = query(collection(db, name), where('teacherId', '==', currentUser.id));
+            }
+
+            const unsub = onSnapshot(q, (snapshot) => {
+                const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
+                setter(data);
+            });
+            unsubscribers.push(unsub);
+        });
+
+        return () => unsubscribers.forEach(unsub => unsub());
+    }, [currentUser, location.pathname]);
 
     // 2d. Fragmented Snapshot for Archived Students (Lazy Loaded)
     useEffect(() => {
