@@ -1,4 +1,4 @@
-شغل التطimport React, { useState } from 'react';
+import React, { useState } from 'react';
 import type { Student, Group, Teacher } from '../types';
 import { TestType, TestGrade, AttendanceStatus } from '../types';
 import ArrowRightIcon from './icons/ArrowRightIcon';
