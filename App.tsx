@@ -230,22 +230,8 @@ const App: React.FC = () => {
     const isOnline = useOnlineStatus();
 
     // View State
-    const [activeView, setActiveView] = useState<ActiveView>('students');
     const [viewingGroup, setViewingGroup] = useState<Group | null>(null);
     const [viewingGroupStudents, setViewingGroupStudents] = useState<Group | null>(null);
-    const [isGeneralView, setIsGeneralView] = useState(false);
-    const [isDirectorReportView, setIsDirectorReportView] = useState(false);
-
-    // --- Automatic Missing Reports Check ---
-
-    const [isDirectorNotesView, setIsDirectorNotesView] = useState(false);
-    const [isDirectorNotificationsView, setIsDirectorNotificationsView] = useState(false);
-    const [isUnpaidStudentsView, setIsUnpaidStudentsView] = useState(false);
-    const [isFinanceView, setIsFinanceView] = useState(false);
-    const [isFeeCollectionView, setIsFeeCollectionView] = useState(false);
-    const [isTeacherManagerView, setIsTeacherManagerView] = useState(false);
-    const [isArchiveView, setIsArchiveView] = useState(false);
-    const [isDebtorsView, setIsDebtorsView] = useState(false); // Add isDebtorsView state
     const [viewingTeacherReportId, setViewingTeacherReportId] = useState<string | null>(null);
 
     const [isTeacherFilterVisible, setIsTeacherFilterVisible] = useState(false);
@@ -359,7 +345,7 @@ const App: React.FC = () => {
             }
 
             const unsub = onSnapshot(q, (snapshot) => {
-                const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 setter(data);
             });
             unsubscribers.push(unsub);
@@ -565,6 +551,7 @@ const App: React.FC = () => {
     // ... (Event Handlers) ...
     const handleOpenStudentDetails = (student: Student, initialTab: 'attendanceLog' | 'progressPlan' | 'tests' | 'fees' | 'notes' | 'reports' = 'attendanceLog') => {
         setDetailsModalState({ student, initialTab });
+        navigate('/student-details');
     };
 
     const handleCloseStudentDetails = () => {
@@ -574,11 +561,13 @@ const App: React.FC = () => {
     const handleOpenTeacherDetails = (teacher: Teacher) => {
         setTeacherForDetails(teacher);
         setSupervisorForDetails(null);
+        navigate('/staff-details');
     };
 
     const handleOpenSupervisorDetails = (supervisor: Supervisor) => {
         setSupervisorForDetails(supervisor);
         setTeacherForDetails(null);
+        navigate('/staff-details');
     };
 
     const handleCloseEmployeeDetails = () => {
@@ -1537,7 +1526,6 @@ const App: React.FC = () => {
         if (isGroupManagerOpen) { setIsGroupManagerOpen(false); return true; }
         if (detailsModalState) { setDetailsModalState(null); return true; }
         if (teacherForDetails || supervisorForDetails) { setTeacherForDetails(null); setSupervisorForDetails(null); return true; }
-        if (studentToArchive) { setStudentToArchive(null); return true; }
         if (isFormOpen) { setIsFormOpen(false); setStudentToEdit(null); return true; }
         if (isSidebarOpen) { setIsSidebarOpen(false); return true; }
         if (isSearchVisible) { setIsSearchVisible(false); setSearchTerm(''); return true; }
@@ -1547,30 +1535,29 @@ const App: React.FC = () => {
         if (viewingGroup) { setViewingGroup(null); return true; }
         if (viewingGroupStudents) { setViewingGroupStudents(null); return true; }
 
-        // Priority 3: Main Views -> Back to Dashboard (Students)
-        if (isTeacherManagerView || isFinanceView || isGeneralView || isDirectorReportView || isDirectorNotesView || isFeeCollectionView || isDirectorNotificationsView || isUnpaidStudentsView || isArchiveView || isDebtorsView) {
-            handleBackToMain();
+        // Priority 3: Routing
+        const mainTabs = ['/students', '/groups', '/attendance_report', '/tests_report', '/financial_report'];
+        if (!mainTabs.includes(location.pathname)) {
+            navigate('/students');
             return true;
         }
 
-        return false; // Nothing to close
-    }, [studentToArchive, studentToUnarchiveId, isFeeModalOpen, teacherForDetails, supervisorForDetails, isTeacherFormOpen, isGroupManagerOpen, detailsModalState, isFormOpen, isSidebarOpen, isSearchVisible, viewingTeacherReportId, viewingGroup, viewingGroupStudents, isTeacherManagerView, isFinanceView, isGeneralView, isDirectorReportView, isDirectorNotesView, isFeeCollectionView, isDirectorNotificationsView, isUnpaidStudentsView, isArchiveView, isDebtorsView]);
+        return false;
+    }, [navigate, location.pathname, studentToArchive, studentToUnarchiveId, isFeeModalOpen, isTeacherFormOpen, isGroupManagerOpen, detailsModalState, teacherForDetails, supervisorForDetails, isFormOpen, isSidebarOpen, isSearchVisible, viewingTeacherReportId, viewingGroup, viewingGroupStudents]);
 
     useEffect(() => {
         const isOverlayOpen =
             studentToArchive !== null || studentToUnarchiveId !== null || isFeeModalOpen ||
             teacherForDetails !== null || supervisorForDetails !== null || isTeacherFormOpen ||
             isGroupManagerOpen || detailsModalState !== null || isFormOpen || isSidebarOpen || isSearchVisible ||
-            viewingTeacherReportId !== null || viewingGroup !== null || viewingGroupStudents !== null ||
-            isTeacherManagerView || isFinanceView || isGeneralView || isDirectorReportView || isDirectorNotesView ||
-            isFeeCollectionView || isDirectorNotificationsView || isUnpaidStudentsView || isArchiveView || isDebtorsView;
+            viewingTeacherReportId !== null || viewingGroup !== null || viewingGroupStudents !== null;
 
         if (isOverlayOpen) {
             if (!window.history.state?.pushed) {
                 window.history.pushState({ pushed: true }, '');
             }
         }
-    }, [studentToArchive, studentToUnarchiveId, isFeeModalOpen, teacherForDetails, supervisorForDetails, isTeacherFormOpen, isGroupManagerOpen, detailsModalState, isFormOpen, isSidebarOpen, isSearchVisible, viewingTeacherReportId, viewingGroup, viewingGroupStudents, isTeacherManagerView, isFinanceView, isGeneralView, isDirectorReportView, isDirectorNotesView, isFeeCollectionView, isDirectorNotificationsView, isUnpaidStudentsView, isArchiveView, isDebtorsView]);
+    }, [studentToArchive, studentToUnarchiveId, isFeeModalOpen, teacherForDetails, supervisorForDetails, isTeacherFormOpen, isGroupManagerOpen, detailsModalState, isFormOpen, isSidebarOpen, isSearchVisible, viewingTeacherReportId, viewingGroup, viewingGroupStudents]);
 
     useEffect(() => {
         const onPopState = () => {
@@ -1741,98 +1728,55 @@ const App: React.FC = () => {
         setDetailsModalState(null);
         setStudentToEdit(null);
 
-        setIsDirectorReportView(false);
-        setIsDirectorNotesView(false);
-        setIsFinanceView(false);
-        setIsFeeCollectionView(false);
-        setIsTeacherManagerView(false);
-        setIsDirectorNotificationsView(false);
-        setIsUnpaidStudentsView(false);
-        setIsArchiveView(false);
-        setIsGeneralView(false);
-        setIsDebtorsView(false);
-
-
         setIsTeacherFilterVisible(false);
         setIsSearchVisible(false);
         setSearchTerm('');
-        if (location.pathname !== '/' && !['/students', '/groups', '/attendance_report', '/tests_report', '/financial_report'].includes(location.pathname)) {
-            // navigate('/students');
-        }
-    }, [location.pathname]);
+        navigate('/students');
+    }, [navigate]);
 
     const handleViewGroupReport = (groupId: string) => {
         const group = groups.find(g => g.id === groupId);
         if (group) {
             setViewingGroup(group);
+            navigate('/group-report');
         }
     };
 
-    const openDirectorView = (viewSetter: React.Dispatch<React.SetStateAction<boolean>>, path: string) => {
-        handleBackToMain();
-        viewSetter(true);
-        navigate(path);
+    const handleViewGroupStudents = (group: Group) => {
+        setViewingGroupStudents(group);
+        navigate('/group-students');
     };
+
+    const handleViewTeacherReport = (id: string) => {
+        setViewingTeacherReportId(id);
+        navigate('/teacher-report');
+    };
+
 
     const handleViewStudent = (studentId: string) => {
         const student = students.find(s => s.id === studentId);
         if (student) {
             handleBackToMain();
-            setActiveView('students');
             setSearchTerm(student.name);
+            navigate('/students');
         }
     };
 
     const handleBottomNavSelect = (view: ActiveView) => {
         handleBackToMain();
-        setActiveView(view);
         navigate('/' + view);
     };
 
-    // Effect to sync URL with internal state
-    useEffect(() => {
+    // Sync activeView with path
+    const activeView = useMemo<ActiveView>(() => {
         const path = location.pathname;
-        if (currentUser) {
-            if (path === '/' || path === '') {
-                navigate('/students', { replace: true });
-                setActiveView('students');
-            } else if (path === '/students' || path === '/groups' || path === '/attendance_report' || path === '/tests_report' || path === '/financial_report') {
-                setActiveView(path.slice(1) as ActiveView);
-                handleBackToMain();
-            } else {
-                // Secondary views - these are switched by their own components or logic
-                // but we map them here for browser history/navigation
-                if (path === '/finance') setIsFinanceView(true);
-                else if (path === '/fee-collection') setIsFeeCollectionView(true);
-                else if (path === '/directornotifications') setIsDirectorNotificationsView(true);
-                else if (path === '/notes') setIsDirectorNotesView(true);
-                else if (path === '/teacher-manager') setIsTeacherManagerView(true);
-                else if (path === '/archive') setIsArchiveView(true);
-                else if (path === '/debtors') setIsDebtorsView(true);
-                else if (path === '/general-view') setIsGeneralView(true);
-                else if (path === '/reports') setIsDirectorReportView(true);
-                else if (path === '/unpaid') setIsUnpaidStudentsView(true);
-            }
-        }
-    }, [location.pathname, currentUser]);
+        if (path === '/groups') return 'groups';
+        if (path === '/attendance_report') return 'attendance_report';
+        if (path === '/tests_report') return 'tests_report';
+        if (path === '/financial_report') return 'financial_report';
+        return 'students';
+    }, [location.pathname]);
 
-    const renderArchiveList = () => {
-        return (
-            <ArchivePage
-                students={students}
-                groups={groups}
-                searchTerm={searchTerm}
-                currentUser={currentUser!}
-                onOpenFeeModal={handleOpenFeeModal}
-                onEditStudent={handleEditStudent}
-                onToggleAttendance={handleToggleAttendance}
-                onArchiveStudent={handleArchiveStudent}
-                onOpenStudentDetails={handleOpenStudentDetails}
-                onDeleteStudentPermanently={handleDeleteStudentPermanently}
-                supervisorFilteredData={supervisorFilteredData}
-            />
-        );
-    };
 
     // ... (Error Handling & Login - No Changes) ...
 
@@ -1952,28 +1896,29 @@ const App: React.FC = () => {
             return <Header leftContent={leftContent} centerContent={centerContent} rightContent={null} />;
         }
 
-        const backButton = (<button onClick={() => handleBackButton()} className="p-2 rounded-lg bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition-all" aria-label="العودة"> <ArrowRightIcon className="w-6 h-6" /> </button>);
-
-        // ... (title logic moved down)
+        const path = location.pathname;
         let title = 'مركز الشاطبي';
+        let isSubView = false;
+        let searchPlaceholder = 'البحث...';
+
         if (currentUser.role === 'supervisor') title = `مركز الشاطبي - المشرف: ${currentUser.name}`;
 
-        if (isArchiveView) { title = 'الأرشيف'; }
-        else if (isDebtorsView) { title = 'المدينون'; }
-        else if (viewingGroup) { title = `تقرير: ${viewingGroup.name}`; }
-        else if (isGeneralView) { title = 'نظرة عامة'; }
-        else if (isDirectorReportView) { title = 'التقارير العامة'; }
-        else if (isDirectorNotesView) { title = 'سجل الملحوظات'; }
-        else if (isFinanceView) { title = 'الإدارة المالية'; }
-        else if (isFeeCollectionView) { title = 'تحصيل الرسوم'; }
-        else if (isTeacherManagerView) { title = 'الإدارة'; }
-        else if (isDirectorNotificationsView) { title = 'الرسائل والإشعارات'; }
-        else if (viewingTeacherReportId) { const teacher = teachers.find(t => t.id === viewingTeacherReportId); title = `تقرير: ${teacher?.name || 'مدرس'}`; }
-        else if (isUnpaidStudentsView) { title = 'الطلاب غير المسددين'; }
-        else if (currentUser.role === 'director' || currentUser.role === 'teacher' || currentUser.role === 'supervisor') {
-            // Calculate count for filtered students
-            const studentCount = activeView === 'students' ? getFilteredStudentCount() : (currentUser.role === 'director' ? activeStudents.length : (currentUser.role === 'supervisor' ? (supervisorFilteredData?.students.length || 0) : teacherStudents.length));
+        if (path === '/archive') { title = 'الأرشيف'; isSubView = true; }
+        else if (path === '/debtors') { title = 'المدينون'; isSubView = true; }
+        else if (path === '/general-view') { title = 'نظرة عامة'; isSubView = true; }
+        else if (path === '/finance') { title = 'الإدارة المالية'; isSubView = true; }
+        else if (path === '/fee-collection') { title = 'تحصيل الرسوم'; isSubView = true; }
+        else if (path === '/teacher-manager') { title = 'الإدارة'; isSubView = true; searchPlaceholder = 'البحث عن موظف...'; }
+        else if (path === '/directornotifications') { title = 'الرسائل والإشعارات'; isSubView = true; }
+        else if (path === '/notes') { title = 'سجل الملحوظات'; isSubView = true; }
+        else if (path === '/reports') { title = 'التقارير العامة'; isSubView = true; }
+        else if (path === '/unpaid') { title = 'الطلاب غير المسددين'; isSubView = true; }
 
+        if (viewingGroup) { title = `تقرير: ${viewingGroup.name}`; isSubView = true; }
+        else if (viewingTeacherReportId) { const teacher = teachers.find(t => t.id === viewingTeacherReportId); title = `تقرير: ${teacher?.name || 'مدرس'}`; isSubView = true; }
+
+        if (!isSubView) {
+            const studentCount = activeView === 'students' ? getFilteredStudentCount() : (currentUser.role === 'director' ? activeStudents.length : (currentUser.role === 'supervisor' ? (supervisorFilteredData?.students.length || 0) : teacherStudents.length));
             const groupCount = currentUser.role === 'director' ? groups.length : (currentUser.role === 'supervisor' ? (supervisorFilteredData?.groups.length || 0) : visibleGroups.length);
 
             const titleMap: Record<ActiveView, string> = {
@@ -1983,57 +1928,42 @@ const App: React.FC = () => {
                 tests_report: 'تقرير الاختبارات',
                 financial_report: 'المصروفات'
             }
-            title = titleMap[activeView];
+            title = titleMap[activeView] || title;
+            searchPlaceholder = activeView === 'groups' ? 'البحث عن مجموعة...' : 'البحث عن طالب...';
         }
+
+        const backButton = (<button onClick={() => handleBackButton()} className="p-2 rounded-lg bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition-all" aria-label="العودة"> <ArrowRightIcon className="w-6 h-6" /> </button>);
 
         let leftContent = null;
         let centerContent = <h1 className="text-xl sm:text-2xl font-bold text-gray-800 truncate px-2">{title}</h1>;
         let rightContent = null;
 
+        const directorBell = currentUser.role === 'director' ? <DirectorNotificationBell notifications={directorNotifications.filter(n => !n.isDeleted).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())} onMarkAsRead={handleMarkDirectorNotificationsAsRead} onDelete={handleDeleteDirectorNotifications} /> : null;
+
         if (currentUser.role === 'director' || currentUser.role === 'supervisor') {
-            // Director & Supervisor Logic
-            // Define isSubView based on active sub-view flags instead of undefined activeTab
-            const isSubView = !!(isArchiveView || isDebtorsView || viewingGroup || isGeneralView || isDirectorReportView || isDirectorNotesView || isFinanceView || isFeeCollectionView || isTeacherManagerView || isDirectorNotificationsView || viewingTeacherReportId || isUnpaidStudentsView);
-
-            const directorBell = currentUser.role === 'director' ? <DirectorNotificationBell notifications={directorNotifications.filter(n => !n.isDeleted).sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())} onMarkAsRead={handleMarkDirectorNotificationsAsRead} onDelete={handleDeleteDirectorNotifications} /> : null;
-
             if (isSubView) {
                 leftContent = backButton;
-
                 if (isSearchVisible) {
                     centerContent = (
                         <div className="relative">
-                            <input
-                                type="search"
-                                placeholder={isTeacherManagerView ? 'البحث عن مدرس أو مشرف...' : 'البحث...'}
-                                value={searchTerm}
-                                onChange={(e) => setSearchTerm(e.target.value)}
-                                className="w-48 sm:w-72 pl-4 pr-10 py-2 border rounded-full bg-gray-100 text-right focus:outline-none focus:ring-2 focus:ring-blue-500"
-                                autoFocus
-                            />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                                <SearchIcon className="w-5 h-5" />
-                            </div>
+                            <input type="search" placeholder={searchPlaceholder} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 sm:w-72 pl-4 pr-10 py-2 border rounded-full bg-gray-100 text-right focus:outline-none focus:ring-2 focus:ring-blue-500" autoFocus />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"> <SearchIcon className="w-5 h-5" /> </div>
                         </div>
                     );
-                } else if (isTeacherManagerView || isArchiveView || isDebtorsView) {
+                } else if (path === '/teacher-manager' || path === '/archive' || path === '/debtors') {
                     centerContent = (
                         <div className="flex items-center gap-2">
-                            <button onClick={toggleSearch} className="p-1 rounded-full text-gray-500 hover:bg-gray-100 transition-colors" aria-label="بحث">
-                                <SearchIcon className="w-5 h-5" />
-                            </button>
+                            <button onClick={toggleSearch} className="p-1 rounded-full text-gray-500 hover:bg-gray-100 transition-colors"> <SearchIcon className="w-5 h-5" /> </button>
                             <h1 className="text-xl sm:text-2xl font-bold text-gray-800 truncate px-2">{title}</h1>
                         </div>
                     );
                 }
 
-                if (isTeacherManagerView) {
+                if (path === '/teacher-manager') {
                     rightContent = (
                         <div className="flex items-center gap-2">
                             {directorBell}
-                            <button onClick={handleOpenAddTeacherForm} className="p-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700 transition-all" aria-label="إضافة موظف جديد">
-                                <UserPlusIcon className="w-6 h-6" />
-                            </button>
+                            <button onClick={handleOpenAddTeacherForm} className="p-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700 transition-all"> <UserPlusIcon className="w-6 h-6" /> </button>
                         </div>
                     );
                 } else {
@@ -2042,105 +1972,65 @@ const App: React.FC = () => {
             } else {
                 leftContent = (
                     <>
-                        <button onClick={handleOpenMenu} className="p-2 rounded-lg bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition-all lg:hidden" aria-label="فتح القائمة">
-                            <MenuIcon className="w-6 h-6" />
-                        </button>
-                        {(activeView === 'students' || activeView === 'groups' || isTeacherManagerView) && (
-                            <button onClick={toggleSearch} className="p-2 rounded-lg bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition-all" aria-label="بحث">
-                                <SearchIcon className="w-6 h-6" />
-                            </button>
+                        <button onClick={handleOpenMenu} className="p-2 rounded-lg bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition-all lg:hidden"> <MenuIcon className="w-6 h-6" /> </button>
+                        {(activeView === 'students' || activeView === 'groups') && (
+                            <button onClick={toggleSearch} className="p-2 rounded-lg bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition-all"> <SearchIcon className="w-6 h-6" /> </button>
                         )}
                     </>
                 );
                 if (isSearchVisible) {
                     centerContent = (
                         <div className="relative">
-                            <input type="search" placeholder={isTeacherManagerView ? 'البحث عن مدرس أو مشرف...' : (activeView === 'groups' ? 'البحث عن مجموعة...' : 'البحث عن طالب...')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 sm:w-72 pl-4 pr-10 py-2 border rounded-full bg-gray-100 text-right focus:outline-none focus:ring-2 focus:ring-blue-500" autoFocus />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                                <SearchIcon className="w-5 h-5" />
-                            </div>
+                            <input type="search" placeholder={searchPlaceholder} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 sm:w-72 pl-4 pr-10 py-2 border rounded-full bg-gray-100 text-right focus:outline-none focus:ring-2 focus:ring-blue-500" autoFocus />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"> <SearchIcon className="w-5 h-5" /> </div>
                         </div>
                     );
                     rightContent = directorBell;
                 } else {
                     let actionButton = null;
-                    if (isTeacherManagerView) {
-                        actionButton = (
-                            <button onClick={handleOpenAddTeacherForm} className="p-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700 transition-all" aria-label="إضافة مدرس جديد">
-                                <UserPlusIcon className="w-6 h-6" />
-                            </button>
-                        );
-                    } else if (activeView === 'students') {
+                    if (activeView === 'students') {
                         actionButton = (
                             <div className="flex gap-2">
                                 {currentUser.role === 'director' && (
-                                    <button
-                                        onClick={handleGenerateAllParents}
-                                        className="p-2 rounded-lg bg-purple-600 text-white shadow hover:bg-purple-700 transition-all"
-                                        title="تحديث حسابات أولياء الأمور"
-                                    >
-                                        <UsersIcon className="w-6 h-6" />
-                                    </button>
+                                    <button onClick={handleGenerateAllParents} className="p-2 rounded-lg bg-purple-600 text-white shadow hover:bg-purple-700 transition-all" title="تحديث حسابات أولياء الأمور"> <UsersIcon className="w-6 h-6" /> </button>
                                 )}
-                                <button onClick={handleOpenAddStudentForm} className="p-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700 transition-all" aria-label="إضافة طالب جديد">
-                                    <UserPlusIcon className="w-6 h-6" />
-                                </button>
+                                <button onClick={handleOpenAddStudentForm} className="p-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700 transition-all"> <UserPlusIcon className="w-6 h-6" /> </button>
                             </div>
                         );
                     } else if (activeView === 'groups') {
                         actionButton = (
-                            <button onClick={() => setIsGroupManagerOpen(true)} className="p-2 rounded-lg text-blue-600 bg-blue-100 shadow hover:bg-blue-200 transition-all" aria-label="إدارة المجموعات">
-                                <UsersIcon className="w-6 h-6" />
-                            </button>
+                            <button onClick={() => setIsGroupManagerOpen(true)} className="p-2 rounded-lg text-blue-600 bg-blue-100 shadow hover:bg-blue-200 transition-all"> <UsersIcon className="w-6 h-6" /> </button>
                         );
                     }
-                    rightContent = (
-                        <div className="flex items-center gap-2">
-                            {actionButton}
-                            {directorBell}
-                        </div>
-                    );
+                    rightContent = <div className="flex items-center gap-2">{actionButton}{directorBell}</div>;
                 }
             }
         } else { // Teacher view
-            // ... (Same as existing teacher view)
-            if (viewingGroup || isArchiveView) {
+            if (viewingGroup || path === '/archive') {
                 leftContent = backButton;
                 centerContent = <h1 className="text-xl sm:text-2xl font-bold text-gray-800 truncate px-2">{viewingGroup ? `تقرير: ${viewingGroup.name}` : 'الأرشيف'}</h1>;
-                rightContent = null;
             } else {
                 leftContent = (
                     <>
-                        <button onClick={handleLogout} className="p-2 rounded-lg bg-red-100 text-red-700 shadow hover:bg-red-200 transition-all" aria-label="تسجيل الخروج">
-                            <LogoutIcon className="w-6 h-6" />
-                        </button>
+                        <button onClick={handleLogout} className="p-2 rounded-lg bg-red-100 text-red-700 shadow hover:bg-red-200 transition-all"> <LogoutIcon className="w-6 h-6" /> </button>
                         {(activeView === 'students' || activeView === 'groups') && (
-                            <button onClick={toggleSearch} className="p-2 rounded-lg bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition-all" aria-label="بحث">
-                                <SearchIcon className="w-6 h-6" />
-                            </button>
+                            <button onClick={toggleSearch} className="p-2 rounded-lg bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition-all"> <SearchIcon className="w-6 h-6" /> </button>
                         )}
                     </>
                 );
-
                 if (isSearchVisible) {
                     centerContent = (
                         <div className="relative">
-                            <input type="search" placeholder={activeView === 'groups' ? 'البحث عن مجموعة...' : 'البحث عن طالب...'} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 sm:w-72 pl-4 pr-10 py-2 border rounded-full bg-gray-100 text-right focus:outline-none focus:ring-2 focus:ring-blue-500" autoFocus />
-                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none">
-                                <SearchIcon className="w-5 h-5" />
-                            </div>
+                            <input type="search" placeholder={searchPlaceholder} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} className="w-48 sm:w-72 pl-4 pr-10 py-2 border rounded-full bg-gray-100 text-right focus:outline-none focus:ring-2 focus:ring-blue-500" autoFocus />
+                            <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"> <SearchIcon className="w-5 h-5" /> </div>
                         </div>
                     );
-                    rightContent = null;
                 } else {
                     centerContent = <h1 className="text-xl sm:text-2xl font-bold text-gray-800 truncate px-2">{title}</h1>;
                     rightContent = (
                         <div className="flex items-center gap-2">
                             {(activeView === 'students' || activeView === 'groups') && (
-                                <button onClick={handleOpenAddStudentForm} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-3 rounded-lg shadow hover:bg-blue-700 transition-all" aria-label="إضافة طالب جديد">
-                                    <UserPlusIcon className="w-5 h-5" />
-                                    <span className="hidden sm:inline">إضافة طالب</span>
-                                </button>
+                                <button onClick={handleOpenAddStudentForm} className="flex items-center gap-2 bg-blue-600 text-white font-bold py-2 px-3 rounded-lg shadow hover:bg-blue-700 transition-all"> <UserPlusIcon className="w-5 h-5" /><span className="hidden sm:inline">إضافة طالب</span> </button>
                             )}
                             <NotificationBell currentUser={currentUser as Extract<CurrentUser, { role: 'teacher' }>} notifications={notifications} groups={groups} onMarkAsRead={handleMarkNotificationsAsRead} onDelete={handleDeleteTeacherNotifications} />
                         </div>
@@ -2185,7 +2075,7 @@ const App: React.FC = () => {
                     />
                 } />
                 <Route path="/groups" element={
-                    <GroupsPage students={students} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onViewStudents={setViewingGroupStudents} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="supervisor" onViewDetails={handleOpenStudentDetails} onMarkWeeklyReportSent={handleMarkWeeklyReportSent} />
+                    <GroupsPage students={students} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onViewStudents={handleViewGroupStudents} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="supervisor" onViewDetails={handleOpenStudentDetails} onMarkWeeklyReportSent={handleMarkWeeklyReportSent} />
                 } />
                 <Route path="/attendance_report" element={
                     <AttendanceReportPage students={students} groups={groups} onViewStudent={handleViewStudent} onArchive={handleArchiveStudent} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role} />
@@ -2217,7 +2107,7 @@ const App: React.FC = () => {
                     onLogExpense={handleLogExpense}
                     financialSettings={financialSettings}
                     onUpdateFinancialSettings={handleUpdateFinancialSettings}
-                    onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
+                    onViewTeacherReport={handleViewTeacherReport}
                     onSendNotificationToAll={handleSendNotificationToAll}
                     onSendNotificationToTeacher={handleSendNotificationToTeacher}
                     onViewTeacherDetails={handleOpenTeacherDetails}
@@ -2228,7 +2118,7 @@ const App: React.FC = () => {
                 />} />
                 <Route path="/directornotifications" element={<DirectorNotificationsPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />} />
                 <Route path="/notes" element={<DirectorNotesPage onBack={() => handleBackButton()} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />} />
-                <Route path="/archive" element={renderArchiveList()} />
+                <Route path="/archive" element={<ArchivePage students={students} groups={groups} searchTerm={searchTerm} currentUser={currentUser!} onOpenFeeModal={handleOpenFeeModal} onEditStudent={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchiveStudent={handleArchiveStudent} onOpenStudentDetails={handleOpenStudentDetails} onDeleteStudentPermanently={handleDeleteStudentPermanently} supervisorFilteredData={supervisorFilteredData} />} />
                 <Route path="/debtors" element={<DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />} />
                 <Route path="/general-view" element={<GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} />} />
                 <Route path="/reports" element={<DirectorReportsPage groups={groups} students={students} onBack={() => handleBackButton()} />} />
@@ -2253,7 +2143,7 @@ const App: React.FC = () => {
                             onSetTeacherAttendance={handleSetTeacherAttendance}
                             onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments}
                             onLogExpense={handleLogExpense}
-                            onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
+                            onViewTeacherReport={handleViewTeacherReport}
                             onSendNotificationToAll={handleSendNotificationToAll}
                             teacherCollections={collections}
                             teacherManualBonuses={teacherManualBonuses}
@@ -2332,7 +2222,7 @@ const App: React.FC = () => {
                     />
                 } />
                 <Route path="/groups" element={
-                    <GroupsPage students={activeStudents} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onViewStudents={setViewingGroupStudents} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="director" onViewDetails={handleOpenStudentDetails} onMarkWeeklyReportSent={handleMarkWeeklyReportSent} />
+                    <GroupsPage students={activeStudents} searchTerm={searchTerm} groups={groups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onViewStudents={handleViewGroupStudents} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="director" onViewDetails={handleOpenStudentDetails} onMarkWeeklyReportSent={handleMarkWeeklyReportSent} />
                 } />
                 <Route path="/attendance_report" element={
                     <AttendanceReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} onArchive={handleArchiveStudent} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role} />
@@ -2364,7 +2254,7 @@ const App: React.FC = () => {
                     onLogExpense={handleLogExpense}
                     financialSettings={financialSettings}
                     onUpdateFinancialSettings={handleUpdateFinancialSettings}
-                    onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
+                    onViewTeacherReport={handleViewTeacherReport}
                     onSendNotificationToAll={handleSendNotificationToAll}
                     onSendNotificationToTeacher={handleSendNotificationToTeacher}
                     onViewTeacherDetails={handleOpenTeacherDetails}
@@ -2375,7 +2265,7 @@ const App: React.FC = () => {
                 />} />
                 <Route path="/directornotifications" element={<DirectorNotificationsPage onBack={handleBackToMain} teachers={teachers} groups={groups} notifications={notifications} onSendNotification={handleSendNotification} />} />
                 <Route path="/notes" element={<DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />} />
-                <Route path="/archive" element={renderArchiveList()} />
+                <Route path="/archive" element={<ArchivePage students={students} groups={groups} searchTerm={searchTerm} currentUser={currentUser!} onOpenFeeModal={handleOpenFeeModal} onEditStudent={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchiveStudent={handleArchiveStudent} onOpenStudentDetails={handleOpenStudentDetails} onDeleteStudentPermanently={handleDeleteStudentPermanently} supervisorFilteredData={supervisorFilteredData} />} />
                 <Route path="/debtors" element={<DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />} />
                 <Route path="/general-view" element={<GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} />} />
                 <Route path="/reports" element={<DirectorReportsPage groups={groups} students={activeStudents} onBack={handleBackToMain} />} />
@@ -2400,7 +2290,7 @@ const App: React.FC = () => {
                             onSetTeacherAttendance={handleSetTeacherAttendance}
                             onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments}
                             onLogExpense={handleLogExpense}
-                            onViewTeacherReport={(id) => setViewingTeacherReportId(id)}
+                            onViewTeacherReport={handleViewTeacherReport}
                             onSendNotificationToAll={handleSendNotificationToAll}
                             teacherCollections={teacherCollections}
                             teacherManualBonuses={teacherManualBonuses}
@@ -2479,7 +2369,7 @@ const App: React.FC = () => {
                     />
                 } />
                 <Route path="/groups" element={
-                    <GroupsPage students={teacherStudents} searchTerm={searchTerm} groups={visibleGroups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onViewStudents={setViewingGroupStudents} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="teacher" onViewDetails={handleOpenStudentDetails} />
+                    <GroupsPage students={teacherStudents} searchTerm={searchTerm} groups={visibleGroups} teachers={teachers} notes={notes} onViewGroupReport={handleViewGroupReport} onViewStudents={handleViewGroupStudents} onOpenFeeModal={handleOpenFeeModal} onAddTest={handleAddTest} onDeleteTest={handleDeleteTest} onAddNote={handleAddNote} onEdit={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchive={handleArchiveStudent} currentUserRole="teacher" onViewDetails={handleOpenStudentDetails} />
                 } />
                 <Route path="/attendance_report" element={
                     <AttendanceReportPage students={teacherStudents} groups={visibleGroups} onViewStudent={handleViewStudent} onArchive={handleArchiveStudent} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role} />
@@ -2492,7 +2382,7 @@ const App: React.FC = () => {
                 } />
 
                 {/* Sub-views as Route wrappers or catch-all */}
-                <Route path="/archive" element={renderArchiveList()} />
+                <Route path="/archive" element={<ArchivePage students={students} groups={groups} searchTerm={searchTerm} currentUser={currentUser!} onOpenFeeModal={handleOpenFeeModal} onEditStudent={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchiveStudent={handleArchiveStudent} onOpenStudentDetails={handleOpenStudentDetails} onDeleteStudentPermanently={handleDeleteStudentPermanently} supervisorFilteredData={supervisorFilteredData} />} />
                 <Route path="*" element={
                     (() => {
                         if (viewingGroup) return <GroupReportPage group={viewingGroup} students={activeStudents.filter(s => s.groupId === viewingGroup.id)} teacher={teachers.find(t => t.id === viewingGroup.teacherId)} onBack={() => handleBackButton()} currentUserRole={currentUser?.role} />;
@@ -2565,14 +2455,14 @@ const App: React.FC = () => {
                         <Sidebar
                             isOpen={isSidebarOpen}
                             onClose={() => setIsSidebarOpen(false)}
-                            onShowGeneralView={() => openDirectorView(setIsGeneralView, '/general-view')}
-                            onShowFinance={() => openDirectorView(setIsFinanceView, '/finance')}
-                            onShowFeeCollection={() => openDirectorView(setIsFeeCollectionView, '/fee-collection')}
-                            onShowNotifications={() => openDirectorView(setIsDirectorNotificationsView, '/directornotifications')}
-                            onShowNotes={() => openDirectorView(setIsDirectorNotesView, '/notes')}
-                            onShowTeacherManager={() => openDirectorView(setIsTeacherManagerView, '/teacher-manager')}
-                            onShowArchive={() => openDirectorView(setIsArchiveView, '/archive')}
-                            onShowDebtors={() => openDirectorView(setIsDebtorsView, '/debtors')}
+                            onShowGeneralView={() => navigate('/general-view')}
+                            onShowFinance={() => navigate('/finance')}
+                            onShowFeeCollection={() => navigate('/fee-collection')}
+                            onShowNotifications={() => navigate('/directornotifications')}
+                            onShowNotes={() => navigate('/notes')}
+                            onShowTeacherManager={() => navigate('/teacher-manager')}
+                            onShowArchive={() => navigate('/archive')}
+                            onShowDebtors={() => navigate('/debtors')}
                             onLogout={handleLogout}
                             currentUserRole={currentUser.role}
                             unreadMessagesCount={unreadMessagesCount}
