@@ -334,6 +334,38 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
         attendanceForMonth.filter(r => getAbsenceValue(r.status) > 0 && r.status !== TeacherAttendanceStatus.ABSENT && r.reason),
         [attendanceForMonth]);
 
+    const allCollections = useMemo(() => {
+        if (!employeeId) return [];
+        const teacherRecords = teacherCollections
+            .filter(c => c.teacherId === employeeId && c.month === selectedMonth)
+            .map(c => ({ ...c, type: 'handed_over' as const }));
+
+        const directorRecords: any[] = [];
+        if (!isSupervisor && teacher) {
+            const teacherGroupIds = new Set(groups.filter(g => g.teacherId === teacher.id).map(g => g.id));
+            const teacherStudents = students.filter(s => teacherGroupIds.has(s.groupId));
+            teacherStudents.forEach(s => {
+                const monthFee = s.fees?.find(f => f.month === selectedMonth && f.paid && f.collectedBy === 'director');
+                if (monthFee) {
+                    directorRecords.push({
+                        id: `dir-${s.id}-${monthFee.month}`,
+                        date: monthFee.paymentDate || `${monthFee.month}-01`,
+                        amount: monthFee.amountPaid || 0,
+                        notes: `تحصيل مباشر للطلاب: ${s.name}`,
+                        type: 'director_collection' as const
+                    });
+                }
+            });
+        }
+        return [...teacherRecords, ...directorRecords].sort((a, b) => b.date.localeCompare(a.date));
+    }, [employeeId, teacherCollections, selectedMonth, isSupervisor, teacher, groups, students]);
+
+    const filteredManualBonuses = useMemo(() => {
+        return teacherManualBonuses
+            .filter(b => b.teacherId === employeeId && b.month === selectedMonth)
+            .sort((a, b) => b.date.localeCompare(a.date));
+    }, [teacherManualBonuses, employeeId, selectedMonth]);
+
     const handlePayEmployee = (finalSalary: number) => {
         if (!employeeId || finalSalary <= 0) return;
         const category = isSupervisor ? ExpenseCategory.SUPERVISOR_SALARY : ExpenseCategory.TEACHER_SALARY;
@@ -691,7 +723,41 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                             <div className="p-4 border-b bg-gray-50/50 flex justify-between items-center">
                                 <h3 className="text-lg font-bold text-gray-800">تاريخ عمليات التسليم</h3>
                             </div>
-                            <div className="overflow-x-auto text-center">
+
+                            {/* Mobile View (Cards) */}
+                            <div className="md:hidden divide-y divide-gray-100">
+                                {allCollections.length > 0 ? (
+                                    allCollections.map(r => (
+                                        <div key={r.id} className="p-4 hover:bg-gray-50 transition-colors">
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <p className="text-sm font-bold text-gray-800">{new Date(r.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</p>
+                                                    <div className="mt-1">
+                                                        {r.type === 'handed_over' ? (
+                                                            <span className="px-2 py-0.5 bg-teal-50 text-teal-600 rounded-full text-[10px] font-bold">تسليم يدوي</span>
+                                                        ) : (
+                                                            <span className="px-2 py-0.5 bg-indigo-50 text-indigo-600 rounded-full text-[10px] font-bold">مدير مباشر</span>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                                <div className="text-left">
+                                                    <p className="text-lg font-black text-teal-600">{r.amount.toLocaleString()} ج.م</p>
+                                                </div>
+                                            </div>
+                                            {r.notes && (
+                                                <p className="text-xs text-gray-500 bg-gray-50 p-2 rounded-lg border border-dashed border-gray-200 mt-1">
+                                                    {r.notes}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="px-6 py-10 text-center text-gray-400 italic">لا توجد عمليات مسجلة لهذا الشهر.</div>
+                                )}
+                            </div>
+
+                            {/* Desktop View (Table) */}
+                            <div className="hidden md:block overflow-x-auto text-center">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
                                         <tr>
@@ -702,36 +768,8 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-100">
-                                        {(() => {
-                                            const teacherRecords = teacherCollections
-                                                .filter(c => c.teacherId === employeeId && c.month === selectedMonth)
-                                                .map(c => ({ ...c, type: 'handed_over' }));
-
-                                            const directorRecords: any[] = [];
-                                            if (!isSupervisor && teacher) {
-                                                const teacherGroupIds = new Set(groups.filter(g => g.teacherId === teacher.id).map(g => g.id));
-                                                const teacherStudents = students.filter(s => teacherGroupIds.has(s.groupId));
-                                                teacherStudents.forEach(s => {
-                                                    const monthFee = s.fees?.find(f => f.month === selectedMonth && f.paid && f.collectedBy === 'director');
-                                                    if (monthFee) {
-                                                        directorRecords.push({
-                                                            id: `dir-${s.id}-${monthFee.month}`,
-                                                            date: monthFee.paymentDate || `${monthFee.month}-01`,
-                                                            amount: monthFee.amountPaid || 0,
-                                                            notes: `تحصيل مباشر للطلاب: ${s.name}`,
-                                                            type: 'director_collection'
-                                                        });
-                                                    }
-                                                });
-                                            }
-
-                                            const allRecords = [...teacherRecords, ...directorRecords].sort((a, b) => b.date.localeCompare(a.date));
-
-                                            if (allRecords.length === 0) {
-                                                return <tr><td colSpan={4} className="px-6 py-10 text-center text-gray-400 italic">لا توجد عمليات مسجلة لهذا الشهر.</td></tr>;
-                                            }
-
-                                            return allRecords.map(r => (
+                                        {allCollections.length > 0 ? (
+                                            allCollections.map(r => (
                                                 <tr key={r.id}>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-bold">{new Date(r.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-teal-600 font-extrabold">{r.amount.toLocaleString()} ج.م</td>
@@ -744,8 +782,10 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                                                         )}
                                                     </td>
                                                 </tr>
-                                            ));
-                                        })()}
+                                            ))
+                                        ) : (
+                                            <tr><td colSpan={4} className="px-6 py-10 text-center text-gray-400 italic">لا توجد عمليات مسجلة لهذا الشهر.</td></tr>
+                                        )}
                                     </tbody>
                                 </table>
                             </div>
@@ -1031,7 +1071,46 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                             <div className="p-4 border-b bg-gray-50/50">
                                 <h3 className="text-lg font-bold text-gray-800">سجل المكافآت والخصومات اليدوية (الشهر المختار)</h3>
                             </div>
-                            <div className="overflow-x-auto">
+
+                            {/* Mobile View (Cards) */}
+                            <div className="md:hidden divide-y divide-gray-100">
+                                {filteredManualBonuses.length > 0 ? (
+                                    filteredManualBonuses.map(b => (
+                                        <div key={b.id} className={`p-4 hover:bg-gray-50 transition-colors ${b.amount < 0 ? 'bg-red-50/10' : 'bg-green-50/10'}`}>
+                                            <div className="flex justify-between items-start mb-2">
+                                                <div>
+                                                    <p className="text-sm font-bold text-gray-800">{new Date(b.date).toLocaleDateString('ar-EG')}</p>
+                                                    <p className="text-[10px] text-gray-400 font-bold mt-0.5">بواسطة: {b.addedBy === 'director' ? 'المدير' : 'مشرف'}</p>
+                                                </div>
+                                                <div className="flex flex-col items-end gap-2">
+                                                    <p className={`text-lg font-black ${b.amount < 0 ? 'text-red-600' : 'text-green-600'}`}>{b.amount.toLocaleString()} ج.م</p>
+                                                    <button
+                                                        onClick={() => {
+                                                            if (window.confirm('هل أنت متأكد من حذف هذه العملية؟')) {
+                                                                onDeleteManualBonus?.(b.id);
+                                                            }
+                                                        }}
+                                                        className="p-1.5 text-red-600 bg-red-50 rounded-lg hover:bg-red-100 transition-colors"
+                                                        title="حذف"
+                                                    >
+                                                        <TrashIcon className="w-4 h-4" />
+                                                    </button>
+                                                </div>
+                                            </div>
+                                            {b.reason && (
+                                                <p className="text-xs text-gray-500 bg-white/60 p-2 rounded-lg border border-dashed border-gray-200 mt-1">
+                                                    {b.reason}
+                                                </p>
+                                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="px-6 py-10 text-center text-gray-400 italic">لا توجد عمليات يدوية مسجلة لهذا الشهر.</div>
+                                )}
+                            </div>
+
+                            {/* Desktop View (Table) */}
+                            <div className="hidden md:block overflow-x-auto">
                                 <table className="min-w-full divide-y divide-gray-200">
                                     <thead className="bg-gray-50">
                                         <tr>
@@ -1043,8 +1122,8 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-100 italic text-center">
-                                        {teacherManualBonuses.filter(b => b.teacherId === employeeId && b.month === selectedMonth).length > 0 ? (
-                                            teacherManualBonuses.filter(b => b.teacherId === employeeId && b.month === selectedMonth).sort((a, b) => b.date.localeCompare(a.date)).map(b => (
+                                        {filteredManualBonuses.length > 0 ? (
+                                            filteredManualBonuses.map(b => (
                                                 <tr key={b.id} className={b.amount < 0 ? 'bg-red-50/10' : 'bg-green-50/10'}>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-bold">{new Date(b.date).toLocaleDateString('ar-EG')}</td>
                                                     <td className={`px-6 py-4 whitespace-nowrap text-sm font-black ${b.amount < 0 ? 'text-red-600' : 'text-green-600'}`}>{b.amount.toLocaleString()} ج.م</td>
