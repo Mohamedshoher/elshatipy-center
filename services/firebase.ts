@@ -1,5 +1,5 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore, initializeFirestore, persistentLocalCache } from "firebase/firestore";
+import { getFirestore, initializeFirestore, persistentLocalCache, persistentMultipleTabManager } from "firebase/firestore";
 
 // هام: يرجى استبدال القيم التالية بإعدادات مشروع Firebase الخاص بك
 // يمكنك الحصول عليها من إعدادات المشروع في لوحة تحكم Firebase
@@ -18,9 +18,12 @@ import { getMessaging } from "firebase/messaging";
 // تهيئة Firebase
 const app = initializeApp(firebaseConfig);
 
-// الحصول على نسخة من Firestore
-// تم تعطيل التخزين المحلي (Offline Persistence) لضمان مزامنة البيانات من الخادم دائماً
-const db = getFirestore(app);
+// تهيئة Firestore مع تفعيل التخزين المحلي (Offline Persistence) لسرعة التحميل
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({
+    tabManager: persistentMultipleTabManager()
+  })
+});
 
 const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
 

@@ -112,6 +112,10 @@ const App: React.FC = () => {
     const [donations, setDonations] = useState<Donation[]>([]);
     const [financialSettings, setFinancialSettings] = useState<FinancialSettings>({ workingDaysPerMonth: 22, absenceDeductionPercentage: 100 });
 
+    // --- Loading State ---
+    const [isDataLoading, setIsDataLoading] = useState(true);
+
+
 
 
     // --- Error State ---
@@ -286,6 +290,7 @@ const App: React.FC = () => {
             return onSnapshot(activeStudentsQuery, (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
                 setActiveStudentsRaw(data);
+                setIsDataLoading(false);
             });
         };
         const unsubActiveStudents = fetchStudents();
@@ -555,33 +560,49 @@ const App: React.FC = () => {
     };
 
     // ... (Event Handlers) ...
-    const handleOpenStudentDetails = (student: Student, initialTab: 'attendanceLog' | 'progressPlan' | 'tests' | 'fees' | 'notes' | 'reports' = 'attendanceLog') => {
+    const handleBackToMain = useCallback(() => {
+        setViewingGroup(null);
+        setViewingGroupStudents(null);
+        setViewingTeacherReportId(null);
+        setDetailsModalState(null);
+        setTeacherForDetails(null);
+        setSupervisorForDetails(null);
+        setIsFormOpen(false);
+        setIsTeacherFormOpen(false);
+        setIsGroupManagerOpen(false);
+        setIsSidebarOpen(false);
+        setIsSearchVisible(false);
+        setSearchTerm('');
+        navigate('/students');
+    }, [navigate]);
+
+    const handleOpenStudentDetails = useCallback((student: Student, initialTab: 'attendanceLog' | 'progressPlan' | 'tests' | 'fees' | 'notes' | 'reports' = 'attendanceLog') => {
         setDetailsModalState({ student, initialTab });
         navigate('/student-details');
-    };
+    }, [navigate]);
 
-    const handleCloseStudentDetails = () => {
+    const handleCloseStudentDetails = useCallback(() => {
         setDetailsModalState(null);
-    };
+    }, []);
 
-    const handleOpenTeacherDetails = (teacher: Teacher) => {
+    const handleOpenTeacherDetails = useCallback((teacher: Teacher) => {
         setTeacherForDetails(teacher);
         setSupervisorForDetails(null);
         navigate('/staff-details');
-    };
+    }, [navigate]);
 
-    const handleOpenSupervisorDetails = (supervisor: Supervisor) => {
+    const handleOpenSupervisorDetails = useCallback((supervisor: Supervisor) => {
         setSupervisorForDetails(supervisor);
         setTeacherForDetails(null);
         navigate('/staff-details');
-    };
+    }, [navigate]);
 
-    const handleCloseEmployeeDetails = () => {
+    const handleCloseEmployeeDetails = useCallback(() => {
         setTeacherForDetails(null);
         setSupervisorForDetails(null);
-    };
+    }, []);
 
-    const handleLogin = (user: CurrentUser) => {
+    const handleLogin = useCallback((user: CurrentUser) => {
         handleBackToMain();
         setStudentToEdit(null);
         setTeacherToEdit(null);
@@ -593,10 +614,10 @@ const App: React.FC = () => {
         setIsChatOpen(false);
 
         setCurrentUser(user);
-    };
+    }, [handleBackToMain, setCurrentUser]);
 
     // تسجيل دخول ولي الأمر
-    const handleParentLogin = (phone: string, password: string) => {
+    const handleParentLogin = useCallback((phone: string, password: string) => {
         const parent = parents.find(p => p.phone === phone && p.password === password);
         if (parent) {
             handleBackToMain();
@@ -610,12 +631,12 @@ const App: React.FC = () => {
         } else {
             alert('رقم الهاتف أو كلمة المرور غير صحيحة');
         }
-    };
+    }, [parents, handleBackToMain, setCurrentUser]);
 
-    const handleLogout = () => {
+    const handleLogout = useCallback(() => {
         setCurrentUser(null);
         navigate('/');
-    };
+    }, [navigate, setCurrentUser]);
 
     // Effect to sync parent currentUser with live parents data
     useEffect(() => {
@@ -634,19 +655,19 @@ const App: React.FC = () => {
         }
     }, [parents, (currentUser as any)?.id]);
 
-    const handleOpenMenu = () => {
+    const handleOpenMenu = useCallback(() => {
         setIsSidebarOpen(true);
         if (isSearchVisible) {
             setIsSearchVisible(false);
             setSearchTerm('');
         }
-    };
+    }, [isSearchVisible]);
 
-    const toggleSearch = () => {
+    const toggleSearch = useCallback(() => {
         const newVisibility = !isSearchVisible;
         setIsSearchVisible(newVisibility);
         if (!newVisibility) { setSearchTerm(''); }
-    };
+    }, [isSearchVisible]);
 
     // ... (CRUD Handlers) ...
     const addOrUpdateStudent = async (studentData: Omit<Student, 'id' | 'attendance' | 'fees' | 'tests'>, studentId?: string) => {
@@ -1745,21 +1766,6 @@ const App: React.FC = () => {
         await batch.commit();
     }
 
-    // View Navigation
-    const handleBackToMain = useCallback(() => {
-        setViewingGroup(null);
-        setViewingGroupStudents(null);
-        setViewingTeacherReportId(null);
-        setTeacherForDetails(null);
-        setSupervisorForDetails(null);
-        setDetailsModalState(null);
-        setStudentToEdit(null);
-
-        setIsTeacherFilterVisible(false);
-        setIsSearchVisible(false);
-        setSearchTerm('');
-        navigate('/students');
-    }, [navigate]);
 
     const handleViewGroupReport = (groupId: string) => {
         const group = groups.find(g => g.id === groupId);
@@ -2505,15 +2511,17 @@ const App: React.FC = () => {
                     <main className="flex-1 overflow-y-auto pb-20">
                         <ErrorBoundary>
                             <Suspense fallback={<ListSkeleton />}>
-                                {currentUser.role === 'director'
-                                    ? renderDirectorContent()
-                                    : (currentUser.role === 'supervisor'
-                                        ? renderSupervisorContent()
-                                        : (currentUser.role === 'parent'
-                                            ? <ParentView currentUser={currentUser} students={students} groups={groups} teachers={teachers} unreadMessagesCount={unreadMessagesCount} setIsChatOpen={setIsChatOpen} setChatInitialUserId={setChatInitialUserId} />
-                                            : (teachers.length > 0 ? renderTeacherContent() : <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>))
-                                    )
-                                }
+                                {isDataLoading && activeStudents.length === 0 ? (
+                                    <ListSkeleton />
+                                ) : (
+                                    currentUser.role === 'director'
+                                        ? renderDirectorContent()
+                                        : (currentUser.role === 'supervisor'
+                                            ? renderSupervisorContent()
+                                            : (currentUser.role === 'parent'
+                                                ? <ParentView currentUser={currentUser} students={students} groups={groups} teachers={teachers} unreadMessagesCount={unreadMessagesCount} setIsChatOpen={setIsChatOpen} setChatInitialUserId={setChatInitialUserId} />
+                                                : (teachers.length > 0 ? renderTeacherContent() : <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>)))
+                                )}
 
                                 {/* Modals & Overlays - Now inside the main Suspense */}
                                 <StudentForm isOpen={isFormOpen} onClose={() => { setIsFormOpen(false); setStudentToEdit(null); }} onSave={addOrUpdateStudent} studentToEdit={studentToEdit} groups={visibleGroups} />
