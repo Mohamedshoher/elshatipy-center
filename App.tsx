@@ -86,40 +86,15 @@ const App: React.FC = () => {
     const location = useLocation();
     // --- Data from Firestore ---
     // --- Data from Firestore with Local Caching for Instant Load ---
-    const [activeStudentsRaw, setActiveStudentsRaw] = useState<Student[]>(() => {
-        try {
-            const cached = localStorage.getItem('shatibi_cache_students_active');
-            return cached ? JSON.parse(cached) : [];
-        } catch { return []; }
-    });
+    const [activeStudentsRaw, setActiveStudentsRaw] = useState<Student[]>([]);
     const [archivedStudentsRaw, setArchivedStudentsRaw] = useState<Student[]>([]);
     const students = useMemo(() => [...activeStudentsRaw, ...archivedStudentsRaw], [activeStudentsRaw, archivedStudentsRaw]);
-    const [groups, setGroups] = useState<Group[]>(() => {
-        try {
-            const cached = localStorage.getItem('shatibi_cache_groups');
-            return cached ? JSON.parse(cached) : [];
-        } catch { return []; }
-    });
-    const [teachers, setTeachers] = useState<Teacher[]>(() => {
-        try {
-            const cached = localStorage.getItem('shatibi_cache_teachers');
-            return cached ? JSON.parse(cached) : [];
-        } catch { return []; }
-    });
-    const [supervisors, setSupervisors] = useState<Supervisor[]>(() => {
-        try {
-            const cached = localStorage.getItem('shatibi_cache_supervisors');
-            return cached ? JSON.parse(cached) : [];
-        } catch { return []; }
-    });
+    const [groups, setGroups] = useState<Group[]>([]);
+    const [teachers, setTeachers] = useState<Teacher[]>([]);
+    const [supervisors, setSupervisors] = useState<Supervisor[]>([]);
 
     const activeTeachers = useMemo(() => teachers.filter(t => t.status === TeacherStatus.ACTIVE), [teachers]);
-    const [parents, setParents] = useState<Parent[]>(() => {
-        try {
-            const cached = localStorage.getItem('shatibi_cache_parents');
-            return cached ? JSON.parse(cached) : [];
-        } catch { return []; }
-    });
+    const [parents, setParents] = useState<Parent[]>([]);
     const [notes, setNotes] = useState<Note[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [directorNotifications, setDirectorNotifications] = useState<DirectorNotification[]>([]);
@@ -137,17 +112,7 @@ const App: React.FC = () => {
     const [donations, setDonations] = useState<Donation[]>([]);
     const [financialSettings, setFinancialSettings] = useState<FinancialSettings>({ workingDaysPerMonth: 22, absenceDeductionPercentage: 100 });
 
-    // Helper to persist large cache safely
-    const safePersist = (key: string, data: any) => {
-        try {
-            localStorage.setItem(key, JSON.stringify(data));
-        } catch (e) {
-            console.warn(`Failed to cache ${key}:`, e);
-            if (e instanceof Error && e.name === 'QuotaExceededError') {
-                localStorage.removeItem(key); // Clear if full to prevent broken cache
-            }
-        }
-    };
+
 
     // --- Error State ---
     const [permissionError, setPermissionError] = useState(false);
@@ -253,7 +218,6 @@ const App: React.FC = () => {
             onSnapshot(collection(db, name), (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                 setter(data);
-                safePersist(cacheKey, data);
             }, (error) => {
                 console.error(`Error fetching public ${name}:`, error.message);
             })
@@ -295,7 +259,6 @@ const App: React.FC = () => {
         const unsubGroups = onSnapshot(groupsQuery, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Group));
             setGroups(data);
-            safePersist('shatibi_cache_groups', data);
         });
         unsubscribers.push(unsubGroups);
 
@@ -323,7 +286,6 @@ const App: React.FC = () => {
             return onSnapshot(activeStudentsQuery, (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
                 setActiveStudentsRaw(data);
-                safePersist('shatibi_cache_students_active', data);
             });
         };
         const unsubActiveStudents = fetchStudents();

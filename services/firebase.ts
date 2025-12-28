@@ -18,32 +18,9 @@ import { getMessaging } from "firebase/messaging";
 // تهيئة Firebase
 const app = initializeApp(firebaseConfig);
 
-// الحصول على نسخة من Firestore مع تمكين التخزين المحلي
-let db;
-// Check if we're in a browser environment
-if (typeof window !== 'undefined') {
-  try {
-    db = initializeFirestore(app, {
-      localCache: persistentLocalCache({})
-    });
-    console.log("✅ Offline persistence enabled.");
-  } catch (err: any) {
-    if (err.code == 'failed-precondition') {
-      // Multiple tabs open - this is expected, use fallback
-      db = getFirestore(app);
-    } else if (err.code == 'unimplemented') {
-      console.warn("⚠️ Browser doesn't support persistence. Using in-memory cache.");
-      db = getFirestore(app);
-    } else {
-      console.error("❌ Error enabling offline persistence: ", err);
-      // Fallback to in-memory cache
-      db = getFirestore(app);
-    }
-  }
-} else {
-  // Server-side: use default Firestore
-  db = getFirestore(app);
-}
+// الحصول على نسخة من Firestore
+// تم تعطيل التخزين المحلي (Offline Persistence) لضمان مزامنة البيانات من الخادم دائماً
+const db = getFirestore(app);
 
 const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
 
