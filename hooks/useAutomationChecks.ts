@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { doc, getDoc, collection, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { CurrentUser, Student, Teacher, Group, TeacherStatus, TeacherAttendanceStatus, FinancialSettings, TeacherAttendanceRecord, AttendanceStatus } from '../types';
-import { getCairoNow, getCairoDateString, getYesterdayDateString, isCairoAfterMidnight, isCairoAfter12_05, isCairoWorkday } from '../services/cairoTimeHelper';
+import { getCairoNow, getCairoDateString, getYesterdayDateString, isCairoAfterMidnight, isCairoAfter12_05, isCairoWorkday, getArabicDayName } from '../services/cairoTimeHelper';
 
 interface UseAutomationChecksProps {
     currentUser: CurrentUser | null;
@@ -90,6 +90,8 @@ export const useAutomationChecks = ({
                     batch.set(automationRef, { lastDeductionCheck: yesterdayString }, { merge: true });
                     operationsCount++;
 
+                    const dayName = getArabicDayName(yesterdayDate);
+
                     for (const teacher of activeTeachersWithStudents) {
                         if (!teacher.students.some(s => new Date(s.joiningDate) <= dateToCheck)) continue;
 
@@ -110,11 +112,10 @@ export const useAutomationChecks = ({
                                 teacherName: teacher.name,
                                 date: yesterdayString,
                                 status: TeacherAttendanceStatus.MISSING_REPORT,
-                                reason: 'تلقائي: لم يتم تسليم التقرير اليومي',
+                                reason: `تلقائي: لم يتم تسليم تقرير يوم ${dayName}`,
                                 timestamp: getCairoNow().toISOString()
                             });
 
-                            const dayName = dateToCheck.toLocaleDateString('ar-EG', { weekday: 'long' });
                             const dirNoteId = `dir-deduct-${teacher.id}-${yesterdayString}`;
                             batch.set(doc(db, 'directorNotifications', dirNoteId), {
                                 date: getCairoNow().toISOString(),

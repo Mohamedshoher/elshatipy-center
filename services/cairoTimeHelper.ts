@@ -8,11 +8,19 @@
  * @returns كائن Date يمثل الوقت الحالي بتوقيت القاهرة
  */
 export function getCairoNow(): Date {
-  const utcDate = new Date();
-  // مصر في التوقيت UTC+2 (تجاهل التوقيت الصيفي للبساطة)
-  // نحول UTC إلى UTC+2 بإضافة ساعتين
-  const cairoDate = new Date(utcDate.getTime() + (2 * 60 * 60 * 1000) - (utcDate.getTimezoneOffset() * 60 * 1000));
-  return cairoDate;
+  const now = new Date();
+  // تحويل الوقت المحلي إلى UTC ثم إضافة ساعتين (توقيت مصر)
+  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
+  return new Date(utc + (2 * 3600000));
+}
+
+/**
+ * الحصول على اسم اليوم باللغة العربية
+ * @param date التاريخ المراد استخراج اسم اليوم منه
+ * @returns اسم اليوم (الأحد، الاثنين، ...)
+ */
+export function getArabicDayName(date: Date): string {
+  return date.toLocaleDateString('ar-EG', { weekday: 'long' });
 }
 
 /**
