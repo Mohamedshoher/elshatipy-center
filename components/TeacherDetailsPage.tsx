@@ -235,33 +235,45 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
     const payrollData = useMemo(() => {
         if (!employeeId) return { baseSalary: 0, adjustments: { bonus: 0, isPaid: false }, absenceDays: 0, bonusDays: 0, absenceDeduction: 0, attendanceBonus: 0, manualBonusTotal: 0, finalSalary: 0, isPaid: false, isPartnership: false, partnershipAmount: 0, collectedAmount: 0, totalHandedOver: 0, remainingBalance: 0 };
 
-        // Calculate collected amount for this teacher (if teacher)
-        let collectedAmount = 0;
+        // Calculate collected amount - differentiate between teacher and director collection
+        let collectedByTeacher = 0;
+        let collectedByDirector = 0;
+        let totalCollectedRevenue = 0;
+
         if (!isSupervisor && teacher) {
-            // Optimization: Use a Set for group IDs
             const teacherGroupIds = new Set(
                 groups.filter(g => g.teacherId === teacher.id).map(g => g.id)
             );
 
-            // Only filter students once
             const teacherStudents = students.filter(s => teacherGroupIds.has(s.groupId));
-
             const monthPrefix = selectedMonth;
-            collectedAmount = teacherStudents.reduce((total, s) => {
+
+            teacherStudents.forEach(s => {
                 const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
-                return total + (monthFee?.amountPaid || 0);
-            }, 0);
+                if (monthFee) {
+                    const amount = monthFee.amountPaid || 0;
+                    totalCollectedRevenue += amount;
+                    if (monthFee.collectedBy === 'director') {
+                        collectedByDirector += amount;
+                    } else {
+                        // Assume collected by teacher for legacy or if explicitly theirs
+                        collectedByTeacher += amount;
+                    }
+                }
+            });
         }
+
+        const collectedAmount = collectedByTeacher; // For compatibility with existing labels if needed, but we'll use clearer names
 
         const isPartnership = !isSupervisor && teacher?.paymentType === PaymentType.PARTNERSHIP;
         const baseSalary = isPartnership ? 0 : employeeSalary;
         const partnershipPercentage = isPartnership ? (teacher?.partnershipPercentage || 0) : 0;
-        const partnershipAmount = isPartnership ? (collectedAmount * partnershipPercentage / 100) : 0;
+        const partnershipAmount = isPartnership ? (totalCollectedRevenue * partnershipPercentage / 100) : 0;
 
         // Calculate handed over and remaining balance for partnership
         const collectionsForMonth = teacherCollections.filter(c => c.teacherId === employeeId && c.month === selectedMonth);
         const totalHandedOver = collectionsForMonth.reduce((sum, c) => sum + c.amount, 0);
-        const remainingBalance = collectedAmount - totalHandedOver;
+        const remainingBalance = collectedByTeacher - totalHandedOver;
 
         // Calculate manual bonuses for this month
         const manualBonusesForMonth = teacherManualBonuses.filter(b => b.teacherId === employeeId && b.month === selectedMonth);
@@ -307,7 +319,10 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
             collectedAmount,
             totalHandedOver,
             remainingBalance,
-            partnershipPercentage
+            partnershipPercentage,
+            collectedByTeacher,
+            collectedByDirector,
+            totalCollectedRevenue
         };
     }, [employeeId, employeeSalary, selectedMonth, teacherPayrollAdjustments, attendanceForMonth, financialSettings, teacherCollections, teacherManualBonuses, teacher, isSupervisor, groups, students]);
 
@@ -437,8 +452,12 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
 
         if (payrollData.isPartnership) {
             message += `💰 *تفاصيل الشراكة (${payrollData.partnershipPercentage}%):*\n`;
-            message += `   • إجمالي المحصل: ${payrollData.collectedAmount.toLocaleString()} ج.م\n`;
+            message += `   • إجمالي الدخل: ${payrollData.totalCollectedRevenue.toLocaleString()} ج.م\n`;
+            message += `   • ما حصله المدرس: ${payrollData.collectedByTeacher.toLocaleString()} ج.م\n`;
             message += `   • المسلّم للإدارة: ${payrollData.totalHandedOver.toLocaleString()} ج.م\n`;
+            if (payrollData.collectedByDirector > 0) {
+                message += `   • المحصل بواسطة المدير: ${payrollData.collectedByDirector.toLocaleString()} ج.م\n`;
+            }
             if (payrollData.remainingBalance !== 0) {
                 const status = payrollData.remainingBalance > 0 ? '(عليك)' : '(لك)';
                 message += `   • المتبقي ${status}: ${Math.abs(payrollData.remainingBalance).toLocaleString()} ج.م\n`;
@@ -648,24 +667,28 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                         </div>
 
                         {/* Current Status Highlights */}
-                        <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
                             <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 text-center">
-                                <p className="text-xs font-bold text-blue-400 mb-1 uppercase tracking-wider">إجمالي ما حصله المدرس</p>
-                                <p className="text-2xl font-black text-blue-700">{payrollData.collectedAmount.toLocaleString()} ج.م</p>
+                                <p className="text-xs font-bold text-blue-400 mb-1 uppercase tracking-wider">ما حصله المدرس</p>
+                                <p className="text-xl font-black text-blue-700">{payrollData.collectedByTeacher.toLocaleString()} ج.م</p>
+                            </div>
+                            <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 text-center">
+                                <p className="text-xs font-bold text-indigo-400 mb-1 uppercase tracking-wider">مستلم بواسطة المدير</p>
+                                <p className="text-xl font-black text-indigo-700">{payrollData.collectedByDirector.toLocaleString()} ج.م</p>
                             </div>
                             <div className="bg-teal-50 p-4 rounded-2xl border border-teal-100 text-center">
-                                <p className="text-xs font-bold text-teal-400 mb-1 uppercase tracking-wider">ما سلمه المدرس للمركز</p>
-                                <p className="text-2xl font-black text-teal-700">{payrollData.totalHandedOver.toLocaleString()} ج.م</p>
+                                <p className="text-xs font-bold text-teal-400 mb-1 uppercase tracking-wider">ما سلمه المدرس</p>
+                                <p className="text-xl font-black text-teal-700">{payrollData.totalHandedOver.toLocaleString()} ج.م</p>
                             </div>
                             <div className={`${payrollData.remainingBalance > 0 ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'} p-4 rounded-2xl border text-center`}>
                                 <p className={`text-xs font-bold ${payrollData.remainingBalance > 0 ? 'text-red-400' : 'text-green-400'} mb-1 uppercase tracking-wider`}>المتبقي معه (عجـز)</p>
-                                <p className={`text-2xl font-black ${payrollData.remainingBalance > 0 ? 'text-red-700' : 'text-green-700'}`}>{payrollData.remainingBalance.toLocaleString()} ج.م</p>
+                                <p className={`text-xl font-black ${payrollData.remainingBalance > 0 ? 'text-red-700' : 'text-green-700'}`}>{payrollData.remainingBalance.toLocaleString()} ج.م</p>
                             </div>
                         </div>
 
                         {/* Collection History Table */}
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">
-                            <div className="p-4 border-b bg-gray-50/50">
+                            <div className="p-4 border-b bg-gray-50/50 flex justify-between items-center">
                                 <h3 className="text-lg font-bold text-gray-800">تاريخ عمليات التسليم</h3>
                             </div>
                             <div className="overflow-x-auto text-center">
@@ -675,20 +698,54 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                                             <th className="px-6 py-3 text-sm font-bold text-gray-500 uppercase">التاريخ</th>
                                             <th className="px-6 py-3 text-sm font-bold text-gray-500 uppercase">المبلغ</th>
                                             <th className="px-6 py-3 text-sm font-bold text-gray-500 uppercase">ملاحظات</th>
+                                            <th className="px-6 py-3 text-sm font-bold text-gray-500 uppercase">النوع</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-100">
-                                        {teacherCollections.filter(c => c.teacherId === employeeId && c.month === selectedMonth).length > 0 ? (
-                                            teacherCollections.filter(c => c.teacherId === employeeId && c.month === selectedMonth).sort((a, b) => b.date.localeCompare(a.date)).map(c => (
-                                                <tr key={c.id}>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-bold">{new Date(c.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-teal-600 font-extrabold">{c.amount.toLocaleString()} ج.م</td>
-                                                    <td className="px-6 py-4 text-sm text-gray-500">{c.notes || '-'}</td>
+                                        {(() => {
+                                            const teacherRecords = teacherCollections
+                                                .filter(c => c.teacherId === employeeId && c.month === selectedMonth)
+                                                .map(c => ({ ...c, type: 'handed_over' }));
+
+                                            const directorRecords: any[] = [];
+                                            if (!isSupervisor && teacher) {
+                                                const teacherGroupIds = new Set(groups.filter(g => g.teacherId === teacher.id).map(g => g.id));
+                                                const teacherStudents = students.filter(s => teacherGroupIds.has(s.groupId));
+                                                teacherStudents.forEach(s => {
+                                                    const monthFee = s.fees?.find(f => f.month === selectedMonth && f.paid && f.collectedBy === 'director');
+                                                    if (monthFee) {
+                                                        directorRecords.push({
+                                                            id: `dir-${s.id}-${monthFee.month}`,
+                                                            date: monthFee.paymentDate || `${monthFee.month}-01`,
+                                                            amount: monthFee.amountPaid || 0,
+                                                            notes: `تحصيل مباشر للطلاب: ${s.name}`,
+                                                            type: 'director_collection'
+                                                        });
+                                                    }
+                                                });
+                                            }
+
+                                            const allRecords = [...teacherRecords, ...directorRecords].sort((a, b) => b.date.localeCompare(a.date));
+
+                                            if (allRecords.length === 0) {
+                                                return <tr><td colSpan={4} className="px-6 py-10 text-center text-gray-400 italic">لا توجد عمليات مسجلة لهذا الشهر.</td></tr>;
+                                            }
+
+                                            return allRecords.map(r => (
+                                                <tr key={r.id}>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-bold">{new Date(r.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-teal-600 font-extrabold">{r.amount.toLocaleString()} ج.م</td>
+                                                    <td className="px-6 py-4 text-sm text-gray-500">{r.notes || '-'}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-xs">
+                                                        {r.type === 'handed_over' ? (
+                                                            <span className="px-2 py-1 bg-teal-50 text-teal-600 rounded-full font-bold">تسليم يدوي</span>
+                                                        ) : (
+                                                            <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full font-bold">مدير مباشر</span>
+                                                        )}
+                                                    </td>
                                                 </tr>
-                                            ))
-                                        ) : (
-                                            <tr><td colSpan={3} className="px-6 py-10 text-center text-gray-400 italic">لا توجد عمليات تسليم مسجلة لهذا الشهر.</td></tr>
-                                        )}
+                                            ));
+                                        })()}
                                     </tbody>
                                 </table>
                             </div>

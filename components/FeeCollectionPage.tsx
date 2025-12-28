@@ -1,5 +1,6 @@
 
 
+
 import React, { useState, useMemo } from 'react';
 import type { Teacher, Group, Student, TeacherCollectionRecord } from '../types';
 import { TeacherStatus } from '../types';
@@ -119,30 +120,31 @@ const TeacherFeeCard = React.memo(({ teacher, groups, students, teacherCollectio
     const financialData = useMemo(() => {
         const teacherGroupIds = groups.filter(g => g.teacherId === teacher.id).map(g => g.id);
 
-        // Calculate amount collected by this specific teacher
-        // 1. If 'collectedBy' is set, it's the source of truth
-        // 2. If 'collectedBy' is missing (old data), fallback to current group ownership
-        const totalCollectedByTeacher = students
-            .flatMap(s => s.fees.map(f => ({ fee: f, studentGroupId: s.groupId })))
-            .filter(({ fee, studentGroupId }) => {
-                const isMatch = fee.month === selectedMonth && fee.paid && fee.amountPaid;
-                if (!isMatch) return false;
+        let totalCollectedByTeacher = 0;
+        let totalCollectedByDirector = 0;
 
-                if (fee.collectedBy) {
-                    return fee.collectedBy === teacher.id;
-                } else {
-                    return teacherGroupIds.includes(studentGroupId);
+        students.forEach(s => {
+            s.fees.forEach(fee => {
+                const isMatch = fee.month === selectedMonth && fee.paid && fee.amountPaid;
+                if (!isMatch) return;
+
+                const val = fee.amountPaid || 0;
+                if (fee.collectedBy === 'director') {
+                    totalCollectedByDirector += val;
+                } else if (fee.collectedBy === teacher.id) {
+                    totalCollectedByTeacher += val;
+                } else if (!fee.collectedBy && teacherGroupIds.includes(s.groupId)) {
+                    // Legacy fallback
+                    totalCollectedByTeacher += val;
                 }
-            })
-            .reduce((sum, { fee }) => sum + (fee.amountPaid || 0), 0);
+            });
+        });
 
         const collectionsForMonth = teacherCollections.filter(c => c.teacherId === teacher.id && c.month === selectedMonth);
-
         const totalHandedOver = collectionsForMonth.reduce((sum, c) => sum + c.amount, 0);
-
         const remainingBalance = totalCollectedByTeacher - totalHandedOver;
 
-        return { totalCollectedByTeacher, totalHandedOver, remainingBalance, collectionsForMonth };
+        return { totalCollectedByTeacher, totalCollectedByDirector, totalHandedOver, remainingBalance, collectionsForMonth };
     }, [teacher, groups, students, teacherCollections, selectedMonth]);
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -174,10 +176,14 @@ const TeacherFeeCard = React.memo(({ teacher, groups, students, teacherCollectio
                         </div>
                         <div>
                             <h3 className="text-xl font-bold text-gray-800">{teacher.name}</h3>
-                            <div className="flex gap-3 mt-1 text-xs sm:text-sm">
+                            <div className="flex flex-wrap gap-3 mt-1 text-xs sm:text-sm">
                                 <div className="flex items-center gap-1">
-                                    <span className="text-gray-500">المحصّل:</span>
+                                    <span className="text-gray-500">حصله المدرس:</span>
                                     <span className="font-bold text-green-600">{financialData.totalCollectedByTeacher.toLocaleString()}</span>
+                                </div>
+                                <div className="flex items-center gap-1">
+                                    <span className="text-gray-500">مباشر للمدير:</span>
+                                    <span className="font-bold text-indigo-600">{financialData.totalCollectedByDirector.toLocaleString()}</span>
                                 </div>
                                 <div className="flex items-center gap-1">
                                     <span className="text-gray-500">المُسلَّم:</span>
@@ -200,18 +206,22 @@ const TeacherFeeCard = React.memo(({ teacher, groups, students, teacherCollectio
             {isExpanded && (
                 <div className="bg-gray-50 border-t border-gray-200">
                     <div className="p-6">
-                        <div className="grid grid-cols-1 md:grid-cols-3 gap-4 text-center mb-6 md:hidden">
+                        <div className="grid grid-cols-2 md:grid-cols-4 gap-4 text-center mb-6">
                             <div className="bg-green-50 p-2 rounded-lg">
-                                <p className="text-sm font-semibold text-green-700">إجمالي المحصّل</p>
-                                <p className="text-xl font-bold text-green-600 mt-1">{financialData.totalCollectedByTeacher.toLocaleString()} EGP</p>
+                                <p className="text-[10px] sm:text-xs font-semibold text-green-700">المحصّل بواسطة المدرس</p>
+                                <p className="text-base sm:text-lg font-bold text-green-600 mt-1">{financialData.totalCollectedByTeacher.toLocaleString()} ج.م</p>
+                            </div>
+                            <div className="bg-indigo-50 p-2 rounded-lg">
+                                <p className="text-[10px] sm:text-xs font-semibold text-indigo-700">مباشر للمدير</p>
+                                <p className="text-base sm:text-lg font-bold text-indigo-600 mt-1">{financialData.totalCollectedByDirector.toLocaleString()} ج.م</p>
                             </div>
                             <div className="bg-blue-50 p-2 rounded-lg">
-                                <p className="text-sm font-semibold text-blue-700">المبلغ المسلَّم</p>
-                                <p className="text-xl font-bold text-blue-600 mt-1">{financialData.totalHandedOver.toLocaleString()} EGP</p>
+                                <p className="text-[10px] sm:text-xs font-semibold text-blue-700">المبلغ المسلَّم</p>
+                                <p className="text-base sm:text-lg font-bold text-blue-600 mt-1">{financialData.totalHandedOver.toLocaleString()} ج.م</p>
                             </div>
                             <div className="bg-red-50 p-2 rounded-lg">
-                                <p className="text-sm font-semibold text-red-700">المبلغ المتبقي</p>
-                                <p className="text-xl font-bold text-red-600 mt-1">{financialData.remainingBalance.toLocaleString()} EGP</p>
+                                <p className="text-[10px] sm:text-xs font-semibold text-red-700">المبلغ المتبقي</p>
+                                <p className="text-base sm:text-lg font-bold text-red-600 mt-1">{financialData.remainingBalance.toLocaleString()} ج.م</p>
                             </div>
                         </div>
 

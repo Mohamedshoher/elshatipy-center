@@ -59,23 +59,42 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
     return students.filter(s => groupIds.includes(s.groupId) && !s.isArchived);
   }, [students, assignedGroups]);
 
-  const collectedAmount = useMemo(() => {
+  const { collectedByTeacher, collectedByDirector, totalRevenue } = useMemo(() => {
     const groupIds = assignedGroups.map(g => g.id);
-    return students
-      .flatMap(s => s.fees.map(f => ({ fee: f, studentGroupId: s.groupId })))
-      .filter(({ fee, studentGroupId }) => {
+    let byTeacher = 0;
+    let byDirector = 0;
+    let total = 0;
+
+    students.forEach(s => {
+      s.fees.forEach(fee => {
         const isMatch = fee.month === selectedMonth && fee.paid && fee.amountPaid;
-        if (!isMatch) return false;
+        if (!isMatch) return;
+
+        const amount = fee.amountPaid || 0;
+        total += amount;
 
         if (fee.collectedBy) {
-          return fee.collectedBy === teacher.id;
+          if (fee.collectedBy === teacher.id) {
+            byTeacher += amount;
+          } else if (fee.collectedBy === 'director') {
+            byDirector += amount;
+          } else {
+            // Some other collector? Assume group assignment for legacy if not director
+            if (groupIds.includes(s.groupId)) byTeacher += amount;
+          }
         } else {
           // Fallback for older data: count if student is CURRENTLY in this teacher's group
-          return groupIds.includes(studentGroupId);
+          if (groupIds.includes(s.groupId)) {
+            byTeacher += amount;
+          }
         }
-      })
-      .reduce((sum, { fee }) => sum + (fee.amountPaid || 0), 0);
+      });
+    });
+
+    return { collectedByTeacher: byTeacher, collectedByDirector: byDirector, totalRevenue: total };
   }, [students, assignedGroups, teacher.id, selectedMonth]);
+
+  const collectedAmount = collectedByTeacher;
 
   const collectionData = useMemo(() => {
     const collectionsForMonth = teacherCollections.filter(c => c.teacherId === teacher.id && c.month === selectedMonth);
@@ -93,7 +112,7 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
     // If paymentType is not set, default to SALARY for backward compatibility
     const isPartnership = teacher.paymentType === PaymentType.PARTNERSHIP;
     const baseSalary = isPartnership ? 0 : (teacher.salary || 0);
-    const partnershipAmount = isPartnership ? (collectedAmount * (teacher.partnershipPercentage || 0) / 100) : 0;
+    const partnershipAmount = isPartnership ? (totalRevenue * (teacher.partnershipPercentage || 0) / 100) : 0;
 
     const adjustments = teacherPayrollAdjustments.find(p => p.teacherId === teacher.id && p.month === selectedMonth) || { bonus: 0, isPaid: false };
     const absenceDays = attendanceForMonth.reduce((total, record) => total + getAbsenceValue(record.status), 0);
@@ -138,12 +157,16 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
     let message = `*تقرير الأداء والراتب - ${monthName}*\n`;
     message += `*المدرس/ة:* ${teacher.name}\n\n`;
     message += `*--- ملخص الأداء ---*\n`;
-    message += `*المبلغ المحصّل:* ${collectedAmount.toLocaleString()} EGP\n`;
+    message += `*إجمالي دخل مجموعاتك:* ${totalRevenue.toLocaleString()} EGP\n`;
+    message += `*ما حصلته أنت:* ${collectedByTeacher.toLocaleString()} EGP\n`;
+    if (collectedByDirector > 0) {
+      message += `*حصلته الإدارة مباشرة:* ${collectedByDirector.toLocaleString()} EGP\n`;
+    }
 
     if (payrollData.isPartnership) {
       message += `*المبلغ المسلّم للإدارة:* ${collectionData.totalHandedOver.toLocaleString()} EGP\n`;
       if (collectionData.remainingBalance > 0) {
-        message += `*المبلغ المتبقي (في ذمتك):* ${collectionData.remainingBalance.toLocaleString()} EGP\n`;
+        message += `*المبلغ المتبقي (عليك):* ${collectionData.remainingBalance.toLocaleString()} EGP\n`;
       }
     }
 
@@ -246,15 +269,23 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
                     <span className="font-bold text-green-700">🤝 شراكة ({teacher.partnershipPercentage}%)</span>
                   </div>
                   <div className="flex justify-between items-center border-b pb-2">
-                    <span className="text-gray-600">المبلغ المحصّل:</span>
-                    <span className="font-bold">{collectedAmount.toLocaleString()} EGP</span>
+                    <span className="text-gray-600">إجمالي دخل المجموعات:</span>
+                    <span className="font-bold">{totalRevenue.toLocaleString()} EGP</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <span className="text-gray-600">ما حصله المدرس:</span>
+                    <span className="font-bold text-blue-600">{collectedByTeacher.toLocaleString()} EGP</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <span className="text-gray-600">محصل بواسطة المدير:</span>
+                    <span className="font-bold text-indigo-600">{collectedByDirector.toLocaleString()} EGP</span>
                   </div>
                   <div className="flex justify-between items-center border-b pb-2">
                     <span className="text-gray-600">المبلغ المسلّم للإدارة:</span>
-                    <span className="font-bold text-blue-600">{collectionData.totalHandedOver.toLocaleString()} EGP</span>
+                    <span className="font-bold text-teal-600">{collectionData.totalHandedOver.toLocaleString()} EGP</span>
                   </div>
                   <div className="flex justify-between items-center border-b pb-2">
-                    <span className="text-gray-600">المتبقي (في ذمة المدرس):</span>
+                    <span className="text-gray-600">المتبقي (عجز):</span>
                     <span className={`font-bold ${collectionData.remainingBalance > 0 ? 'text-red-600' : 'text-green-600'}`}>{collectionData.remainingBalance.toLocaleString()} EGP</span>
                   </div>
                   <div className="flex justify-between items-center border-b pb-2 mt-2 pt-2 border-t-2">
