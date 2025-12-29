@@ -22,6 +22,98 @@ const SECTIONS = [
     { id: 'group-all', name: '📢 جميع المدرسين', keyword: 'all' },
 ];
 
+// Helper function to format "last seen" time
+const formatLastSeen = (timestamp: any): string => {
+    if (!timestamp) return 'غير متصل';
+    
+    try {
+        const lastSeenTime = timestamp.toDate?.() || new Date(timestamp);
+        const now = new Date();
+        const diffMs = now.getTime() - lastSeenTime.getTime();
+        const diffMinutes = Math.floor(diffMs / 60000);
+        const diffHours = Math.floor(diffMs / 3600000);
+        const diffDays = Math.floor(diffMs / 86400000);
+        
+        if (diffMinutes < 1) {
+            return 'نشط الآن';
+        }
+        if (diffMinutes < 60) {
+            return `منذ ${diffMinutes} د`;
+        }
+        if (diffHours < 24) {
+            return `منذ ${diffHours} س`;
+        }
+        if (diffDays === 1) {
+            return 'أمس';
+        }
+        if (diffDays < 7) {
+            return `منذ ${diffDays} أيام`;
+        }
+        
+        // Format: 12 ديسمبر
+        const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+        const dateNum = lastSeenTime.getDate();
+        const monthName = months[lastSeenTime.getMonth()];
+        return `${dateNum} ${monthName}`;
+    } catch {
+        return 'غير متصل';
+    }
+};
+
+// Helper function to format date separator
+const getDateSeparatorText = (date: Date): string => {
+    const today = new Date();
+    const yesterday = new Date(today);
+    yesterday.setDate(yesterday.getDate() - 1);
+    
+    const dateToCheck = new Date(date.getFullYear(), date.getMonth(), date.getDate());
+    const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
+    const yesterdayDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
+    
+    if (dateToCheck.getTime() === todayDate.getTime()) {
+        return 'اليوم';
+    }
+    if (dateToCheck.getTime() === yesterdayDate.getTime()) {
+        return 'أمس';
+    }
+    
+    // Format: يوم الجمعة، 12 ديسمبر 2024
+    const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
+    const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
+    
+    const dayName = days[date.getDay()];
+    const monthName = months[date.getMonth()];
+    const dateNum = date.getDate();
+    const year = date.getFullYear();
+    
+    return `${dayName}، ${dateNum} ${monthName} ${year}`;
+};
+
+// Helper function to check if date changed between messages
+const isDateChanged = (currentMsg: ChatMessage, previousMsg: ChatMessage | undefined): boolean => {
+    if (!previousMsg) return true;
+    
+    const currentDate = currentMsg.timestamp?.seconds 
+        ? new Date(currentMsg.timestamp.seconds * 1000)
+        : new Date();
+    const previousDate = previousMsg.timestamp?.seconds 
+        ? new Date(previousMsg.timestamp.seconds * 1000)
+        : new Date();
+    
+    return currentDate.toDateString() !== previousDate.toDateString();
+};
+
+// Date Separator Component
+const DateSeparator = React.memo(({ date }: { date: Date }) => (
+    <div className="flex items-center justify-center gap-3 my-4">
+        <div className="flex-1 h-px bg-gray-300"></div>
+        <span className="text-xs font-semibold text-gray-500 px-2 bg-gray-50 rounded-full whitespace-nowrap">
+            {getDateSeparatorText(date)}
+        </span>
+        <div className="flex-1 h-px bg-gray-300"></div>
+    </div>
+));
+
 const MessageItem = React.memo(({ msg, isMe, searchQuery, searchResultId, isSearchOpen, onPin, currentUserRole, selectedUserId, messageRef }: {
     msg: ChatMessage,
     isMe: boolean,
@@ -42,6 +134,14 @@ const MessageItem = React.memo(({ msg, isMe, searchQuery, searchResultId, isSear
                 : part
         );
     }
+
+    const messageDate = msg.timestamp?.seconds 
+        ? new Date(msg.timestamp.seconds * 1000)
+        : new Date();
+    const timeString = messageDate.toLocaleTimeString('ar-EG', { 
+        hour: '2-digit', 
+        minute: '2-digit' 
+    });
 
     return (
         <div
@@ -70,7 +170,7 @@ const MessageItem = React.memo(({ msg, isMe, searchQuery, searchResultId, isSear
                 <div className="flex justify-between items-center mt-1 gap-2">
                     {msg.isPinned && <span className="text-[10px] text-yellow-300 bg-black/20 px-1 rounded">📌 مثبتة</span>}
                     <span className={`text-[10px] block text-right ml-auto ${isMe ? 'text-blue-200' : 'text-gray-400'}`}>
-                        {msg.timestamp?.seconds ? new Date(msg.timestamp.seconds * 1000).toLocaleTimeString('ar-EG', { hour: '2-digit', minute: '2-digit' }) : '...'}
+                        {timeString}
                         {isMe && (msg.read ? <span className="mr-1">✓✓</span> : <span className="mr-1">✓</span>)}
                     </span>
                 </div>
@@ -778,7 +878,11 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                                     ) : user.description ? (
                                         <span className="text-teal-600 font-medium">{user.description}</span>
                                     ) : (
-                                        user.id.startsWith('group-') ? <span className="text-amber-600">مجموعة عامة</span> : (user.isOnline ? <span className="text-green-600">نشط الآن</span> : 'غير متصل')
+                                        user.id.startsWith('group-') ? <span className="text-amber-600">مجموعة عامة</span> : (
+                                            <span className={user.isOnline ? 'text-green-600' : 'text-gray-400'}>
+                                                {user.isOnline ? 'نشط الآن' : formatLastSeen(user.lastSeen)}
+                                            </span>
+                                        )
                                     )}
                                 </p>
                             </div>
@@ -819,8 +923,20 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                             </div>
                             <div className="flex-1 min-w-0">
                                 <h3 className="font-bold text-gray-800 truncate">{selectedUser.name}</h3>
-                                {selectedUser.isOnline && !selectedUser.id.startsWith('group-') && <span className="text-xs text-green-600 flex items-center gap-1"><span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span> متصل</span>}
-                                {selectedUser.id.startsWith('group-') && <span className="text-xs text-amber-600 font-semibold">مجموعة بث للقسم</span>}
+                                {selectedUser.id.startsWith('group-') ? (
+                                    <span className="text-xs text-amber-600 font-semibold">مجموعة بث للقسم</span>
+                                ) : (
+                                    <span className={`text-xs flex items-center gap-1 ${selectedUser.isOnline ? 'text-green-600' : 'text-gray-500'}`}>
+                                        {selectedUser.isOnline ? (
+                                            <>
+                                                <span className="w-1.5 h-1.5 rounded-full bg-green-500 inline-block"></span>
+                                                <span>متصل</span>
+                                            </>
+                                        ) : (
+                                            <span>آخر ظهور {formatLastSeen(selectedUser.lastSeen)}</span>
+                                        )}
+                                    </span>
+                                )}
                             </div>
 
                             <div className="flex items-center gap-1">
@@ -916,20 +1032,30 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                             className="flex-1 overflow-y-auto p-4 space-y-4 bg-gray-50 bg-opacity-50"
                             style={{ backgroundImage: 'radial-gradient(#cbd5e1 1px, transparent 1px)', backgroundSize: '20px 20px' }}
                         >
-                            {messages.map(msg => (
-                                <MessageItem
-                                    key={msg.id}
-                                    msg={msg}
-                                    isMe={msg.senderId === (currentUser.role === 'director' ? 'director' : currentUser.uid)}
-                                    searchQuery={searchQuery}
-                                    searchResultId={searchResults[currentSearchIndex]}
-                                    isSearchOpen={isSearchOpen}
-                                    onPin={handlePinMessage}
-                                    currentUserRole={currentUser.role}
-                                    selectedUserId={selectedUser.id}
-                                    messageRef={el => messageRefs.current[msg.id] = el}
-                                />
-                            ))}
+                            {messages.map((msg, index) => {
+                                const previousMsg = index > 0 ? messages[index - 1] : undefined;
+                                const showDateSeparator = isDateChanged(msg, previousMsg);
+                                const messageDate = msg.timestamp?.seconds 
+                                    ? new Date(msg.timestamp.seconds * 1000)
+                                    : new Date();
+                                
+                                return (
+                                    <React.Fragment key={msg.id}>
+                                        {showDateSeparator && <DateSeparator date={messageDate} />}
+                                        <MessageItem
+                                            msg={msg}
+                                            isMe={msg.senderId === (currentUser.role === 'director' ? 'director' : currentUser.uid)}
+                                            searchQuery={searchQuery}
+                                            searchResultId={searchResults[currentSearchIndex]}
+                                            isSearchOpen={isSearchOpen}
+                                            onPin={handlePinMessage}
+                                            currentUserRole={currentUser.role}
+                                            selectedUserId={selectedUser.id}
+                                            messageRef={el => messageRefs.current[msg.id] = el}
+                                        />
+                                    </React.Fragment>
+                                );
+                            })}
                             <div ref={messagesEndRef} className="h-8" />
                         </div>
 
