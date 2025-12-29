@@ -8,10 +8,13 @@
  * @returns كائن Date يمثل الوقت الحالي بتوقيت القاهرة
  */
 export function getCairoNow(): Date {
+  // مصر تستخدم توقيت UTC+2 ثابت طوال السنة
+  // نحسب الفرق بين التوقيت المحلي والقاهرة
   const now = new Date();
-  // تحويل الوقت المحلي إلى UTC ثم إضافة ساعتين (توقيت مصر)
-  const utc = now.getTime() + (now.getTimezoneOffset() * 60000);
-  return new Date(utc + (2 * 3600000));
+  const localOffset = now.getTimezoneOffset(); // بالدقائق
+  const cairoOffset = -120; // Cairo = UTC+2 = -120 دقيقة من UTC
+  const diffMinutes = (cairoOffset - localOffset) * 60000; // تحويل للميلي ثانية
+  return new Date(now.getTime() + diffMinutes);
 }
 
 /**
