@@ -162,10 +162,10 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
   };
 
   return ReactDOM.createPortal(
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex justify-center items-center p-4">
-      <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
-        <div className="flex justify-between items-center mb-6">
-          <h2 className="text-2xl font-bold text-gray-800">
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex justify-center items-center p-2 md:p-4">
+      <div className="bg-white rounded-lg shadow-2xl p-4 md:p-8 w-full max-w-2xl max-h-[95vh] overflow-y-auto">
+        <div className="flex justify-between items-center mb-4 md:mb-6">
+          <h2 className="text-xl md:text-2xl font-bold text-gray-800">
             {section ? 'تعديل القسم' : 'إضافة قسم جديد'}
           </h2>
           <button
@@ -460,17 +460,17 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
         </div>
 
         {/* أزرار الحفظ والإلغاء */}
-        <div className="flex gap-3 mt-8">
+        <div className="flex gap-3 mt-6 md:mt-8">
           <button
             onClick={handleSave}
-            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-3 rounded-lg transition"
+            className="flex-1 flex items-center justify-center gap-2 bg-blue-600 hover:bg-blue-700 text-white font-semibold py-2.5 md:py-3 rounded-lg transition text-sm md:text-base"
           >
-            <CheckCircleIcon className="w-5 h-5" />
+            <CheckCircleIcon className="w-4 h-4 md:w-5 md:h-5" />
             حفظ
           </button>
           <button
             onClick={onCancel}
-            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-3 rounded-lg transition"
+            className="flex-1 bg-gray-300 hover:bg-gray-400 text-gray-800 font-semibold py-2.5 md:py-3 rounded-lg transition text-sm md:text-base"
           >
             إلغاء
           </button>

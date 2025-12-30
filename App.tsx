@@ -32,7 +32,7 @@ const TestsReportPage = lazy(() => import('./components/TestsReportPage'));
 const FinancialReportPage = lazy(() => import('./components/FinancialReportPage'));
 const DebtorsPage = lazy(() => import('./components/DebtorsPage'));
 const UnarchiveModal = lazy(() => import('./components/UnarchiveModal'));
-const ParentLoginScreen = lazy(() => import('./components/ParentLoginScreen'));
+
 const ParentDashboard = lazy(() => import('./components/ParentDashboard'));
 const ParentView = lazy(() => import('./components/ParentView'));
 const ArchivePage = lazy(() => import('./components/ArchivePage'));
@@ -61,6 +61,16 @@ import { db } from './services/firebase';
 import { applyDeductions } from './services/deductionService';
 import { generateAllParents } from './services/parentGenerationService';
 const LoginScreen = lazy(() => import('./components/LoginScreen'));
+// Pre-load critical components
+const preloadComponents = () => {
+    const components = [
+        () => import('./components/LoginScreen'),
+        () => import('./components/LandingPage'),
+        () => import('./components/AllStudentsPage'),
+    ];
+    components.forEach(c => c());
+};
+preloadComponents();
 import { collection, onSnapshot, doc, addDoc, updateDoc, deleteDoc, getDoc, writeBatch, query, where, getDocs, arrayUnion, setDoc, deleteField, orderBy, limit, documentId } from 'firebase/firestore';
 import UsersIcon from './components/icons/UsersIcon';
 import { useOnlineStatus } from './hooks/useOnlineStatus';
@@ -128,7 +138,7 @@ const App: React.FC = () => {
     const [currentUser, setCurrentUser] = useLocalStorage<CurrentUser | null>('shatibi-center-currentUser', null);
 
     // --- Parent UI States ---
-    const [loginMode, setLoginMode] = useState<'staff' | 'parent'>('staff');
+
 
 
     // Listener for unread messages and notifications
@@ -625,21 +635,7 @@ const App: React.FC = () => {
     }, [handleBackToMain, setCurrentUser]);
 
     // تسجيل دخول ولي الأمر
-    const handleParentLogin = useCallback((phone: string, password: string) => {
-        const parent = parents.find(p => p.phone === phone && p.password === password);
-        if (parent) {
-            handleBackToMain();
-            setCurrentUser({
-                role: 'parent',
-                id: parent.id,
-                name: parent.name,
-                phone: parent.phone,
-                studentIds: parent.studentIds
-            });
-        } else {
-            alert('رقم الهاتف أو كلمة المرور غير صحيحة');
-        }
-    }, [parents, handleBackToMain, setCurrentUser]);
+
 
     const handleLogout = useCallback(() => {
         setCurrentUser(null);
@@ -1862,85 +1858,51 @@ const App: React.FC = () => {
         );
     }
 
-    // عرض الصفحة الرئيسية للجميع بدون تسجيل دخول
-    if (location.pathname === '/' && !currentUser) {
-        return (
-            <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>جاري التحميل...</p></div>}>
-                <LandingPage />
-            </Suspense>
-        );
-    }
-
+    // --- Unified Public View (Landing & Login) ---
     if (!currentUser) {
+        const isLanding = location.pathname === '/';
+
         return (
-            <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
-                {/* Modern Background Elements */}
-                <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/20 blur-[120px] rounded-full"></div>
-                <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[120px] rounded-full"></div>
-                <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-teal-500/10 blur-[150px] rounded-full"></div>
+            <div className="min-h-screen bg-slate-50 overflow-x-hidden" dir="rtl">
+                <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
+                    {isLanding ? (
+                        <LandingPage />
+                    ) : (
+                        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden">
+                            {/* Modern Background Elements */}
+                            <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/20 blur-[120px] rounded-full"></div>
+                            <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[120px] rounded-full"></div>
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-teal-500/10 blur-[150px] rounded-full"></div>
 
-                {/* Return to Home Button */}
-                <button
-                    onClick={() => navigate('/')}
-                    className="absolute top-6 left-6 z-20 flex items-center gap-2 text-blue-200/80 hover:text-white transition-all hover:bg-white/10 px-4 py-2 rounded-2xl backdrop-blur-md group"
-                    title="العودة للصفحة الرئيسية"
-                >
-                    <span className="font-bold text-sm hidden sm:block group-hover:translate-x-1 transition-transform">الرئيسية</span>
-                    <HomeIcon className="w-6 h-6" />
-                </button>
-
-                <div className="w-full max-w-[480px] z-10">
-                    <div className="text-center mb-10 animate-in fade-in slide-in-from-top-6 duration-700">
-                        <h1 className="text-5xl font-black text-white mb-3 tracking-tight">مركز الشاطبي</h1>
-                        <p className="text-blue-200/60 text-lg">نظام الإدارة التعليمية المتكامل</p>
-                    </div>
-
-                    <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl p-2 sm:p-3 shadow-black/20 overflow-hidden animate-in zoom-in-95 duration-500">
-                        {/* Selector Tabs */}
-                        <div className="flex p-1.5 bg-gray-100/80 rounded-[2rem] mb-2">
+                            {/* Return to Home Button */}
                             <button
-                                onClick={() => setLoginMode('staff')}
-                                className={`flex-1 py-4 px-6 rounded-[1.7rem] font-bold text-base transition-all duration-300 flex items-center justify-center gap-2 ${loginMode === 'staff'
-                                    ? 'bg-white text-blue-600 shadow-sm ring-1 ring-black/5'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                    }`}
+                                onClick={() => navigate('/')}
+                                className="absolute top-6 left-6 z-20 flex items-center gap-2 text-blue-200/80 hover:text-white transition-all hover:bg-white/10 px-4 py-2 rounded-2xl backdrop-blur-md group"
+                                title="العودة للصفحة الرئيسية"
                             >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M21 13.255A23.931 23.931 0 0112 15c-3.183 0-6.22-.62-9-1.745M16 6V4a2 2 0 00-2-2h-4a2 2 0 00-2 2v2m4 6h.01M5 20h14a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-                                </svg>
-                                الموظفين
+                                <span className="font-bold text-sm hidden sm:block group-hover:translate-x-1 transition-transform">الرئيسية</span>
+                                <HomeIcon className="w-6 h-6" />
                             </button>
-                            <button
-                                onClick={() => setLoginMode('parent')}
-                                className={`flex-1 py-4 px-6 rounded-[1.7rem] font-bold text-base transition-all duration-300 flex items-center justify-center gap-2 ${loginMode === 'parent'
-                                    ? 'bg-white text-teal-600 shadow-sm ring-1 ring-black/5'
-                                    : 'text-gray-500 hover:text-gray-700'
-                                    }`}
-                            >
-                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
-                                </svg>
-                                أولياء الأمور
-                            </button>
-                        </div>
 
-                        <div className="p-6 sm:p-10 pt-4">
-                            {loginMode === 'staff' ? (
-                                <Suspense fallback={<div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-600"></div></div>}>
-                                    <LoginScreen onLogin={handleLogin} teachers={teachers} supervisors={supervisors} />
-                                </Suspense>
-                            ) : (
-                                <Suspense fallback={<div className="flex justify-center p-8"><div className="animate-spin rounded-full h-8 w-8 border-b-2 border-teal-600"></div></div>}>
-                                    <ParentLoginScreen onLogin={handleParentLogin} parents={parents} />
-                                </Suspense>
-                            )}
-                        </div>
-                    </div>
+                            <div className="w-full max-w-[480px] z-10">
+                                <div className="text-center mb-10 animate-in fade-in slide-in-from-top-6 duration-700">
+                                    <h1 className="text-5xl font-black text-white mb-3 tracking-tight">مركز الشاطبي</h1>
+                                    <p className="text-blue-200/60 text-lg">نظام الإدارة التعليمية المتكامل</p>
+                                </div>
 
-                    <p className="text-center text-blue-200/40 text-sm mt-8">
-                        &copy; {new Date().getFullYear()} مركز الشاطبي. جميع الحقوق محفوظة.
-                    </p>
-                </div>
+                                <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl p-2 sm:p-3 shadow-black/20 overflow-hidden animate-in zoom-in-95 duration-500">
+                                    <div className="p-6 sm:p-10 pt-4">
+                                        <LoginScreen onLogin={handleLogin} teachers={teachers} supervisors={supervisors} parents={parents} />
+                                    </div>
+                                </div>
+
+                                <p className="text-center text-blue-200/40 text-sm mt-8">
+                                    &copy; {new Date().getFullYear()} مركز الشاطبي. جميع الحقوق محفوظة.
+                                </p>
+                            </div>
+                        </div>
+                    )}
+                </Suspense>
             </div>
         );
     }

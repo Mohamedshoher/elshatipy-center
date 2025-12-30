@@ -80,19 +80,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
                 <>
                   <button
                     onClick={() => navigate('/login')}
-                    className="flex items-center justify-center p-2 sm:px-6 sm:py-2.5 border-2 border-blue-600 text-blue-600 hover:bg-blue-600 hover:text-white font-bold rounded-xl transition-all transform hover:scale-105 shadow-sm hover:shadow-md text-sm sm:text-base"
-                    title="دخول الموظفين"
+                    className="flex items-center justify-center p-2 sm:px-6 sm:py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 shadow-md hover:shadow-lg text-sm sm:text-base ring-2 ring-white/50"
+                    title="تسجيل الدخول"
                   >
-                    <span className="text-lg sm:mr-2">👤</span>
-                    <span className="hidden sm:inline">دخول الموظفين</span>
-                  </button>
-                  <button
-                    onClick={() => navigate('/parent-login')}
-                    className="flex items-center justify-center p-2 sm:px-6 sm:py-2.5 bg-gradient-to-r from-teal-600 to-emerald-600 hover:from-teal-700 hover:to-emerald-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 shadow-md hover:shadow-md text-sm sm:text-base"
-                    title="دخول ولي الأمر"
-                  >
-                    <span className="text-lg sm:mr-2">👨‍👩‍👧</span>
-                    <span className="hidden sm:inline">دخول ولي الأمر</span>
+                    <span className="text-lg sm:mr-2">🔐</span>
+                    <span className="hidden sm:inline">تسجيل الدخول</span>
                   </button>
                 </>
               )}

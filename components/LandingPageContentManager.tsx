@@ -254,24 +254,29 @@ const LandingPageContentManager: React.FC<LandingPageContentManagerProps> = ({
     <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex justify-center items-center p-4 animate-in fade-in duration-300">
       <div className="bg-white rounded-2xl shadow-2xl w-full max-w-5xl max-h-[95vh] overflow-hidden flex flex-col animate-in zoom-in-95 duration-300">
         {/* رأس الصفحة - تصميم محسّن */}
-        <div className="sticky top-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-6 flex justify-between items-center shadow-lg z-20">
-          <div className="flex items-center gap-4">
-            <div className="w-12 h-12 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
-              <span className="text-2xl">📝</span>
+        {/* رأس الصفحة - تصميم محسّن متجاوب */}
+        <div className="sticky top-0 bg-gradient-to-r from-blue-600 via-indigo-600 to-purple-600 text-white p-4 flex justify-between items-center shadow-lg z-20">
+          <div className="flex items-center gap-3 overflow-hidden">
+            <div className="w-10 h-10 md:w-12 md:h-12 shrink-0 bg-white/20 rounded-xl flex items-center justify-center backdrop-blur-sm">
+              <span className="text-xl md:text-2xl">📝</span>
             </div>
-            <div>
-              <h1 className="text-3xl font-extrabold drop-shadow-lg">إدارة محتوى الصفحة الرئيسية</h1>
+            <div className="min-w-0 flex-1">
+              <h1 className="text-lg md:text-3xl font-extrabold drop-shadow-lg whitespace-nowrap overflow-hidden text-ellipsis">
+                إدارة محتوى الصفحة الرئيسية
+              </h1>
               {editingContent && (
-                <p className="text-blue-100 text-sm mt-1 flex items-center gap-2">
+                <p className="text-blue-100 text-xs md:text-sm mt-0.5 flex items-center gap-2 truncate">
                   <span>🕒</span>
-                  آخر تحديث: {new Date(editingContent.updatedAt).toLocaleString('ar-EG')}
+                  <span className="truncate">
+                    آخر تحديث: {new Date(editingContent.updatedAt).toLocaleDateString('ar-EG')}
+                  </span>
                 </p>
               )}
             </div>
           </div>
           <button
             onClick={onClose}
-            className="p-2.5 hover:bg-white/20 rounded-xl transition-all transform hover:scale-110 active:scale-95"
+            className="p-2 md:p-2.5 hover:bg-white/20 rounded-xl transition-all transform hover:scale-110 active:scale-95 shrink-0"
             title="إغلاق"
           >
             <XIcon className="w-6 h-6" />
@@ -295,29 +300,30 @@ const LandingPageContentManager: React.FC<LandingPageContentManagerProps> = ({
         {/* المحتوى */}
         <div className="flex-1 overflow-y-auto p-6 bg-gradient-to-br from-gray-50 to-blue-50/30">
           {/* التبويبات - تصميم محسّن */}
-          <div className="flex gap-3 mb-8 bg-white rounded-xl p-2 shadow-md">
+          {/* التبويبات - تصميم محسّن */}
+          <div className="flex gap-2 md:gap-3 mb-4 md:mb-8 bg-white rounded-xl p-1.5 md:p-2 shadow-md">
             <button
               onClick={() => setActiveTab('hero')}
-              className={`flex-1 px-6 py-3 font-bold rounded-lg transition-all transform ${activeTab === 'hero'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-105'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+              className={`flex-1 px-3 py-2 md:px-6 md:py-3 font-bold rounded-lg transition-all transform ${activeTab === 'hero'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-100 md:scale-105'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
                 }`}
             >
-              <span className="flex items-center justify-center gap-2">
-                <span className="text-xl">🎨</span>
-                <span>قسم البطل</span>
+              <span className="flex items-center justify-center gap-1.5 md:gap-2 text-sm md:text-base">
+                <span className="text-lg md:text-xl">🎨</span>
+                <span className="whitespace-nowrap">قسم البطل</span>
               </span>
             </button>
             <button
               onClick={() => setActiveTab('sections')}
-              className={`flex-1 px-6 py-3 font-bold rounded-lg transition-all transform ${activeTab === 'sections'
-                  ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-105'
-                  : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+              className={`flex-1 px-3 py-2 md:px-6 md:py-3 font-bold rounded-lg transition-all transform ${activeTab === 'sections'
+                ? 'bg-gradient-to-r from-blue-600 to-indigo-600 text-white shadow-lg scale-100 md:scale-105'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
                 }`}
             >
-              <span className="flex items-center justify-center gap-2">
-                <span className="text-xl">📋</span>
-                <span>الأقسام ({editingContent?.sections.length || 0})</span>
+              <span className="flex items-center justify-center gap-1.5 md:gap-2 text-sm md:text-base">
+                <span className="text-lg md:text-xl">📋</span>
+                <span className="whitespace-nowrap">الأقسام ({editingContent?.sections.length || 0})</span>
               </span>
             </button>
           </div>
@@ -434,32 +440,33 @@ const LandingPageContentManager: React.FC<LandingPageContentManagerProps> = ({
         </div>
 
         {/* أزرار التحكم - تصميم محسّن */}
-        <div className="sticky bottom-0 bg-gradient-to-r from-gray-100 to-blue-50 border-t-2 border-blue-200 p-6 flex flex-wrap gap-3 justify-end shadow-lg">
+        {/* أزرار التحكم - تصميم محسّن */}
+        <div className="sticky bottom-0 bg-gradient-to-r from-gray-100 to-blue-50 border-t-2 border-blue-200 p-4 md:p-6 flex flex-wrap gap-2 md:gap-3 justify-end shadow-lg">
           {isPublished && (
             <button
               onClick={handleUnpublish}
               disabled={isPublishing}
-              className="px-6 py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-orange-300 disabled:to-red-300 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg flex items-center gap-2"
+              className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-orange-600 to-red-600 hover:from-orange-700 hover:to-red-700 disabled:from-orange-300 disabled:to-red-300 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg flex items-center gap-1.5 md:gap-2 text-sm md:text-base"
             >
-              <span className="text-xl">🔄</span>
-              إلغاء النشر
+              <span className="text-lg md:text-xl">🔄</span>
+              <span className="whitespace-nowrap">إلغاء النشر</span>
             </button>
           )}
           <button
             onClick={handleSaveDraft}
             disabled={isSaving || isPublishing}
-            className="px-6 py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 disabled:from-gray-300 disabled:to-gray-400 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg flex items-center gap-2"
+            className="px-4 py-2 md:px-6 md:py-3 bg-gradient-to-r from-gray-600 to-gray-700 hover:from-gray-700 hover:to-gray-800 disabled:from-gray-300 disabled:to-gray-400 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-lg flex items-center gap-1.5 md:gap-2 text-sm md:text-base mr-auto md:mr-0"
           >
-            <span className="text-xl">💾</span>
-            حفظ المسودة
+            <span className="text-lg md:text-xl">💾</span>
+            <span className="whitespace-nowrap">حفظ المسودة</span>
           </button>
           <button
             onClick={handlePublish}
             disabled={isPublishing || isSaving || !editingContent}
-            className="px-8 py-3 flex items-center gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-green-300 disabled:to-emerald-300 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-xl"
+            className="px-4 py-2 md:px-8 md:py-3 flex items-center gap-1.5 md:gap-2 bg-gradient-to-r from-green-600 to-emerald-600 hover:from-green-700 hover:to-emerald-700 disabled:from-green-300 disabled:to-emerald-300 text-white font-bold rounded-xl transition-all transform hover:scale-105 disabled:hover:scale-100 shadow-xl text-sm md:text-base"
           >
-            <CheckCircleIcon className="w-5 h-5" />
-            <span>{isPublished ? '🔄 تحديث النشر' : '📤 نشر الآن'}</span>
+            <CheckCircleIcon className="w-4 h-4 md:w-5 md:h-5" />
+            <span className="whitespace-nowrap">{isPublished ? '🔄 تحديث' : '📤 نشر الآن'}</span>
           </button>
         </div>
 

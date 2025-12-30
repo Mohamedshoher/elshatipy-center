@@ -48,18 +48,20 @@ const SectionPreview: React.FC<SectionPreviewProps> = ({
 
   return (
     <div className={`bg-white border-l-4 rounded-lg shadow hover:shadow-lg transition-shadow p-4 ${section.isActive ? 'border-l-blue-600' : 'border-l-gray-300'}`}>
-      <div className="flex items-start justify-between gap-4">
+      <div className="flex items-start justify-between gap-3 md:gap-4">
         <div className="flex-1 min-w-0">
-          <div className="flex items-center gap-3 mb-2">
-            <span className="text-sm font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded">
-              {section.order}
-            </span>
-            <h3 className="text-lg font-semibold text-gray-900 truncate">{section.title}</h3>
-            <span className="text-xs bg-gray-100 text-gray-700 px-2 py-1 rounded whitespace-nowrap">
+          <div className="flex flex-wrap items-center gap-2 md:gap-3 mb-2">
+            <div className="flex items-center gap-2 min-w-0">
+              <span className="text-xs md:text-sm font-bold bg-blue-100 text-blue-700 px-1.5 py-0.5 md:px-2 md:py-1 rounded shrink-0">
+                {section.order}
+              </span>
+              <h3 className="text-base md:text-lg font-semibold text-gray-900 truncate">{section.title}</h3>
+            </div>
+            <span className="text-xs bg-gray-100 text-gray-700 px-1.5 py-0.5 md:px-2 md:py-1 rounded whitespace-nowrap shrink-0">
               {getTypeLabel(section.type)}
             </span>
           </div>
-          <p className="text-sm text-gray-600 mb-3 line-clamp-2">{getPreview()}</p>
+          <p className="text-xs md:text-sm text-gray-600 mb-2 md:mb-3 line-clamp-2">{getPreview()}</p>
         </div>
       </div>
 
@@ -75,27 +77,26 @@ const SectionPreview: React.FC<SectionPreviewProps> = ({
       )}
 
       {/* الأزرار */}
-      <div className="flex flex-wrap gap-2">
+      <div className="flex flex-wrap gap-2 text-xs md:text-sm">
         <button
           onClick={onEdit}
-          className="px-3 py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 text-sm font-semibold rounded transition"
+          className="px-2 py-1.5 md:px-3 md:py-2 bg-blue-100 hover:bg-blue-200 text-blue-700 font-semibold rounded transition"
         >
           ✏️ تعديل
         </button>
         <button
           onClick={onToggleActive}
-          className={`px-3 py-2 text-sm font-semibold rounded transition flex items-center gap-1 ${
-            section.isActive
+          className={`px-2 py-1.5 md:px-3 md:py-2 font-semibold rounded transition flex items-center gap-1 ${section.isActive
               ? 'bg-green-100 hover:bg-green-200 text-green-700'
               : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
-          }`}
+            }`}
         >
-          <CheckCircleIcon className="w-4 h-4" />
+          <CheckCircleIcon className="w-3 h-3 md:w-4 md:h-4" />
           {section.isActive ? 'مرئي' : 'مخفي'}
         </button>
         <button
           onClick={onDelete}
-          className="px-3 py-2 bg-red-100 hover:bg-red-200 text-red-700 text-sm font-semibold rounded transition"
+          className="px-2 py-1.5 md:px-3 md:py-2 bg-red-100 hover:bg-red-200 text-red-700 font-semibold rounded transition"
         >
           🗑️ حذف
         </button>

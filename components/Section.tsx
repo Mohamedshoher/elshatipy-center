@@ -64,6 +64,7 @@ const Section: React.FC<SectionProps> = ({ section }) => {
                   src={section.imageUrl}
                   alt={section.imageCaption || section.title}
                   className="w-full h-auto"
+                  loading="lazy"
                 />
               </div>
             )}
@@ -126,6 +127,7 @@ const Section: React.FC<SectionProps> = ({ section }) => {
                       src={section.testimonialImage}
                       alt={section.testimonialAuthor}
                       className="relative w-20 h-20 rounded-full object-cover ring-4 ring-white shadow-xl"
+                      loading="lazy"
                     />
                   </div>
                 </div>
@@ -189,6 +191,7 @@ const Section: React.FC<SectionProps> = ({ section }) => {
                   src={section.adImageUrl}
                   alt={section.adAltText || section.title}
                   className="w-full h-auto"
+                  loading="lazy"
                 />
               </a>
             )}

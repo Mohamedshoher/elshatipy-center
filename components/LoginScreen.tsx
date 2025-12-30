@@ -1,5 +1,5 @@
 import React, { useState } from 'react';
-import { CurrentUser, Teacher, Supervisor, TeacherStatus, GroupType } from '../types';
+import { CurrentUser, Teacher, Supervisor, TeacherStatus, GroupType, Parent } from '../types';
 import BriefcaseIcon from './icons/BriefcaseIcon';
 import UserIcon from './icons/UserIcon';
 
@@ -7,15 +7,21 @@ interface LoginScreenProps {
     onLogin: (user: CurrentUser) => void;
     teachers: Teacher[];
     supervisors: Supervisor[];
+    parents: Parent[];
 }
 
-const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisors }) => {
-    const [loginType, setLoginType] = useState<'director' | 'supervisor' | 'teacher'>('director');
+const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisors, parents }) => {
+    const [loginType, setLoginType] = useState<'director' | 'supervisor' | 'teacher' | 'parent'>('director');
     const [directorPassword, setDirectorPassword] = useState('');
     const [selectedTeacherId, setSelectedTeacherId] = useState('');
     const [teacherPassword, setTeacherPassword] = useState('');
     const [selectedSupervisorId, setSelectedSupervisorId] = useState('');
     const [supervisorPassword, setSupervisorPassword] = useState('');
+
+    // Parent Login State
+    const [parentPhone, setParentPhone] = useState('');
+    const [parentPassword, setParentPassword] = useState('');
+    const [parentError, setParentError] = useState('');
 
     const activeTeachers = teachers.filter(t => t.status === TeacherStatus.ACTIVE);
     const DIRECTOR_PASSWORD = 'admin123';
@@ -52,27 +58,79 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisor
         }
     };
 
+    const handleParentLogin = (e: React.FormEvent) => {
+        e.preventDefault();
+        setParentError('');
+
+        if (parentPhone.length !== 11) {
+            setParentError('رقم الهاتف يجب أن يكون 11 رقم');
+            return;
+        }
+
+        if (parentPassword.length !== 6 || !/^\d+$/.test(parentPassword)) {
+            setParentError('كلمة المرور يجب أن تكون 6 أرقام');
+            return;
+        }
+
+        const fullPhone = '02' + parentPhone;
+        const parent = parents.find(p => p.phone === fullPhone);
+
+        if (!parent) {
+            setParentError('لا يوجد حساب مسجل بهذا الرقم. يرجى التواصل مع الإدارة');
+            return;
+        }
+
+        if (parent.password !== parentPassword) {
+            setParentError('كلمة المرور غير صحيحة');
+            return;
+        }
+
+        onLogin({
+            role: 'parent',
+            id: parent.id,
+            name: parent.name,
+            phone: parent.phone,
+            studentIds: parent.studentIds
+        });
+    };
+
+    const onParentPhoneChange = (value: string) => {
+        const numbersOnly = value.replace(/\D/g, '');
+        setParentPhone(numbersOnly.slice(0, 11));
+    };
+
+    const onParentPasswordChange = (value: string) => {
+        const numbersOnly = value.replace(/\D/g, '');
+        setParentPassword(numbersOnly.slice(0, 6));
+    };
+
     return (
         <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
             {/* Sub-tabs for Role Selection */}
-            <div className="flex justify-center mb-8 bg-gray-50 p-1.5 rounded-2xl border border-gray-100 overflow-x-auto no-scrollbar">
+            <div className="flex justify-center mb-8 bg-gray-50 p-1.5 rounded-2xl border border-gray-100 overflow-x-auto no-scrollbar scroll-smooth">
                 <button
                     onClick={() => setLoginType('director')}
-                    className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl font-bold text-sm transition-all duration-300 ${loginType === 'director' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
+                    className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl font-bold text-sm transition-all duration-300 whitespace-nowrap ${loginType === 'director' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
                 >
                     المدير
                 </button>
                 <button
                     onClick={() => setLoginType('supervisor')}
-                    className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl font-bold text-sm transition-all duration-300 ${loginType === 'supervisor' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
+                    className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl font-bold text-sm transition-all duration-300 whitespace-nowrap ${loginType === 'supervisor' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
                 >
                     المشرف
                 </button>
                 <button
                     onClick={() => setLoginType('teacher')}
-                    className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl font-bold text-sm transition-all duration-300 ${loginType === 'teacher' ? 'bg-teal-600 text-white shadow-md shadow-teal-500/20' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
+                    className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl font-bold text-sm transition-all duration-300 whitespace-nowrap ${loginType === 'teacher' ? 'bg-teal-600 text-white shadow-md shadow-teal-500/20' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
                 >
                     المدرس
+                </button>
+                <button
+                    onClick={() => setLoginType('parent')}
+                    className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl font-bold text-sm transition-all duration-300 whitespace-nowrap ${loginType === 'parent' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
+                >
+                    ولي الأمر
                 </button>
             </div>
 
@@ -180,6 +238,64 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisor
                             </div>
                         )}
                     </div>
+                )}
+
+                {loginType === 'parent' && (
+                    <form onSubmit={handleParentLogin} className="space-y-6 animate-in slide-in-from-left-4 duration-300">
+                        <div className="text-center">
+                            <div className="inline-flex items-center justify-center w-16 h-16 bg-indigo-50 rounded-full mb-4">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-indigo-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M13 7a4 4 0 11-8 0 4 4 0 018 0z" />
+                                </svg>
+                            </div>
+                            <h3 className="text-xl font-bold text-gray-800">دخول ولي الأمر</h3>
+                            <p className="text-gray-500 text-sm mt-1">متابعة الأبناء والتواصل مع المركز</p>
+                        </div>
+
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between">
+                                    <span>رقم الهاتف</span>
+                                    <span className={`text-xs ${parentPhone.length === 11 ? 'text-green-500' : 'text-gray-400'}`}>{parentPhone.length}/11</span>
+                                </label>
+                                <input
+                                    type="tel"
+                                    value={parentPhone}
+                                    onChange={(e) => onParentPhoneChange(e.target.value)}
+                                    placeholder="01xxxxxxxxx"
+                                    className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-center text-lg font-bold outline-none tracking-widest"
+                                    dir="ltr"
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1 flex justify-between">
+                                    <span>كلمة المرور (6 أرقام)</span>
+                                    <span className={`text-xs ${parentPassword.length === 6 ? 'text-green-500' : 'text-gray-400'}`}>{parentPassword.length}/6</span>
+                                </label>
+                                <input
+                                    type="password"
+                                    value={parentPassword}
+                                    onChange={(e) => onParentPasswordChange(e.target.value)}
+                                    placeholder="••••••"
+                                    className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-indigo-500 focus:ring-4 focus:ring-indigo-500/10 transition-all text-center text-lg font-bold outline-none tracking-[0.5em]"
+                                    dir="ltr"
+                                />
+                            </div>
+                        </div>
+
+                        {parentError && (
+                            <div className="flex items-center gap-2 bg-red-50 border border-red-100 text-red-600 px-4 py-3 rounded-xl text-sm animate-shake">
+                                <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" />
+                                </svg>
+                                <p>{parentError}</p>
+                            </div>
+                        )}
+
+                        <button type="submit" className="w-full bg-indigo-600 hover:bg-indigo-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-indigo-500/25 active:scale-[0.98] text-lg">
+                            دخول كولي أمر
+                        </button>
+                    </form>
                 )}
             </div>
         </div>

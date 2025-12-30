@@ -9,9 +9,17 @@ const PUBLISHED_DOC_ID = 'landing-published';
 
 export const useLandingPageContent = () => {
   const [draftContent, setDraftContent] = useState<LandingPageContent | null>(null);
-  const [publishedContent, setPublishedContent] = useState<LandingPageContent | null>(null);
+  const [publishedContent, setPublishedContent] = useState<LandingPageContent | null>(() => {
+    // محاولة استرجاع المحتوى المخزن مسبقاً لسرعة التحميل
+    const cached = localStorage.getItem('shatibi_landing_cache');
+    try {
+      return cached ? JSON.parse(cached) : null;
+    } catch (e) {
+      return null;
+    }
+  });
   const [loadingDraft, setLoadingDraft] = useState(true);
-  const [loadingPublished, setLoadingPublished] = useState(true);
+  const [loadingPublished, setLoadingPublished] = useState(!publishedContent);
   const [errorDraft, setErrorDraft] = useState<string | null>(null);
   const [errorPublished, setErrorPublished] = useState<string | null>(null);
 
@@ -46,8 +54,10 @@ export const useLandingPageContent = () => {
         if (snapshot.exists()) {
           const data = snapshot.data() as LandingPageContent;
           setPublishedContent(data);
+          localStorage.setItem('shatibi_landing_cache', JSON.stringify(data));
         } else {
           setPublishedContent(null);
+          localStorage.removeItem('shatibi_landing_cache');
         }
         setLoadingPublished(false);
       },
