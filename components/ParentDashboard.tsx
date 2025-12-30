@@ -1,16 +1,14 @@
 import React from 'react';
 import type { Student, Group } from '../types';
 import UserIcon from './icons/UserIcon';
-import PhoneIcon from './icons/PhoneIcon';
 
 interface ParentDashboardProps {
     students: Student[];
     groups: Group[];
     onViewStudent: (student: Student) => void;
-    parentPhone: string;
 }
 
-const ParentDashboard: React.FC<ParentDashboardProps> = ({ students, groups, onViewStudent, parentPhone }) => {
+const ParentDashboard: React.FC<ParentDashboardProps> = ({ students, groups, onViewStudent }) => {
     // حساب إحصائيات لكل طالب
     const getStudentStats = (student: Student) => {
         const today = new Date().toISOString().split('T')[0];
@@ -39,23 +37,6 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ students, groups, onV
     return (
         <div className="p-4 sm:p-6 lg:p-8 animate-in fade-in duration-500" dir="rtl">
             <div className="max-w-6xl mx-auto">
-                {/* Header Card */}
-                <div className="bg-white/80 backdrop-blur-md rounded-[2rem] shadow-xl shadow-black/5 p-8 mb-10 border border-white/50">
-                    <div className="flex flex-col md:flex-row items-center justify-between gap-6">
-                        <div className="text-center md:text-right">
-                            <h1 className="text-4xl font-black text-gray-900 mb-2">مرحباً بك</h1>
-                        </div>
-                        <div className="bg-gradient-to-br from-teal-50 to-blue-50 rounded-2xl p-4 border border-teal-100/50 shadow-inner">
-                            <div className="flex items-center gap-3 text-teal-700">
-                                <div className="bg-white p-2 rounded-xl shadow-sm">
-                                    <PhoneIcon className="w-6 h-6" />
-                                </div>
-                                <span className="font-bold text-lg tracking-wider" dir="ltr">{parentPhone}</span>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-
                 {/* Section Title */}
                 <div className="flex items-center gap-4 mb-8">
                     <div className="h-8 w-2 bg-teal-500 rounded-full"></div>

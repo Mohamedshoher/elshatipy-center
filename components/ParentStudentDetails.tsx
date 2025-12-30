@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import { useNavigate } from 'react-router-dom';
 import type { Student, Group, Teacher } from '../types';
 import { TestType, TestGrade, AttendanceStatus } from '../types';
 import ArrowRightIcon from './icons/ArrowRightIcon';
@@ -7,6 +8,7 @@ import ClipboardListIcon from './icons/ClipboardListIcon';
 import CashIcon from './icons/CashIcon';
 import CalendarCheckIcon from './icons/CalendarCheckIcon';
 import DocumentReportIcon from './icons/DocumentReportIcon';
+import HomeIcon from './icons/HomeIcon';
 
 interface ParentStudentDetailsProps {
     student: Student;
@@ -20,6 +22,7 @@ interface ParentStudentDetailsProps {
 type TabType = 'tests' | 'fees' | 'attendance' | 'progress';
 
 const ParentStudentDetails: React.FC<ParentStudentDetailsProps> = ({ student, group, teacher, onClose, onOpenChat, unreadMessagesCount }) => {
+    const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabType>('tests');
 
     // Test Type Translation
@@ -310,13 +313,22 @@ const ParentStudentDetails: React.FC<ParentStudentDetailsProps> = ({ student, gr
                 <div className="absolute bottom-0 left-0 w-48 h-48 bg-blue-500/10 blur-[60px] rounded-full -ml-24 -mb-24"></div>
 
                 <div className="max-w-4xl mx-auto relative z-10">
-                    {/* Back Button */}
-                    <button
-                        onClick={onClose}
-                        className="bg-gray-100 hover:bg-gray-200 p-2.5 rounded-xl transition-all duration-300 text-gray-600 hover:scale-105 active:scale-95 shadow-sm mb-3"
-                    >
-                        <ArrowRightIcon className="w-5 h-5" />
-                    </button>
+                    {/* Back Button and Home Button */}
+                    <div className="flex items-center gap-3 mb-3">
+                        <button
+                            onClick={onClose}
+                            className="bg-gray-100 hover:bg-gray-200 p-2.5 rounded-xl transition-all duration-300 text-gray-600 hover:scale-105 active:scale-95 shadow-sm"
+                        >
+                            <ArrowRightIcon className="w-5 h-5" />
+                        </button>
+                        <button
+                            onClick={() => navigate('/')}
+                            className="bg-indigo-100 hover:bg-indigo-200 p-2.5 rounded-xl transition-all duration-300 text-indigo-600 hover:scale-105 active:scale-95 shadow-sm"
+                            title="الذهاب إلى الصفحة الرئيسية"
+                        >
+                            <HomeIcon className="w-5 h-5" />
+                        </button>
+                    </div>
 
                     {/* Student Name - Direct */}
                     <h1 className="text-3xl md:text-4xl font-black text-gray-900 tracking-tight mb-3">{student.name}</h1>

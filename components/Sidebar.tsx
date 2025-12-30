@@ -14,6 +14,8 @@ import CreditCardOffIcon from './icons/CreditCardOffIcon';
 import ArchiveIcon from './icons/ArchiveIcon';
 import ChartBarIcon from './icons/ChartBarIcon';
 import UserIcon from './icons/UserIcon';
+import EditIcon from './icons/EditIcon';
+import HomeIcon from './icons/HomeIcon';
 
 interface SidebarProps {
   isOpen: boolean;
@@ -27,12 +29,14 @@ interface SidebarProps {
   onShowArchive: () => void;
   onShowDebtors: () => void; // Add onShowDebtors
   onShowSupervisorManager?: () => void;
+  onShowLandingPageContent?: () => void;
+  onShowLandingPage?: () => void;
   onLogout: () => void;
   currentUserRole?: string;
   unreadMessagesCount?: number;
 }
 
-const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, onShowFinance, onShowFeeCollection, onShowNotifications, onShowNotes, onShowTeacherManager, onShowArchive, onShowDebtors, onShowSupervisorManager, onLogout, currentUserRole, unreadMessagesCount }) => {
+const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, onShowFinance, onShowFeeCollection, onShowNotifications, onShowNotes, onShowTeacherManager, onShowArchive, onShowDebtors, onShowSupervisorManager, onShowLandingPageContent, onShowLandingPage, onLogout, currentUserRole, unreadMessagesCount }) => {
 
   const handleAction = (action: () => void) => {
     onClose();
@@ -55,6 +59,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, o
       </div>
       <nav className="flex-1 p-4 overflow-y-auto">
         <ul className="space-y-1">
+          {onShowLandingPage && (
+            <li className="mb-4 pb-4 border-b">
+              <button onClick={() => handleAction(onShowLandingPage)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-indigo-100 hover:text-indigo-800 transition-colors">
+                <HomeIcon className="w-6 h-6 ml-4 text-indigo-600" />
+                <span className="font-semibold">الصفحة الرئيسية</span>
+              </button>
+            </li>
+          )}
           <li>
             <button onClick={() => handleAction(onShowTeacherManager)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-teal-100 hover:text-teal-800 transition-colors">
               <BriefcaseIcon className="w-6 h-6 ml-4 text-teal-600" />
@@ -66,6 +78,14 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, o
               <button onClick={() => handleAction(onShowSupervisorManager)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-blue-100 hover:text-blue-800 transition-colors">
                 <UserIcon className="w-6 h-6 ml-4 text-blue-600" />
                 <span className="font-semibold">إدارة المشرفين</span>
+              </button>
+            </li>
+          )}
+          {isDirector && onShowLandingPageContent && (
+            <li>
+              <button onClick={() => handleAction(onShowLandingPageContent)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-green-100 hover:text-green-800 transition-colors">
+                <EditIcon className="w-6 h-6 ml-4 text-green-600" />
+                <span className="font-semibold">إدارة الصفحة الرئيسية</span>
               </button>
             </li>
           )}

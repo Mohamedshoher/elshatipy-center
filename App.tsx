@@ -36,6 +36,8 @@ const ParentLoginScreen = lazy(() => import('./components/ParentLoginScreen'));
 const ParentDashboard = lazy(() => import('./components/ParentDashboard'));
 const ParentView = lazy(() => import('./components/ParentView'));
 const ArchivePage = lazy(() => import('./components/ArchivePage'));
+const LandingPage = lazy(() => import('./components/LandingPage'));
+const LandingPageContentManager = lazy(() => import('./components/LandingPageContentManager'));
 
 import NotificationBell from './components/NotificationBell';
 import DirectorNotificationBell from './components/DirectorNotificationBell';
@@ -48,6 +50,7 @@ import LogoutIcon from './components/icons/LogoutIcon';
 import MenuIcon from './components/icons/MenuIcon';
 import BriefcaseIcon from './components/icons/BriefcaseIcon';
 import UserIcon from './components/icons/UserIcon';
+import HomeIcon from './components/icons/HomeIcon';
 import SearchIcon from './components/icons/SearchIcon';
 import ArrowRightIcon from './components/icons/ArrowRightIcon';
 import ArchiveIcon from './components/icons/ArchiveIcon';
@@ -198,6 +201,11 @@ const App: React.FC = () => {
     const [detailsModalState, setDetailsModalState] = useState<{ student: Student; initialTab: 'attendanceLog' | 'progressPlan' | 'tests' | 'fees' | 'notes' | 'reports'; } | null>(null);
 
     const isOnline = useOnlineStatus();
+
+    // Landing Page Content Manager State
+    const [isLandingPageContentOpen, setIsLandingPageContentOpen] = useState(false);
+    const [parentViewingLandingPage, setParentViewingLandingPage] = useState(false);
+    const [teacherViewingLandingPage, setTeacherViewingLandingPage] = useState(false);
 
     // View State
     const [viewingGroup, setViewingGroup] = useState<Group | null>(null);
@@ -1854,6 +1862,15 @@ const App: React.FC = () => {
         );
     }
 
+    // عرض الصفحة الرئيسية للجميع بدون تسجيل دخول
+    if (location.pathname === '/' && !currentUser) {
+        return (
+            <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>جاري التحميل...</p></div>}>
+                <LandingPage />
+            </Suspense>
+        );
+    }
+
     if (!currentUser) {
         return (
             <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden" dir="rtl">
@@ -1861,6 +1878,16 @@ const App: React.FC = () => {
                 <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/20 blur-[120px] rounded-full"></div>
                 <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[120px] rounded-full"></div>
                 <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-teal-500/10 blur-[150px] rounded-full"></div>
+
+                {/* Return to Home Button */}
+                <button
+                    onClick={() => navigate('/')}
+                    className="absolute top-6 left-6 z-20 flex items-center gap-2 text-blue-200/80 hover:text-white transition-all hover:bg-white/10 px-4 py-2 rounded-2xl backdrop-blur-md group"
+                    title="العودة للصفحة الرئيسية"
+                >
+                    <span className="font-bold text-sm hidden sm:block group-hover:translate-x-1 transition-transform">الرئيسية</span>
+                    <HomeIcon className="w-6 h-6" />
+                </button>
 
                 <div className="w-full max-w-[480px] z-10">
                     <div className="text-center mb-10 animate-in fade-in slide-in-from-top-6 duration-700">
@@ -1920,13 +1947,51 @@ const App: React.FC = () => {
 
     const renderHeader = () => {
         if (currentUser.role === 'parent') {
-            const leftContent = (
-                <button onClick={handleLogout} className="p-2 rounded-lg bg-red-100 text-red-700 shadow hover:bg-red-200 transition-all" aria-label="تسجيل الخروج">
-                    <LogoutIcon className="w-6 h-6" />
-                </button>
-            );
-            const centerContent = <h1 className="text-xl font-bold text-gray-800">بوابة ولي الأمر</h1>;
-            return <Header leftContent={leftContent} centerContent={centerContent} rightContent={null} />;
+            if (parentViewingLandingPage) {
+                // لا نعرض أي هيدر عندما يكون ولي الأمر في الصفحة الرئيسية
+                return null;
+            } else {
+                // Header for Parent Dashboard
+                // في اليمين: زر الصفحة الرئيسية
+                const homeButtonContent = (
+                    <button
+                        onClick={() => setParentViewingLandingPage(true)}
+                        className="flex items-center gap-2 p-2 sm:px-4 sm:py-2 rounded-xl bg-indigo-50 text-indigo-700 hover:bg-indigo-100 transition-all border border-indigo-100 shadow-sm"
+                        title="الصفحة الرئيسية"
+                    >
+                        <HomeIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="hidden sm:inline font-bold">الرئيسية</span>
+                    </button>
+                );
+
+                // في الوسط: الترحيب ورقم الهاتف
+                const centerInfoContent = (
+                    <div className="flex flex-col items-center justify-center">
+                        <span className="text-[10px] sm:text-sm text-gray-500 font-medium whitespace-nowrap">مرحباً بك يا</span>
+                        <div className="flex items-center gap-1 text-gray-800" dir="ltr">
+                            <span className="text-xs sm:text-lg font-black tracking-wider">{(currentUser as any).phone}</span>
+                            <UserIcon className="w-3 h-3 sm:w-5 sm:h-5 text-indigo-500" />
+                        </div>
+                    </div>
+                );
+
+                // في اليسار: زر تسجيل الخروج
+                const logoutButtonContent = (
+                    <button
+                        onClick={handleLogout}
+                        className="flex items-center gap-2 p-2 sm:px-4 sm:py-2 rounded-xl bg-red-50 text-red-700 hover:bg-red-100 transition-all border border-red-100 shadow-sm"
+                        title="تسجيل الخروج"
+                    >
+                        <LogoutIcon className="w-5 h-5 sm:w-6 sm:h-6" />
+                        <span className="hidden sm:inline font-bold">خروج</span>
+                    </button>
+                );
+
+                // نظرأً لأن الموقع RTL:
+                // leftContent يظهر في اليمين (البداية) -> نضع فيه زر الرئيسية
+                // rightContent يظهر في اليسار (النهاية) -> نضع فيه زر الخروج
+                return <Header leftContent={homeButtonContent} centerContent={centerInfoContent} rightContent={logoutButtonContent} />;
+            }
         }
 
         const path = location.pathname;
@@ -2039,17 +2104,20 @@ const App: React.FC = () => {
                 }
             }
         } else { // Teacher view
+            if (teacherViewingLandingPage) return null;
+
             if (viewingGroup || path === '/archive') {
                 leftContent = backButton;
                 centerContent = <h1 className="text-xl sm:text-2xl font-bold text-gray-800 truncate px-2">{viewingGroup ? `تقرير: ${viewingGroup.name}` : 'الأرشيف'}</h1>;
             } else {
                 leftContent = (
-                    <>
-                        <button onClick={handleLogout} className="p-2 rounded-lg bg-red-100 text-red-700 shadow hover:bg-red-200 transition-all"> <LogoutIcon className="w-6 h-6" /> </button>
+                    <div className="flex gap-2">
+                        <button onClick={handleLogout} className="p-2 rounded-lg bg-red-100 text-red-700 shadow hover:bg-red-200 transition-all" title="تسجيل الخروج"> <LogoutIcon className="w-6 h-6" /> </button>
+                        <button onClick={() => setTeacherViewingLandingPage(true)} className="p-2 rounded-lg bg-indigo-100 text-indigo-700 shadow hover:bg-indigo-200 transition-all" title="الصفحة الرئيسية"> <HomeIcon className="w-6 h-6" /> </button>
                         {(activeView === 'students' || activeView === 'groups') && (
                             <button onClick={toggleSearch} className="p-2 rounded-lg bg-gray-200 text-gray-700 shadow hover:bg-gray-300 transition-all"> <SearchIcon className="w-6 h-6" /> </button>
                         )}
-                    </>
+                    </div>
                 );
                 if (isSearchVisible) {
                     centerContent = (
@@ -2090,6 +2158,12 @@ const App: React.FC = () => {
 
         return (
             <Routes>
+                {/* Landing Page - Accessible to all authenticated users */}
+                <Route path="/" element={
+                    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>جاري التحميل...</p></div>}>
+                        <LandingPage />
+                    </Suspense>
+                } />
                 {/* Main Views */}
                 <Route path="/students" element={
                     <AllStudentsPage
@@ -2237,6 +2311,12 @@ const App: React.FC = () => {
     const renderDirectorContent = () => {
         return (
             <Routes>
+                {/* Landing Page - Accessible to all authenticated users */}
+                <Route path="/" element={
+                    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>جاري التحميل...</p></div>}>
+                        <LandingPage />
+                    </Suspense>
+                } />
                 {/* Main Views */}
                 <Route path="/students" element={
                     <AllStudentsPage
@@ -2385,6 +2465,8 @@ const App: React.FC = () => {
     const renderTeacherContent = () => {
         return (
             <Routes>
+                {/* Landing Page - Accessible to all authenticated users */}
+                <Route path="/" element={<Navigate to="/students" replace />} />
                 {/* Main Views */}
                 <Route path="/students" element={
                     <AllStudentsPage
@@ -2484,7 +2566,7 @@ const App: React.FC = () => {
             )}
             <div className="flex">
                 <Suspense fallback={<SidebarSkeleton />}>
-                    {(currentUser.role === 'director' || currentUser.role === 'supervisor') && (
+                    {currentUser && (currentUser.role === 'director' || currentUser.role === 'supervisor') && location.pathname !== '/' && (
                         <Sidebar
                             isOpen={isSidebarOpen}
                             onClose={() => setIsSidebarOpen(false)}
@@ -2496,6 +2578,8 @@ const App: React.FC = () => {
                             onShowTeacherManager={() => navigate('/teacher-manager')}
                             onShowArchive={() => navigate('/archive')}
                             onShowDebtors={() => navigate('/debtors')}
+                            onShowLandingPageContent={() => setIsLandingPageContentOpen(true)}
+                            onShowLandingPage={() => navigate('/')}
                             onLogout={handleLogout}
                             currentUserRole={currentUser.role}
                             unreadMessagesCount={unreadMessagesCount}
@@ -2505,7 +2589,7 @@ const App: React.FC = () => {
 
                 <div className="flex-1 flex flex-col w-full min-w-0">
                     <Suspense fallback={<HeaderSkeleton />}>
-                        {renderHeader()}
+                        {currentUser && location.pathname !== '/' && renderHeader()}
                     </Suspense>
 
                     <main className="flex-1 overflow-y-auto pb-20">
@@ -2519,8 +2603,29 @@ const App: React.FC = () => {
                                         : (currentUser.role === 'supervisor'
                                             ? renderSupervisorContent()
                                             : (currentUser.role === 'parent'
-                                                ? <ParentView currentUser={currentUser} students={students} groups={groups} teachers={teachers} unreadMessagesCount={unreadMessagesCount} setIsChatOpen={setIsChatOpen} setChatInitialUserId={setChatInitialUserId} />
-                                                : (teachers.length > 0 ? renderTeacherContent() : <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>)))
+                                                ? (parentViewingLandingPage ? (
+                                                    <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>جاري التحميل...</p></div>}>
+                                                        <LandingPage onBackToParent={() => setParentViewingLandingPage(false)} />
+                                                    </Suspense>
+                                                ) : (
+                                                    <ParentView
+                                                        currentUser={currentUser}
+                                                        students={students}
+                                                        groups={groups}
+                                                        teachers={teachers}
+                                                        unreadMessagesCount={unreadMessagesCount}
+                                                        setIsChatOpen={setIsChatOpen}
+                                                        setChatInitialUserId={setChatInitialUserId}
+                                                        onNavigateToHome={() => setParentViewingLandingPage(true)}
+                                                    />
+                                                ))
+                                                : (teachers.length > 0 ? (
+                                                    teacherViewingLandingPage ? (
+                                                        <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>جاري التحميل...</p></div>}>
+                                                            <LandingPage onBackToParent={() => setTeacherViewingLandingPage(false)} />
+                                                        </Suspense>
+                                                    ) : renderTeacherContent()
+                                                ) : <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>)))
                                 )}
 
                                 {/* Modals & Overlays - Now inside the main Suspense */}
@@ -2544,7 +2649,7 @@ const App: React.FC = () => {
                                 <UnarchiveModal isOpen={!!studentToUnarchiveId} onClose={() => setStudentToUnarchiveId(null)} onConfirm={handleConfirmUnarchive} groups={groupsForUnarchiveModal} studentName={students.find(s => s.id === studentToUnarchiveId)?.name || ''} />
 
                                 {/* Chat System - Always mounted for instant opening */}
-                                {currentUser && (
+                                {currentUser && location.pathname !== '/' && (
                                     <>
                                         <button
                                             onClick={() => setIsChatOpen(true)}
@@ -2593,7 +2698,7 @@ const App: React.FC = () => {
                         </ErrorBoundary>
                     </main>
                     <Suspense fallback={null}>
-                        {currentUser.role !== 'parent' && <BottomNavBar activeView={activeView} onSelectView={handleBottomNavSelect} />}
+                        {currentUser && currentUser.role !== 'parent' && location.pathname !== '/' && !teacherViewingLandingPage && <BottomNavBar activeView={activeView} onSelectView={handleBottomNavSelect} />}
                     </Suspense>
                 </div>
             </div>
@@ -2609,6 +2714,16 @@ const App: React.FC = () => {
                         </div>
                     </div>
                 </div>
+            )}
+
+            {/* Landing Page Content Manager */}
+            {isLandingPageContentOpen && currentUser.role === 'director' && (
+                <Suspense fallback={null}>
+                    <LandingPageContentManager
+                        onClose={() => setIsLandingPageContentOpen(false)}
+                        currentDirector={currentUser}
+                    />
+                </Suspense>
             )}
         </div>
     );

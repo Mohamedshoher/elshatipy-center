@@ -11,6 +11,7 @@ interface ParentViewProps {
     unreadMessagesCount: number;
     setIsChatOpen: (isOpen: boolean) => void;
     setChatInitialUserId: (id: string) => void;
+    onNavigateToHome?: () => void;
 }
 
 const ParentView: React.FC<ParentViewProps> = ({
@@ -20,7 +21,8 @@ const ParentView: React.FC<ParentViewProps> = ({
     teachers,
     unreadMessagesCount,
     setIsChatOpen,
-    setChatInitialUserId
+    setChatInitialUserId,
+    onNavigateToHome
 }) => {
     const [selectedParentStudent, setSelectedParentStudent] = useState<Student | null>(null);
 
@@ -56,7 +58,6 @@ const ParentView: React.FC<ParentViewProps> = ({
             students={parentStudents}
             groups={groups}
             onViewStudent={setSelectedParentStudent}
-            parentPhone={currentUser.phone}
         />
     );
 };
