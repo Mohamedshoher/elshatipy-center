@@ -26,6 +26,17 @@ const Section: React.FC<SectionProps> = ({ section }) => {
     return url.replace('watch?v=', 'embed/');
   };
 
+  const optimizeImageUrl = (url?: string) => {
+    if (!url) return '';
+    // تحسين روابط Cloudinary تلقائياً
+    if (url.includes('cloudinary.com')) {
+      if (url.includes('/upload/')) {
+        return url.replace('/upload/', '/upload/f_auto,q_auto/');
+      }
+    }
+    return url;
+  };
+
   return (
     <div className="w-full">
       {section.type === 'text' && (
@@ -62,7 +73,7 @@ const Section: React.FC<SectionProps> = ({ section }) => {
               <div className="group relative rounded-2xl overflow-hidden shadow-2xl transform hover:scale-[1.02] transition-all duration-500 aspect-video">
                 <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
                 <img
-                  src={section.imageUrl}
+                  src={optimizeImageUrl(section.imageUrl)}
                   alt={section.imageCaption || section.title}
                   className="w-full h-full object-cover"
                   style={{ objectPosition: section.imagePosition || 'center center' }}
@@ -92,16 +103,10 @@ const Section: React.FC<SectionProps> = ({ section }) => {
               </h2>
             )}
             {section.youtubeUrl && (
-              <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/10 transform hover:scale-[1.02] transition-all duration-500">
-                <iframe
-                  width="100%"
-                  height="100%"
-                  src={getYoutubeEmbedUrl(section.youtubeUrl)}
+              <div className="relative w-full aspect-video rounded-2xl overflow-hidden shadow-2xl ring-4 ring-white/10 transform hover:scale-[1.02] transition-all duration-500 bg-black group/video">
+                <YouTubeLite
+                  url={section.youtubeUrl}
                   title={section.title}
-                  frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
-                  allowFullScreen
-                  className="absolute top-0 left-0"
                 />
               </div>
             )}
@@ -126,7 +131,7 @@ const Section: React.FC<SectionProps> = ({ section }) => {
                   <div className="relative">
                     <div className="absolute inset-0 bg-gradient-to-br from-blue-400 to-indigo-500 rounded-full blur-lg opacity-50"></div>
                     <img
-                      src={section.testimonialImage}
+                      src={optimizeImageUrl(section.testimonialImage)}
                       alt={section.testimonialAuthor}
                       className="relative w-20 h-20 rounded-full object-cover ring-4 ring-white shadow-xl"
                       loading="lazy"
@@ -190,7 +195,7 @@ const Section: React.FC<SectionProps> = ({ section }) => {
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
                 <img
-                  src={section.adImageUrl}
+                  src={optimizeImageUrl(section.adImageUrl)}
                   alt={section.adAltText || section.title}
                   className="w-full h-full object-cover"
                   style={{ objectPosition: section.imagePosition || 'center center' }}
@@ -212,3 +217,54 @@ const Section: React.FC<SectionProps> = ({ section }) => {
 };
 
 export default Section;
+
+// YouTube Lite Component for Performance
+const YouTubeLite: React.FC<{ url: string; title: string }> = ({ url, title }) => {
+  const [isLoaded, setIsLoaded] = React.useState(false);
+
+  const videoId = React.useMemo(() => {
+    if (url.includes('youtu.be/')) return url.split('youtu.be/')[1]?.split('?')[0];
+    if (url.includes('v=')) return url.split('v=')[1]?.split('&')[0];
+    if (url.includes('embed/')) return url.split('embed/')[1]?.split('?')[0];
+    return null;
+  }, [url]);
+
+  const thumbnailUrl = videoId ? `https://img.youtube.com/vi/${videoId}/maxresdefault.jpg` : null;
+
+  if (isLoaded) {
+    return (
+      <iframe
+        width="100%"
+        height="100%"
+        src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
+        title={title}
+        frameBorder="0"
+        allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
+        allowFullScreen
+        className="absolute top-0 left-0"
+      />
+    );
+  }
+
+  return (
+    <div
+      className="absolute inset-0 cursor-pointer flex items-center justify-center bg-black group/video"
+      onClick={() => setIsLoaded(true)}
+    >
+      {thumbnailUrl && (
+        <img
+          src={thumbnailUrl}
+          alt={title}
+          className="w-full h-full object-cover opacity-60 group-hover/video:opacity-80 transition-opacity"
+          loading="lazy"
+        />
+      )}
+      <div className="absolute inset-0 bg-black/20 group-hover/video:bg-black/40 transition-colors"></div>
+      <div className="relative w-20 h-20 bg-red-600 rounded-full flex items-center justify-center shadow-2xl group-hover/video:scale-110 transition-transform">
+        <svg className="w-10 h-10 text-white translate-x-1" fill="currentColor" viewBox="0 0 24 24">
+          <path d="M8 5v14l11-7z" />
+        </svg>
+      </div>
+    </div>
+  );
+};

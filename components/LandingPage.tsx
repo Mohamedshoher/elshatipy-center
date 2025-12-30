@@ -45,6 +45,14 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
 
   const content = publishedContent;
 
+  const optimizeImageUrl = (url?: string) => {
+    if (!url) return '';
+    if (url.includes('cloudinary.com') && url.includes('/upload/')) {
+      return url.replace('/upload/', '/upload/f_auto,q_auto/');
+    }
+    return url;
+  };
+
   return (
     <div className="min-h-screen bg-gradient-to-br from-slate-50 via-blue-50 to-indigo-50">
       {/* شريط أعلى بأزرار الدخول - تصميم محسّن */}
@@ -96,13 +104,23 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
       {/* قسم البطل - تصميم محسّن */}
       {content?.heroImage || content?.heroTitle ? (
         <div className="relative overflow-hidden">
-          <div
-            className="relative h-[500px] bg-cover flex items-center justify-center animate-in fade-in zoom-in-95 duration-700"
-            style={content?.heroImage ? {
-              backgroundImage: `url(${content.heroImage})`,
-              backgroundPosition: content.heroImagePosition || 'center'
-            } : {}}
-          >
+          {/* Preload hero image for better LCP */}
+          {content?.heroImage && (
+            <link rel="preload" as="image" href={optimizeImageUrl(content.heroImage)} fetchPriority="high" />
+          )}
+          <div className="relative h-[400px] sm:h-[500px] flex items-center justify-center overflow-hidden">
+            {/* Real img tag for better LCP discovery */}
+            {content?.heroImage && (
+              <img
+                src={optimizeImageUrl(content.heroImage)}
+                alt=""
+                className="absolute inset-0 w-full h-full object-cover animate-in fade-in zoom-in-95 duration-700"
+                style={{ objectPosition: content.heroImagePosition || 'center' }}
+                fetchPriority="high"
+                aria-hidden="true"
+              />
+            )}
+
             {/* Overlay with gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-blue-900/70 via-indigo-900/60 to-purple-900/70"></div>
 
@@ -115,12 +133,12 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
             {/* Content */}
             <div className="relative z-10 text-center text-white px-4 max-w-4xl mx-auto animate-in fade-in slide-in-from-bottom-4 duration-1000">
               {content?.heroTitle && (
-                <h1 className="text-5xl sm:text-6xl md:text-7xl font-extrabold mb-6 leading-tight drop-shadow-2xl">
+                <h1 className="text-4xl sm:text-6xl md:text-7xl font-extrabold mb-6 leading-tight drop-shadow-2xl">
                   {content.heroTitle}
                 </h1>
               )}
               {content?.heroSubtitle && (
-                <p className="text-xl sm:text-2xl md:text-3xl text-blue-100 font-medium drop-shadow-lg">
+                <p className="text-lg sm:text-2xl md:text-3xl text-blue-100 font-medium drop-shadow-lg">
                   {content.heroSubtitle}
                 </p>
               )}
