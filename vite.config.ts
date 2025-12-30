@@ -6,9 +6,20 @@ export default defineConfig({
   plugins: [react()],
   server: {
     port: 5174,
-    strictPort: true,
+    strictPort: false,
   },
   build: {
-    outDir: 'dist'
+    outDir: 'dist',
+    minify: 'esbuild',
+    cssMinify: true,
+    sourcemap: false,
+    rollupOptions: {
+      output: {
+        manualChunks: {
+          'vendor-react': ['react', 'react-dom', 'react-router-dom'],
+          'vendor-firebase': ['firebase/app', 'firebase/firestore'],
+        }
+      }
+    }
   }
 })

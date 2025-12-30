@@ -106,7 +106,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
         <div className="relative overflow-hidden">
           {/* Preload hero image for better LCP */}
           {content?.heroImage && (
-            <link rel="preload" as="image" href={optimizeImageUrl(content.heroImage)} fetchPriority="high" />
+            <link rel="preload" as="image" href={optimizeImageUrl(content.heroImage)} {...({ fetchpriority: "high" } as any)} />
           )}
           <div className="relative h-[400px] sm:h-[500px] flex items-center justify-center overflow-hidden">
             {/* Real img tag for better LCP discovery */}
@@ -116,7 +116,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
                 alt=""
                 className="absolute inset-0 w-full h-full object-cover animate-in fade-in zoom-in-95 duration-700"
                 style={{ objectPosition: content.heroImagePosition || 'center' }}
-                fetchPriority="high"
+                {...({ fetchpriority: "high" } as any)}
                 aria-hidden="true"
               />
             )}
