@@ -89,14 +89,17 @@ export const useLandingPageContent = () => {
 
   // نشر محتوى
   const publishContent = async (
-    directorName: string
+    directorName: string,
+    contentOverride?: LandingPageContent
   ): Promise<void> => {
     try {
-      // نسخ من المسودة إلى المنشور
-      if (draftContent) {
+      // استخدام المحتوى الممرر أو المسودة الحالية
+      const contentToPublish = contentOverride || draftContent;
+
+      if (contentToPublish) {
         const publishedDoc = doc(db, 'landingPageContent', PUBLISHED_DOC_ID);
         await setDoc(publishedDoc, {
-          ...draftContent,
+          ...contentToPublish,
           id: PUBLISHED_DOC_ID,
           isPublished: true,
           publishedAt: new Date().toISOString(),

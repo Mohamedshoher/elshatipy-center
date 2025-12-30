@@ -352,44 +352,57 @@ export interface DirectorNotification {
 }
 
 // LANDING PAGE CONTENT TYPES
-export type PageSectionType = 'text' | 'image' | 'video' | 'testimonial' | 'cta' | 'advertisement';
+export type PageSectionType = 'text' | 'image' | 'video' | 'testimonial' | 'cta' | 'advertisement' | 'slider';
+
+export interface SliderImage {
+  id: string;
+  url: string;
+  caption?: string;
+  imagePosition?: string;
+}
 
 export interface PageSection {
   id: string;                    // معرّف فريد (UUID)
   type: PageSectionType;         // نوع القسم
   order: number;                 // ترتيب العرض (1, 2, 3...)
-  
+
   // حقول مشتركة
   title: string;                 // عنوان القسم
   description?: string;          // وصف إضافي
-  
+
   // حقول حسب النوع:
   // نوع "text": نص بسيط
   content?: string;              // محتوى النص
-  
+
   // نوع "image": صورة واحدة
   imageUrl?: string;             // رابط الصورة (Firebase Storage)
   imageCaption?: string;         // تعليق على الصورة
-  
+
   // نوع "video": فيديو YouTube
   youtubeUrl?: string;           // رابط الفيديو (https://www.youtube.com/watch?v=...)
-  
+
   // نوع "testimonial": شهادة عميل
   testimonialText?: string;      // نص الشهادة
   testimonialAuthor?: string;    // اسم صاحب الشهادة
   testimonialRole?: string;      // مسمى وظيفي/أسرة
   testimonialImage?: string;     // صورة الشخص
-  
+
   // نوع "cta": زر دعوة للعمل
   ctaText?: string;              // نص الزر (مثل: "سجل الآن")
   ctaLink?: string;              // الرابط الذي يذهب إليه الزر
   ctaColor?: 'blue' | 'green' | 'red'; // لون الزر
-  
+
   // نوع "advertisement": إعلان
   adImageUrl?: string;           // صورة الإعلان
   adLink?: string;               // رابط الإعلان
   adAltText?: string;            // نص بديل
-  
+
+  // نوع "slider": شريط صور متحرّك
+  sliderImages?: SliderImage[];  // قائمة الصور في السلايدر
+  sliderInterval?: number;       // مدة العرض بالثواني
+
+  imagePosition?: string;        // وضعية الصورة (CSS object-position مثل 'center 20%')
+
   isActive: boolean;             // هل القسم مفعل أم مخفي؟
   createdAt: string;             // تاريخ الإنشاء
   updatedAt: string;             // آخر تحديث
@@ -397,20 +410,21 @@ export interface PageSection {
 
 export interface LandingPageContent {
   id: string;                    // معرّف فريد
-  
+
   // معلومات العنوان والبطل
   heroTitle: string;             // العنوان الرئيسي
   heroSubtitle?: string;         // العنوان الفرعي
   heroImage?: string;            // صورة البطل
-  
+  heroImagePosition?: string;    // وضعية صورة البطل (CSS object-position)
+
   // الأقسام المرنة
   sections: PageSection[];       // قائمة الأقسام
-  
+
   // حالة النشر
   isPublished: boolean;          // هل المحتوى منشور؟
   publishedAt?: string;          // تاريخ آخر نشر
   publishedBy?: string;          // اسم المدير الذي نشر
-  
+
   // البيانات الوصفية
   createdAt: string;             // تاريخ الإنشاء
   updatedAt: string;             // آخر تحديث

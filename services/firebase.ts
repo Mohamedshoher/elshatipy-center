@@ -19,12 +19,8 @@ import { getMessaging } from "firebase/messaging";
 // تهيئة Firebase
 const app = initializeApp(firebaseConfig);
 
-// تهيئة Firestore مع تفعيل التخزين المحلي (Offline Persistence) لسرعة التحميل
-const db = initializeFirestore(app, {
-  localCache: persistentLocalCache({
-    tabManager: persistentMultipleTabManager()
-  })
-});
+// تهيئة Firestore
+const db = getFirestore(app);
 
 const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
 const storage = getStorage(app);
@@ -47,7 +43,7 @@ export const uploadImage = async (
     const timestamp = Date.now();
     const fileName = `${timestamp}_${file.name}`;
     const storageRef = ref(storage, `${folderPath}/${fileName}`);
-    
+
     await uploadBytes(storageRef, file);
     const downloadUrl = await getDownloadURL(storageRef);
     return downloadUrl;

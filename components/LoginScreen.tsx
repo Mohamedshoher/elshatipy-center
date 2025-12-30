@@ -11,7 +11,7 @@ interface LoginScreenProps {
 }
 
 const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisors, parents }) => {
-    const [loginType, setLoginType] = useState<'director' | 'supervisor' | 'teacher' | 'parent'>('director');
+    const [loginType, setLoginType] = useState<'director' | 'supervisor' | 'teacher' | 'parent'>('parent');
     const [directorPassword, setDirectorPassword] = useState('');
     const [selectedTeacherId, setSelectedTeacherId] = useState('');
     const [teacherPassword, setTeacherPassword] = useState('');
@@ -106,33 +106,45 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisor
 
     return (
         <div className="w-full animate-in fade-in slide-in-from-bottom-4 duration-500">
-            {/* Sub-tabs for Role Selection */}
-            <div className="flex justify-center mb-8 bg-gray-50 p-1.5 rounded-2xl border border-gray-100 overflow-x-auto no-scrollbar scroll-smooth">
-                <button
-                    onClick={() => setLoginType('director')}
-                    className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl font-bold text-sm transition-all duration-300 whitespace-nowrap ${loginType === 'director' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
-                >
-                    المدير
-                </button>
-                <button
-                    onClick={() => setLoginType('supervisor')}
-                    className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl font-bold text-sm transition-all duration-300 whitespace-nowrap ${loginType === 'supervisor' ? 'bg-blue-600 text-white shadow-md shadow-blue-500/20' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
-                >
-                    المشرف
-                </button>
-                <button
-                    onClick={() => setLoginType('teacher')}
-                    className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl font-bold text-sm transition-all duration-300 whitespace-nowrap ${loginType === 'teacher' ? 'bg-teal-600 text-white shadow-md shadow-teal-500/20' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
-                >
-                    المدرس
-                </button>
+            {/* Main Tabs Selection */}
+            <div className="flex justify-center mb-6 bg-gray-100/50 p-1.5 rounded-2xl border border-gray-200">
                 <button
                     onClick={() => setLoginType('parent')}
-                    className={`flex-1 min-w-[80px] py-2.5 px-3 rounded-xl font-bold text-sm transition-all duration-300 whitespace-nowrap ${loginType === 'parent' ? 'bg-indigo-600 text-white shadow-md shadow-indigo-500/20' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
+                    className={`flex-1 py-3 px-4 rounded-xl font-bold text-base transition-all duration-300 ${loginType === 'parent' ? 'bg-indigo-600 text-white shadow-lg' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
                 >
                     ولي الأمر
                 </button>
+                <button
+                    onClick={() => { if (loginType === 'parent') setLoginType('teacher'); }}
+                    className={`flex-1 py-3 px-4 rounded-xl font-bold text-base transition-all duration-300 ${loginType !== 'parent' ? 'bg-blue-600 text-white shadow-lg' : 'text-gray-500 hover:bg-white hover:text-gray-700'}`}
+                >
+                    الإدارة
+                </button>
             </div>
+
+            {/* Sub-tabs for Role Selection (Only for Staff) */}
+            {loginType !== 'parent' && (
+                <div className="flex justify-center mb-8 bg-gray-50 p-1 rounded-xl border border-gray-100 overflow-x-auto no-scrollbar scroll-smooth animate-in slide-in-from-top-2 duration-300">
+                    <button
+                        onClick={() => setLoginType('director')}
+                        className={`flex-1 min-w-[70px] py-2 px-2 rounded-lg font-bold text-xs transition-all duration-300 whitespace-nowrap ${loginType === 'director' ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        المدير
+                    </button>
+                    <button
+                        onClick={() => setLoginType('supervisor')}
+                        className={`flex-1 min-w-[70px] py-2 px-2 rounded-lg font-bold text-xs transition-all duration-300 whitespace-nowrap ${loginType === 'supervisor' ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        المشرف
+                    </button>
+                    <button
+                        onClick={() => setLoginType('teacher')}
+                        className={`flex-1 min-w-[70px] py-2 px-2 rounded-lg font-bold text-xs transition-all duration-300 whitespace-nowrap ${loginType === 'teacher' ? 'bg-blue-100 text-blue-700' : 'text-gray-400 hover:text-gray-600'}`}
+                    >
+                        المدرس
+                    </button>
+                </div>
+            )}
 
             <div className="min-h-[320px]">
                 {loginType === 'director' && (
@@ -145,11 +157,12 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisor
                             <p className="text-gray-500 text-sm mt-1">وصول كامل لجميع البيانات والصلاحيات</p>
                         </div>
                         <div>
+                            <label className="block text-sm font-medium text-gray-700 mb-1">كلمة المرور</label>
                             <input
                                 type="password"
                                 value={directorPassword}
                                 onChange={(e) => setDirectorPassword(e.target.value)}
-                                placeholder="كلمة المرور"
+                                placeholder="••••••••"
                                 className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-center text-lg font-bold outline-none"
                                 required
                             />
@@ -170,27 +183,33 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisor
                             <p className="text-gray-500 text-sm mt-1">إشراف علمي ومالي على الأقسام</p>
                         </div>
                         <div className="space-y-4">
-                            <select
-                                value={selectedSupervisorId}
-                                onChange={(e) => setSelectedSupervisorId(e.target.value)}
-                                className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-center font-bold outline-none appearance-none cursor-pointer"
-                                required
-                            >
-                                <option value="" disabled>-- اختر اسم المشرف --</option>
-                                {supervisors.map(s => {
-                                    const sectionDisplay = Array.isArray(s.section) ? s.section.join('، ') : s.section;
-                                    return <option key={s.id} value={s.id}>{s.name} ({sectionDisplay})</option>
-                                })}
-                            </select>
-                            <input
-                                type="password"
-                                value={supervisorPassword}
-                                onChange={(e) => setSupervisorPassword(e.target.value)}
-                                placeholder="كلمة المرور"
-                                className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-center text-lg font-bold outline-none"
-                                required
-                                disabled={!selectedSupervisorId}
-                            />
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">اسم المشرف</label>
+                                <select
+                                    value={selectedSupervisorId}
+                                    onChange={(e) => setSelectedSupervisorId(e.target.value)}
+                                    className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-center font-bold outline-none appearance-none cursor-pointer"
+                                    required
+                                >
+                                    <option value="" disabled>-- اختر اسم المشرف --</option>
+                                    {supervisors.map(s => {
+                                        const sectionDisplay = Array.isArray(s.section) ? s.section.join('، ') : s.section;
+                                        return <option key={s.id} value={s.id}>{s.name} ({sectionDisplay})</option>
+                                    })}
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium text-gray-700 mb-1">كلمة المرور</label>
+                                <input
+                                    type="password"
+                                    value={supervisorPassword}
+                                    onChange={(e) => setSupervisorPassword(e.target.value)}
+                                    placeholder="••••••••"
+                                    className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-blue-500 focus:ring-4 focus:ring-blue-500/10 transition-all text-center text-lg font-bold outline-none"
+                                    required
+                                    disabled={!selectedSupervisorId}
+                                />
+                            </div>
                         </div>
                         <button type="submit" disabled={!selectedSupervisorId} className="w-full bg-blue-600 hover:bg-blue-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-blue-500/25 active:scale-[0.98] text-lg disabled:opacity-50">
                             دخول كمشرف
@@ -210,24 +229,30 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisor
 
                         {activeTeachers.length > 0 ? (
                             <form onSubmit={handleTeacherLogin} className="space-y-4">
-                                <select
-                                    value={selectedTeacherId}
-                                    onChange={(e) => setSelectedTeacherId(e.target.value)}
-                                    className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-center font-bold outline-none appearance-none cursor-pointer"
-                                    required
-                                >
-                                    <option value="" disabled>-- اختر اسم المدرس --</option>
-                                    {activeTeachers.map(teacher => (<option key={teacher.id} value={teacher.id}>{teacher.name}</option>))}
-                                </select>
-                                <input
-                                    type="password"
-                                    value={teacherPassword}
-                                    onChange={(e) => setTeacherPassword(e.target.value)}
-                                    placeholder="كلمة المرور"
-                                    className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-center text-lg font-bold outline-none"
-                                    required
-                                    disabled={!selectedTeacherId}
-                                />
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">اسم المدرس</label>
+                                    <select
+                                        value={selectedTeacherId}
+                                        onChange={(e) => setSelectedTeacherId(e.target.value)}
+                                        className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-center font-bold outline-none appearance-none cursor-pointer"
+                                        required
+                                    >
+                                        <option value="" disabled>-- اختر اسم المدرس --</option>
+                                        {activeTeachers.map(teacher => (<option key={teacher.id} value={teacher.id}>{teacher.name}</option>))}
+                                    </select>
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium text-gray-700 mb-1">كلمة المرور</label>
+                                    <input
+                                        type="password"
+                                        value={teacherPassword}
+                                        onChange={(e) => setTeacherPassword(e.target.value)}
+                                        placeholder="••••••••"
+                                        className="w-full px-5 py-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:bg-white focus:border-teal-500 focus:ring-4 focus:ring-teal-500/10 transition-all text-center text-lg font-bold outline-none"
+                                        required
+                                        disabled={!selectedTeacherId}
+                                    />
+                                </div>
                                 <button type="submit" disabled={!selectedTeacherId} className="w-full bg-teal-600 hover:bg-teal-700 text-white font-bold py-4 rounded-2xl transition-all shadow-lg shadow-teal-500/25 active:scale-[0.98] text-lg disabled:opacity-50">
                                     دخول كمدرس
                                 </button>

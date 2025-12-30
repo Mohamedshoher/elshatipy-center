@@ -23,6 +23,7 @@ const SectionPreview: React.FC<SectionPreviewProps> = ({
       testimonial: 'شهادة عميل',
       cta: 'دعوة للعمل',
       advertisement: 'إعلان',
+      slider: 'سلايدر صور (Slideshow)',
     };
     return labels[type] || type;
   };
@@ -41,6 +42,8 @@ const SectionPreview: React.FC<SectionPreviewProps> = ({
         return `زر: ${section.ctaText}`;
       case 'advertisement':
         return 'إعلان';
+      case 'slider':
+        return `سلايدر: ${(section.sliderImages || []).length} صور`;
       default:
         return '';
     }
@@ -66,12 +69,12 @@ const SectionPreview: React.FC<SectionPreviewProps> = ({
       </div>
 
       {/* صورة معاينة صغيرة */}
-      {(section.imageUrl || section.adImageUrl) && (
+      {(section.imageUrl || section.adImageUrl || (section.sliderImages && section.sliderImages.length > 0)) && (
         <div className="mb-4">
           <img
-            src={section.imageUrl || section.adImageUrl}
+            src={section.imageUrl || section.adImageUrl || section.sliderImages?.[0]?.url}
             alt={section.title}
-            className="h-24 w-24 object-cover rounded"
+            className="h-24 w-24 object-cover rounded border border-gray-100 shadow-sm"
           />
         </div>
       )}
@@ -87,8 +90,8 @@ const SectionPreview: React.FC<SectionPreviewProps> = ({
         <button
           onClick={onToggleActive}
           className={`px-2 py-1.5 md:px-3 md:py-2 font-semibold rounded transition flex items-center gap-1 ${section.isActive
-              ? 'bg-green-100 hover:bg-green-200 text-green-700'
-              : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
+            ? 'bg-green-100 hover:bg-green-200 text-green-700'
+            : 'bg-gray-100 hover:bg-gray-200 text-gray-700'
             }`}
         >
           <CheckCircleIcon className="w-3 h-3 md:w-4 md:h-4" />

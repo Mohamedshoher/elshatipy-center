@@ -6,6 +6,7 @@ import SectionPreview from './SectionPreview';
 import XIcon from './icons/XIcon';
 import UserPlusIcon from './icons/UserPlusIcon';
 import CheckCircleIcon from './icons/CheckCircleIcon';
+import { ImagePreview, ImagePositionControls } from './ImageContentControls';
 
 interface LandingPageContentManagerProps {
   onClose: () => void;
@@ -51,7 +52,7 @@ const LandingPageContentManager: React.FC<LandingPageContentManagerProps> = ({
   }, [draftContent, loadingDraft, editingContent, currentDirector]);
 
   const handleHeroChange = useCallback(
-    (field: 'heroTitle' | 'heroSubtitle' | 'heroImage', value: string) => {
+    (field: 'heroTitle' | 'heroSubtitle' | 'heroImage' | 'heroImagePosition', value: string) => {
       if (editingContent) {
         setEditingContent(prev => ({
           ...prev!,
@@ -200,10 +201,10 @@ const LandingPageContentManager: React.FC<LandingPageContentManagerProps> = ({
       setSuccessMessage(null);
 
       try {
-        // حفظ أولاً ثم نشر
+        // حفظ أولاً ثم نشر باستخدام المحتوى الحالي مباشرة
         await saveDraft(editingContent);
-        const directorName = 'المدير';
-        await publishContent(directorName);
+        const directorName = (currentDirector as any)?.name || 'المدير';
+        await publishContent(directorName, editingContent);
         setSuccessMessage('✅ تم نشر المحتوى بنجاح! سيظهر على الصفحة الرئيسية الآن.');
         setTimeout(() => setSuccessMessage(null), 5000);
       } catch (error) {
@@ -367,7 +368,7 @@ const LandingPageContentManager: React.FC<LandingPageContentManagerProps> = ({
                 <input
                   type="url"
                   value={editingContent.heroImage || ''}
-                  onChange={e => setEditingContent(prev => ({ ...prev, heroImage: e.target.value }))}
+                  onChange={e => handleHeroChange('heroImage', e.target.value)}
                   placeholder="مثال: https://example.com/hero.jpg"
                   className="w-full p-4 border-2 border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent transition-all"
                 />
@@ -376,12 +377,14 @@ const LandingPageContentManager: React.FC<LandingPageContentManagerProps> = ({
                   أدخل رابط الصورة مباشرة
                 </p>
                 {editingContent.heroImage && (
-                  <div className="mt-6">
-                    <div className="relative rounded-xl overflow-hidden shadow-lg">
-                      <img
-                        src={editingContent.heroImage}
-                        alt="صورة البطل"
-                        className="w-full h-auto max-h-80 object-cover"
+                  <div className="mt-6 flex flex-col md:flex-row gap-6">
+                    <div className="flex-1">
+                      <ImagePreview src={editingContent.heroImage} alt="صورة البطل" position={editingContent.heroImagePosition} />
+                    </div>
+                    <div className="flex-1">
+                      <ImagePositionControls
+                        value={editingContent.heroImagePosition}
+                        onChange={(pos) => handleHeroChange('heroImagePosition', pos)}
                       />
                     </div>
                   </div>
@@ -407,23 +410,26 @@ const LandingPageContentManager: React.FC<LandingPageContentManagerProps> = ({
               ) : (
                 <>
                   <div className="space-y-3">
-                    {sortedSections.map(section => (
-                      <div
-                        key={section.id}
-                        draggable
-                        onDragStart={() => handleDragStart(section.id)}
-                        onDragOver={handleDragOver}
-                        onDrop={() => handleDrop(section.id)}
-                        className="cursor-move"
-                      >
-                        <SectionPreview
-                          section={section}
-                          onEdit={() => handleEditSection(section.id)}
-                          onDelete={() => handleDeleteSection(section.id)}
-                          onToggleActive={() => handleToggleSectionActive(section.id)}
-                        />
-                      </div>
-                    ))}
+                    {sortedSections.map(section => {
+                      if (!section || !section.id) return null;
+                      return (
+                        <div
+                          key={section.id}
+                          draggable
+                          onDragStart={() => handleDragStart(section.id)}
+                          onDragOver={handleDragOver}
+                          onDrop={() => handleDrop(section.id)}
+                          className="cursor-move"
+                        >
+                          <SectionPreview
+                            section={section}
+                            onEdit={() => handleEditSection(section.id)}
+                            onDelete={() => handleDeleteSection(section.id)}
+                            onToggleActive={() => handleToggleSectionActive(section.id)}
+                          />
+                        </div>
+                      );
+                    })}
                   </div>
 
                   <button

@@ -30,7 +30,6 @@ const StudentForm: React.FC<StudentFormProps> = ({ isOpen, onClose, onSave, stud
   // DEBUG: Check if new code is loaded
   useEffect(() => {
     if (isOpen) {
-      console.log("StudentForm mounted - Version with Orphan Checkbox Moved");
       if (scrollableRef.current) {
         scrollableRef.current.scrollTop = 0;
       }

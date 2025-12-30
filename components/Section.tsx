@@ -1,5 +1,6 @@
 import React from 'react';
 import type { PageSection } from '../types';
+import Slider from './Slider';
 
 interface SectionProps {
   section: PageSection;
@@ -58,12 +59,13 @@ const Section: React.FC<SectionProps> = ({ section }) => {
               </h2>
             )}
             {section.imageUrl && (
-              <div className="group relative rounded-2xl overflow-hidden shadow-2xl transform hover:scale-[1.02] transition-all duration-500">
-                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500"></div>
+              <div className="group relative rounded-2xl overflow-hidden shadow-2xl transform hover:scale-[1.02] transition-all duration-500 aspect-video">
+                <div className="absolute inset-0 bg-gradient-to-t from-black/20 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
                 <img
                   src={section.imageUrl}
                   alt={section.imageCaption || section.title}
-                  className="w-full h-auto"
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: section.imagePosition || 'center center' }}
                   loading="lazy"
                 />
               </div>
@@ -97,7 +99,7 @@ const Section: React.FC<SectionProps> = ({ section }) => {
                   src={getYoutubeEmbedUrl(section.youtubeUrl)}
                   title={section.title}
                   frameBorder="0"
-                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                  allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
                   allowFullScreen
                   className="absolute top-0 left-0"
                 />
@@ -184,18 +186,25 @@ const Section: React.FC<SectionProps> = ({ section }) => {
                 href={section.adLink || '#'}
                 target={section.adLink ? '_blank' : undefined}
                 rel={section.adLink ? 'noopener noreferrer' : undefined}
-                className="block group relative rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-[1.02]"
+                className="block group relative rounded-2xl overflow-hidden shadow-xl hover:shadow-2xl transition-all duration-500 transform hover:scale-[1.02] aspect-[21/9]"
               >
                 <div className="absolute inset-0 bg-gradient-to-t from-black/30 to-transparent opacity-0 group-hover:opacity-100 transition-opacity duration-500 z-10"></div>
                 <img
                   src={section.adImageUrl}
                   alt={section.adAltText || section.title}
-                  className="w-full h-auto"
+                  className="w-full h-full object-cover"
+                  style={{ objectPosition: section.imagePosition || 'center center' }}
                   loading="lazy"
                 />
               </a>
             )}
           </div>
+        </div>
+      )}
+
+      {section.type === 'slider' && (
+        <div className="w-full">
+          <Slider section={section} />
         </div>
       )}
     </div>

@@ -3,72 +3,7 @@ import ReactDOM from 'react-dom';
 import type { PageSection, PageSectionType } from '../types';
 import XIcon from './icons/XIcon';
 import CheckCircleIcon from './icons/CheckCircleIcon';
-
-const ImagePreview = ({ src, alt = "معاينة" }: { src: string; alt?: string }) => {
-  const [error, setError] = useState(false);
-
-  useEffect(() => {
-    setError(false);
-  }, [src]);
-
-  if (!src) return null;
-
-  return (
-    <div className="mt-4">
-      <p className="text-sm text-gray-600 mb-2">{alt}:</p>
-      {!error ? (
-        <img
-          src={src}
-          alt={alt}
-          className="max-w-full h-auto rounded-lg max-h-48 object-cover border border-gray-200"
-          onError={() => setError(true)}
-        />
-      ) : (
-        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
-          <div className="flex items-center gap-2 mb-2">
-            <span className="text-xl">⚠️</span>
-            <span className="font-bold">فشل تحميل الصورة</span>
-          </div>
-
-          {/* اكتشاف خطأ شائع: وضع رابط صفحة بدلاً من رابط صورة */}
-          {(src.includes('vecteezy.com') || (!src.includes('drive.google.com') && !src.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i))) ? (
-            <div className="mb-3 bg-white p-3 rounded border border-red-100">
-              <p className="font-bold text-red-700 mb-1">💡 يبدو أنك وضعت رابط "الصفحة" وليس الصورة!</p>
-              <p className="text-gray-700 mb-2">الرابط الذي وضعته لا ينتهي بلاحقة صورة (مثل .jpg).</p>
-              <p className="font-semibold text-gray-800">كيف تحصل على الرابط الصحيح؟</p>
-              <ol className="list-decimal list-inside text-gray-600 mt-1 space-y-1">
-                <li>افتح الرابط الذي نسخته في متصفحك.</li>
-                <li>اضغط <b>بزر الماوس الأيمن</b> فوق الصورة نفسها.</li>
-                <li>اختر <b>"نسخ عنوان الصورة" (Copy Image Address)</b>.</li>
-                <li>الصق ذلك الرابط هنا.</li>
-              </ol>
-            </div>
-          ) : src.includes('drive.google.com') ? (
-            <div className="mb-3 bg-white p-3 rounded border border-yellow-100 text-yellow-800">
-              <p className="font-bold mb-1">💡 رابط Google Drive</p>
-              <p className="mb-2">لقد قمنا بتحويل الرابط تلقائياً، ولكن الصورة لا تظهر؟</p>
-              <p className="font-semibold">الحل:</p>
-              <ul className="list-disc list-inside mt-1">
-                <li>تأكد من إعدادات المشاركة في درايف.</li>
-                <li>يجب أن تكون: <b>"أي شخص لديه الرابط" (Anyone with the link)</b>.</li>
-                <li>وليس "حصري" (Restricted).</li>
-              </ul>
-            </div>
-          ) : (
-            <>
-              <p className="mb-2">تأكد من الآتي:</p>
-              <ul className="list-disc list-inside space-y-1 opacity-90">
-                <li>الرابط صحيح ويعمل بشكل مباشر</li>
-                <li>الرابط ينتهي بامتداد صورة (jpg, png, etc)</li>
-                <li>الموقع المصدر يسمح بالمشاركة (ليس محمياً)</li>
-              </ul>
-            </>
-          )}
-        </div>
-      )}
-    </div>
-  );
-};
+import { ImagePreview, ImagePositionControls } from './ImageContentControls';
 
 interface SectionFormProps {
   section?: PageSection;
@@ -84,6 +19,7 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
       order: 1,
       title: '',
       isActive: true,
+      imagePosition: '50% 50%',
       createdAt: new Date().toISOString(),
       updatedAt: new Date().toISOString(),
     }
@@ -93,7 +29,7 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
 
   const handleInputChange = (
     field: keyof PageSection,
-    value: string | number | boolean
+    value: any
   ) => {
     setFormData(prev => ({
       ...prev,
@@ -158,6 +94,11 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
       return;
     }
 
+    if (formData.type === 'slider' && (!formData.sliderImages || formData.sliderImages.length === 0)) {
+      alert('يرجى إضافة شريحة واحدة على الأقل');
+      return;
+    }
+
     onSave(formData);
   };
 
@@ -194,6 +135,7 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
               <option value="testimonial">شهادة عميل</option>
               <option value="cta">دعوة للعمل (زر)</option>
               <option value="advertisement">إعلان</option>
+              <option value="slider">سلايدر صور (Slideshow)</option>
             </select>
           </div>
 
@@ -219,7 +161,7 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
             <input
               type="number"
               value={formData.order}
-              onChange={e => handleInputChange('order', parseInt(e.target.value))}
+              onChange={e => handleInputChange('order', parseInt(e.target.value) || 1)}
               min="1"
               className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
             />
@@ -270,8 +212,16 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
                 />
                 <p className="text-xs text-gray-500 mt-1">أدخل رابط الصورة مباشرة</p>
               </div>
-              <ImagePreview src={formData.imageUrl || ''} alt="معاينة الصورة" />
-              <div>
+              <ImagePreview src={formData.imageUrl || ''} alt="معاينة الصورة" position={formData.imagePosition} />
+
+              {formData.imageUrl && (
+                <ImagePositionControls
+                  value={formData.imagePosition}
+                  onChange={(pos) => handleInputChange('imagePosition', pos)}
+                />
+              )}
+
+              <div className="pt-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   تعليق على الصورة
                 </label>
@@ -307,7 +257,7 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
                     src={formData.youtubeUrl.replace('watch?v=', 'embed/')}
                     title="معاينة الفيديو"
                     frameBorder="0"
-                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                    allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
                     allowFullScreen
                     className="rounded-lg"
                   />
@@ -428,8 +378,16 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
                 />
                 <p className="text-xs text-gray-500 mt-1">أدخل رابط الصورة مباشرة</p>
               </div>
-              <ImagePreview src={formData.adImageUrl || ''} alt="معاينة الإعلان" />
-              <div>
+              <ImagePreview src={formData.adImageUrl || ''} alt="معاينة الإعلان" position={formData.imagePosition} />
+
+              {formData.adImageUrl && (
+                <ImagePositionControls
+                  value={formData.imagePosition}
+                  onChange={(pos) => handleInputChange('imagePosition', pos)}
+                />
+              )}
+
+              <div className="pt-2">
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   رابط الإعلان (اختياري)
                 </label>
@@ -442,6 +400,105 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
                 />
               </div>
             </>
+          )}
+
+          {formData.type === 'slider' && (
+            <div className="space-y-6">
+              <div className="bg-gray-50 p-4 rounded-xl border border-gray-200">
+                <h3 className="text-lg font-bold text-gray-800 mb-4 flex items-center gap-2">
+                  <span>🖼️</span> إدارة شرائح الصور (الحد الأقصى 10)
+                </h3>
+
+                <div className="space-y-4 max-h-[400px] overflow-y-auto p-2">
+                  {(formData.sliderImages || []).map((slide, index) => (
+                    <div key={slide.id} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm relative group">
+                      <button
+                        onClick={() => {
+                          const newImages = (formData.sliderImages || []).filter(img => img.id !== slide.id);
+                          handleInputChange('sliderImages', newImages);
+                        }}
+                        className="absolute top-2 left-2 p-1.5 bg-red-100 text-red-600 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
+                        title="حذف الشريحة"
+                      >
+                        <XIcon className="w-4 h-4" />
+                      </button>
+
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                        <div>
+                          <label className="block text-xs font-bold text-gray-500 mb-1">رابط الصورة {index + 1}</label>
+                          <input
+                            type="url"
+                            value={slide.url}
+                            onChange={e => {
+                              const newImages = [...(formData.sliderImages || [])];
+                              newImages[index] = { ...slide, url: e.target.value };
+                              handleInputChange('sliderImages', newImages);
+                            }}
+                            className="w-full text-xs p-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500"
+                            placeholder="https://..."
+                          />
+                          <ImagePreview src={slide.url} alt={`شريحة ${index + 1}`} position={slide.imagePosition} />
+                        </div>
+
+                        <div className="space-y-2">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">التعليق (فوق الصورة)</label>
+                            <input
+                              type="text"
+                              value={slide.caption || ''}
+                              onChange={e => {
+                                const newImages = [...(formData.sliderImages || [])];
+                                newImages[index] = { ...slide, caption: e.target.value };
+                                handleInputChange('sliderImages', newImages);
+                              }}
+                              className="w-full text-xs p-2 border border-gray-200 rounded focus:ring-1 focus:ring-blue-500"
+                              placeholder="محتوى يظهر فوق الصورة"
+                            />
+                          </div>
+                          <ImagePositionControls
+                            value={slide.imagePosition}
+                            onChange={(pos) => {
+                              const newImages = [...(formData.sliderImages || [])];
+                              newImages[index] = { ...slide, imagePosition: pos };
+                              handleInputChange('sliderImages', newImages);
+                            }}
+                          />
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                {(formData.sliderImages || []).length < 10 && (
+                  <button
+                    onClick={() => {
+                      const newSlide = { id: `slide-${Date.now()}`, url: '', caption: '', imagePosition: '50% 50%' };
+                      handleInputChange('sliderImages', [...(formData.sliderImages || []), newSlide]);
+                    }}
+                    className="w-full mt-4 py-3 border-2 border-dashed border-blue-200 rounded-lg text-blue-600 font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+                  >
+                    <span>➕</span> إضافة شريحة جديدة
+                  </button>
+                )}
+              </div>
+
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-100">
+                <label className="block text-sm font-bold text-blue-800 mb-2">
+                  ⏱️ مدة الانتقال التلقائي (بالثواني)
+                </label>
+                <input
+                  type="number"
+                  value={formData.sliderInterval || 5}
+                  onChange={e => handleInputChange('sliderInterval', parseInt(e.target.value) || 5)}
+                  min="2"
+                  max="20"
+                  className="w-full p-3 border border-blue-200 rounded-lg focus:ring-2 focus:ring-blue-500"
+                />
+                <p className="text-[10px] text-blue-600 mt-1 italic">
+                  * سيتم الانتقال طلاحقاً بين الصور كل {formData.sliderInterval || 5} ثوانٍ
+                </p>
+              </div>
+            </div>
           )}
 
           {/* إظهار/إخفاء القسم */}

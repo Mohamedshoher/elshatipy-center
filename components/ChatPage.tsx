@@ -25,7 +25,7 @@ const SECTIONS = [
 // Helper function to format "last seen" time
 const formatLastSeen = (timestamp: any): string => {
     if (!timestamp) return 'غير متصل';
-    
+
     try {
         const lastSeenTime = timestamp.toDate?.() || new Date(timestamp);
         const now = new Date();
@@ -33,7 +33,7 @@ const formatLastSeen = (timestamp: any): string => {
         const diffMinutes = Math.floor(diffMs / 60000);
         const diffHours = Math.floor(diffMs / 3600000);
         const diffDays = Math.floor(diffMs / 86400000);
-        
+
         if (diffMinutes < 1) {
             return 'نشط الآن';
         }
@@ -49,7 +49,7 @@ const formatLastSeen = (timestamp: any): string => {
         if (diffDays < 7) {
             return `منذ ${diffDays} أيام`;
         }
-        
+
         // Format: 12 ديسمبر
         const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
         const dateNum = lastSeenTime.getDate();
@@ -65,41 +65,41 @@ const getDateSeparatorText = (date: Date): string => {
     const today = new Date();
     const yesterday = new Date(today);
     yesterday.setDate(yesterday.getDate() - 1);
-    
+
     const dateToCheck = new Date(date.getFullYear(), date.getMonth(), date.getDate());
     const todayDate = new Date(today.getFullYear(), today.getMonth(), today.getDate());
     const yesterdayDate = new Date(yesterday.getFullYear(), yesterday.getMonth(), yesterday.getDate());
-    
+
     if (dateToCheck.getTime() === todayDate.getTime()) {
         return 'اليوم';
     }
     if (dateToCheck.getTime() === yesterdayDate.getTime()) {
         return 'أمس';
     }
-    
+
     // Format: يوم الجمعة، 12 ديسمبر 2024
     const days = ['الأحد', 'الاثنين', 'الثلاثاء', 'الأربعاء', 'الخميس', 'الجمعة', 'السبت'];
     const months = ['يناير', 'فبراير', 'مارس', 'أبريل', 'مايو', 'يونيو', 'يوليو', 'أغسطس', 'سبتمبر', 'أكتوبر', 'نوفمبر', 'ديسمبر'];
-    
+
     const dayName = days[date.getDay()];
     const monthName = months[date.getMonth()];
     const dateNum = date.getDate();
     const year = date.getFullYear();
-    
+
     return `${dayName}، ${dateNum} ${monthName} ${year}`;
 };
 
 // Helper function to check if date changed between messages
 const isDateChanged = (currentMsg: ChatMessage, previousMsg: ChatMessage | undefined): boolean => {
     if (!previousMsg) return true;
-    
-    const currentDate = currentMsg.timestamp?.seconds 
+
+    const currentDate = currentMsg.timestamp?.seconds
         ? new Date(currentMsg.timestamp.seconds * 1000)
         : new Date();
-    const previousDate = previousMsg.timestamp?.seconds 
+    const previousDate = previousMsg.timestamp?.seconds
         ? new Date(previousMsg.timestamp.seconds * 1000)
         : new Date();
-    
+
     return currentDate.toDateString() !== previousDate.toDateString();
 };
 
@@ -135,12 +135,12 @@ const MessageItem = React.memo(({ msg, isMe, searchQuery, searchResultId, isSear
         );
     }
 
-    const messageDate = msg.timestamp?.seconds 
+    const messageDate = msg.timestamp?.seconds
         ? new Date(msg.timestamp.seconds * 1000)
         : new Date();
-    const timeString = messageDate.toLocaleTimeString('ar-EG', { 
-        hour: '2-digit', 
-        minute: '2-digit' 
+    const timeString = messageDate.toLocaleTimeString('ar-EG', {
+        hour: '2-digit',
+        minute: '2-digit'
     });
 
     return (
@@ -210,7 +210,9 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
     const handleScroll = (e: React.UIEvent<HTMLDivElement>) => {
         const target = e.currentTarget;
         const isAtBottom = target.scrollHeight - target.scrollTop <= target.clientHeight + 100;
-        isAtBottomRef.current = isAtBottom;
+        if (isAtBottomRef) {
+            isAtBottomRef.current = isAtBottom;
+        }
     };
 
     useEffect(() => {
@@ -376,16 +378,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
         // Optimized: We limit these to the last 100 messages to populate recent chats list efficiently
         const qTo = query(
             collection(db, 'messages'),
-            where('receiverId', '==', myId),
-            orderBy('timestamp', 'desc'),
-            limit(100)
+            where('receiverId', '==', myId)
         );
 
         const qFrom = query(
             collection(db, 'messages'),
-            where('senderId', '==', myId),
-            orderBy('timestamp', 'desc'),
-            limit(100)
+            where('senderId', '==', myId)
         );
 
         // Separate query strictly for unread counts (no limit, but should be small number of docs)
@@ -729,9 +727,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
         // Listen to ALL incoming messages for Director/Supervisor to discover new contacts (Parents)
         const q = query(
             collection(db, 'messages'),
-            where('receiverId', '==', currentUser.role === 'director' ? 'director' : currentUser.uid),
-            orderBy('timestamp', 'desc'),
-            limit(50)
+            where('receiverId', '==', currentUser.role === 'director' ? 'director' : currentUser.uid)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -1035,10 +1031,10 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
                             {messages.map((msg, index) => {
                                 const previousMsg = index > 0 ? messages[index - 1] : undefined;
                                 const showDateSeparator = isDateChanged(msg, previousMsg);
-                                const messageDate = msg.timestamp?.seconds 
+                                const messageDate = msg.timestamp?.seconds
                                     ? new Date(msg.timestamp.seconds * 1000)
                                     : new Date();
-                                
+
                                 return (
                                     <React.Fragment key={msg.id}>
                                         {showDateSeparator && <DateSeparator date={messageDate} />}

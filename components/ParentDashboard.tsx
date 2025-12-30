@@ -94,7 +94,7 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ students, groups, onV
                                                 </div>
                                             </div>
                                             <div className="bg-gray-50 p-4 rounded-[1.5rem] border border-gray-100">
-                                                <p className="text-gray-400 text-xs font-bold mb-1">آخر الاختبارات</p>
+                                                <p className="text-gray-400 text-xs font-bold mb-1">عدد الاختبارات</p>
                                                 <span className="text-xl font-black text-gray-800">{stats.recentTests.length}</span>
                                                 <span className="text-gray-400 text-xs mr-1">اختبارات</span>
                                             </div>

@@ -1868,37 +1868,48 @@ const App: React.FC = () => {
                     {isLanding ? (
                         <LandingPage />
                     ) : (
-                        <div className="min-h-screen bg-[#0f172a] flex items-center justify-center p-4 relative overflow-hidden">
+                        <div className="min-h-screen bg-[#0f172a] flex flex-col relative overflow-hidden" dir="rtl">
                             {/* Modern Background Elements */}
-                            <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/20 blur-[120px] rounded-full"></div>
-                            <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[120px] rounded-full"></div>
-                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-teal-500/10 blur-[150px] rounded-full"></div>
+                            <div className="absolute top-[-10%] right-[-10%] w-[40%] h-[40%] bg-blue-600/20 blur-[120px] rounded-full pointer-events-none"></div>
+                            <div className="absolute bottom-[-10%] left-[-10%] w-[40%] h-[40%] bg-purple-600/20 blur-[120px] rounded-full pointer-events-none"></div>
+                            <div className="absolute top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 w-[60%] h-[60%] bg-teal-500/10 blur-[150px] rounded-full pointer-events-none"></div>
 
-                            {/* Return to Home Button */}
-                            <button
-                                onClick={() => navigate('/')}
-                                className="absolute top-6 left-6 z-20 flex items-center gap-2 text-blue-200/80 hover:text-white transition-all hover:bg-white/10 px-4 py-2 rounded-2xl backdrop-blur-md group"
-                                title="العودة للصفحة الرئيسية"
-                            >
-                                <span className="font-bold text-sm hidden sm:block group-hover:translate-x-1 transition-transform">الرئيسية</span>
-                                <HomeIcon className="w-6 h-6" />
-                            </button>
-
-                            <div className="w-full max-w-[480px] z-10">
-                                <div className="text-center mb-10 animate-in fade-in slide-in-from-top-6 duration-700">
-                                    <h1 className="text-5xl font-black text-white mb-3 tracking-tight">مركز الشاطبي</h1>
-                                    <p className="text-blue-200/60 text-lg">نظام الإدارة التعليمية المتكامل</p>
-                                </div>
-
-                                <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl p-2 sm:p-3 shadow-black/20 overflow-hidden animate-in zoom-in-95 duration-500">
-                                    <div className="p-6 sm:p-10 pt-4">
-                                        <LoginScreen onLogin={handleLogin} teachers={teachers} supervisors={supervisors} parents={parents} />
+                            {/* Header for Login Page */}
+                            <header className="w-full px-6 py-4 flex items-center justify-between z-20 bg-white/5 backdrop-blur-xl border-b border-white/10 shadow-2xl">
+                                <div className="flex items-center gap-3">
+                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
+                                        <svg viewBox="0 0 24 24" className="w-6 h-6 text-white fill-current"><path d="M12 3L4 9v12h16V9l-8-6zm0 2.2L18 10.1V19h-3v-5H9v5H6V10.1l6-4.9z" /></svg>
                                     </div>
+                                    <span className="text-xl font-bold text-white tracking-tight hidden xs:block">مركز الشاطبي</span>
                                 </div>
 
-                                <p className="text-center text-blue-200/40 text-sm mt-8">
-                                    &copy; {new Date().getFullYear()} مركز الشاطبي. جميع الحقوق محفوظة.
-                                </p>
+                                <button
+                                    onClick={() => navigate('/')}
+                                    className="flex items-center gap-2 text-white transition-all bg-white/10 hover:bg-blue-600 border border-white/20 hover:border-transparent px-5 py-2.5 rounded-xl backdrop-blur-md group shadow-xl hover:shadow-blue-500/20"
+                                    title="العودة للصفحة الرئيسية"
+                                >
+                                    <HomeIcon className="w-5 h-5" />
+                                    <span className="font-bold text-sm">الصفحة الرئيسية</span>
+                                </button>
+                            </header>
+
+                            <div className="flex-1 flex items-center justify-center p-4 relative z-10">
+                                <div className="w-full max-w-[480px] py-8">
+                                    <div className="text-center mb-8 animate-in fade-in slide-in-from-top-6 duration-700">
+                                        <h1 className="text-4xl sm:text-5xl font-black text-white mb-2 tracking-tight">مركز الشاطبي</h1>
+                                        <p className="text-blue-200/60 text-base sm:text-lg italic">نظام الإدارة التعليمية المتكامل</p>
+                                    </div>
+
+                                    <div className="bg-white/95 backdrop-blur-xl rounded-[2.5rem] shadow-2xl p-2 sm:p-3 shadow-black/20 overflow-hidden animate-in zoom-in-95 duration-500">
+                                        <div className="p-6 sm:p-10 pt-4">
+                                            <LoginScreen onLogin={handleLogin} teachers={teachers} supervisors={supervisors} parents={parents} />
+                                        </div>
+                                    </div>
+
+                                    <p className="text-center text-blue-200/40 text-xs mt-8 font-medium">
+                                        &copy; {new Date().getFullYear()} مركز الشاطبي للإدارة والتدريب. جميع الحقوق محفوظة.
+                                    </p>
+                                </div>
                             </div>
                         </div>
                     )}

@@ -97,8 +97,11 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
       {content?.heroImage || content?.heroTitle ? (
         <div className="relative overflow-hidden">
           <div
-            className="relative h-[500px] bg-cover bg-center flex items-center justify-center animate-in fade-in zoom-in-95 duration-700"
-            style={content?.heroImage ? { backgroundImage: `url(${content.heroImage})` } : {}}
+            className="relative h-[500px] bg-cover flex items-center justify-center animate-in fade-in zoom-in-95 duration-700"
+            style={content?.heroImage ? {
+              backgroundImage: `url(${content.heroImage})`,
+              backgroundPosition: content.heroImagePosition || 'center'
+            } : {}}
           >
             {/* Overlay with gradient */}
             <div className="absolute inset-0 bg-gradient-to-br from-blue-900/70 via-indigo-900/60 to-purple-900/70"></div>
