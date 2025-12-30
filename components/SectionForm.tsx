@@ -1,7 +1,74 @@
 import React, { useState, useEffect } from 'react';
+import ReactDOM from 'react-dom';
 import type { PageSection, PageSectionType } from '../types';
 import XIcon from './icons/XIcon';
 import CheckCircleIcon from './icons/CheckCircleIcon';
+
+const ImagePreview = ({ src, alt = "معاينة" }: { src: string; alt?: string }) => {
+  const [error, setError] = useState(false);
+
+  useEffect(() => {
+    setError(false);
+  }, [src]);
+
+  if (!src) return null;
+
+  return (
+    <div className="mt-4">
+      <p className="text-sm text-gray-600 mb-2">{alt}:</p>
+      {!error ? (
+        <img
+          src={src}
+          alt={alt}
+          className="max-w-full h-auto rounded-lg max-h-48 object-cover border border-gray-200"
+          onError={() => setError(true)}
+        />
+      ) : (
+        <div className="p-4 bg-red-50 border border-red-200 rounded-lg text-red-600 text-sm">
+          <div className="flex items-center gap-2 mb-2">
+            <span className="text-xl">⚠️</span>
+            <span className="font-bold">فشل تحميل الصورة</span>
+          </div>
+
+          {/* اكتشاف خطأ شائع: وضع رابط صفحة بدلاً من رابط صورة */}
+          {(src.includes('vecteezy.com') || (!src.includes('drive.google.com') && !src.match(/\.(jpg|jpeg|png|webp|gif|svg)$/i))) ? (
+            <div className="mb-3 bg-white p-3 rounded border border-red-100">
+              <p className="font-bold text-red-700 mb-1">💡 يبدو أنك وضعت رابط "الصفحة" وليس الصورة!</p>
+              <p className="text-gray-700 mb-2">الرابط الذي وضعته لا ينتهي بلاحقة صورة (مثل .jpg).</p>
+              <p className="font-semibold text-gray-800">كيف تحصل على الرابط الصحيح؟</p>
+              <ol className="list-decimal list-inside text-gray-600 mt-1 space-y-1">
+                <li>افتح الرابط الذي نسخته في متصفحك.</li>
+                <li>اضغط <b>بزر الماوس الأيمن</b> فوق الصورة نفسها.</li>
+                <li>اختر <b>"نسخ عنوان الصورة" (Copy Image Address)</b>.</li>
+                <li>الصق ذلك الرابط هنا.</li>
+              </ol>
+            </div>
+          ) : src.includes('drive.google.com') ? (
+            <div className="mb-3 bg-white p-3 rounded border border-yellow-100 text-yellow-800">
+              <p className="font-bold mb-1">💡 رابط Google Drive</p>
+              <p className="mb-2">لقد قمنا بتحويل الرابط تلقائياً، ولكن الصورة لا تظهر؟</p>
+              <p className="font-semibold">الحل:</p>
+              <ul className="list-disc list-inside mt-1">
+                <li>تأكد من إعدادات المشاركة في درايف.</li>
+                <li>يجب أن تكون: <b>"أي شخص لديه الرابط" (Anyone with the link)</b>.</li>
+                <li>وليس "حصري" (Restricted).</li>
+              </ul>
+            </div>
+          ) : (
+            <>
+              <p className="mb-2">تأكد من الآتي:</p>
+              <ul className="list-disc list-inside space-y-1 opacity-90">
+                <li>الرابط صحيح ويعمل بشكل مباشر</li>
+                <li>الرابط ينتهي بامتداد صورة (jpg, png, etc)</li>
+                <li>الموقع المصدر يسمح بالمشاركة (ليس محمياً)</li>
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+    </div>
+  );
+};
 
 interface SectionFormProps {
   section?: PageSection;
@@ -22,9 +89,7 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
     }
   );
 
-  const [previewImage, setPreviewImage] = useState<string | null>(
-    formData.imageUrl || formData.adImageUrl || null
-  );
+
 
   const handleInputChange = (
     field: keyof PageSection,
@@ -41,14 +106,24 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
     imageField: 'imageUrl' | 'adImageUrl' | 'testimonialImage',
     url: string
   ) => {
+    let finalUrl = url;
+
+    // تحويل روابط Google Drive تلقائياً إلى روابط مباشرة
+    // يحول من: https://drive.google.com/file/d/FILE_ID/view...
+    // إلى: https://drive.google.com/uc?export=view&id=FILE_ID
+    if (url.includes('drive.google.com') && url.includes('/file/d/')) {
+      const match = url.match(/\/file\/d\/([^/]+)/);
+      if (match && match[1]) {
+        finalUrl = `https://drive.google.com/uc?export=view&id=${match[1]}`;
+      }
+    }
+
     setFormData(prev => ({
       ...prev,
-      [imageField]: url,
+      [imageField]: finalUrl,
       updatedAt: new Date().toISOString(),
     }));
-    if (url) {
-      setPreviewImage(url);
-    }
+
   };
 
   const handleSave = () => {
@@ -86,8 +161,8 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
     onSave(formData);
   };
 
-  return (
-    <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+  return ReactDOM.createPortal(
+    <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex justify-center items-center p-4">
       <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-8 w-full max-w-2xl max-h-[90vh] overflow-y-auto">
         <div className="flex justify-between items-center mb-6">
           <h2 className="text-2xl font-bold text-gray-800">
@@ -195,12 +270,7 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
                 />
                 <p className="text-xs text-gray-500 mt-1">أدخل رابط الصورة مباشرة</p>
               </div>
-              {previewImage && (
-                <div className="mt-4">
-                  <p className="text-sm text-gray-600 mb-2">معاينة الصورة:</p>
-                  <img src={previewImage} alt="معاينة" className="max-w-full h-auto rounded-lg max-h-48 object-cover" />
-                </div>
-              )}
+              <ImagePreview src={formData.imageUrl || ''} alt="معاينة الصورة" />
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   تعليق على الصورة
@@ -358,12 +428,7 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
                 />
                 <p className="text-xs text-gray-500 mt-1">أدخل رابط الصورة مباشرة</p>
               </div>
-              {previewImage && (
-                <div className="mt-4">
-                  <p className="text-sm text-gray-600 mb-2">معاينة الإعلان:</p>
-                  <img src={previewImage} alt="معاينة" className="max-w-full h-auto rounded-lg max-h-48 object-cover" />
-                </div>
-              )}
+              <ImagePreview src={formData.adImageUrl || ''} alt="معاينة الإعلان" />
               <div>
                 <label className="block text-sm font-semibold text-gray-700 mb-2">
                   رابط الإعلان (اختياري)
@@ -411,7 +476,8 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
           </button>
         </div>
       </div>
-    </div>
+    </div>,
+    document.body
   );
 };
 
