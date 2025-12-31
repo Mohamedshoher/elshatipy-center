@@ -66,6 +66,9 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
     let total = 0;
 
     students.forEach(s => {
+      // Very Important: Only count students in groups assigned to THIS teacher
+      if (!groupIds.includes(s.groupId)) return;
+
       s.fees.forEach(fee => {
         const isMatch = fee.month === selectedMonth && fee.paid && fee.amountPaid;
         if (!isMatch) return;
@@ -73,26 +76,17 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
         const amount = fee.amountPaid || 0;
         total += amount;
 
-        if (fee.collectedBy) {
-          if (fee.collectedBy === teacher.id) {
-            byTeacher += amount;
-          } else if (fee.collectedBy === 'director') {
-            byDirector += amount;
-          } else {
-            // Some other collector? Assume group assignment for legacy if not director
-            if (groupIds.includes(s.groupId)) byTeacher += amount;
-          }
+        if (fee.collectedBy === 'director') {
+          byDirector += amount;
         } else {
-          // Fallback for older data: count if student is CURRENTLY in this teacher's group
-          if (groupIds.includes(s.groupId)) {
-            byTeacher += amount;
-          }
+          // Count everything else as teacher collection for these specific groups
+          byTeacher += amount;
         }
       });
     });
 
     return { collectedByTeacher: byTeacher, collectedByDirector: byDirector, totalRevenue: total };
-  }, [students, assignedGroups, teacher.id, selectedMonth]);
+  }, [students, assignedGroups, selectedMonth]);
 
   const collectedAmount = collectedByTeacher;
 

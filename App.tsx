@@ -2208,6 +2208,12 @@ const App: React.FC = () => {
                 {/* Catch-all for sub-views that aren't yet routed */}
                 <Route path="*" element={
                     (() => {
+                        if (viewingTeacherReportId) {
+                            const reportTeacher = teachers.find(t => t.id === viewingTeacherReportId);
+                            if (reportTeacher) {
+                                return <TeacherReportPage teacher={reportTeacher} groups={groups} students={students} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={() => handleBackButton()} teacherCollections={collections} currentUserRole={currentUser?.role} />;
+                            }
+                        }
                         if (teacherForDetails || supervisorForDetails) return <TeacherDetailsPage
                             teacher={teacherForDetails}
                             supervisor={supervisorForDetails}
@@ -2229,6 +2235,7 @@ const App: React.FC = () => {
                             teacherManualBonuses={teacherManualBonuses}
                             currentUserRole={currentUser?.role}
                             onAddTeacherCollection={handleAddTeacherCollection}
+                            onDeleteTeacherCollection={handleDeleteTeacherCollection}
                             onAddManualBonus={handleAddManualBonus}
                             onDeleteManualBonus={handleDeleteManualBonus}
                             onDeleteTeacherAttendance={handleDeleteTeacherAttendance}
@@ -2361,6 +2368,12 @@ const App: React.FC = () => {
                 {/* Catch-all for sub-views that aren't yet routed */}
                 <Route path="*" element={
                     (() => {
+                        if (viewingTeacherReportId) {
+                            const reportTeacher = teachers.find(t => t.id === viewingTeacherReportId);
+                            if (reportTeacher) {
+                                return <TeacherReportPage teacher={reportTeacher} groups={groups} students={activeStudents} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={handleBackToMain} teacherCollections={teacherCollections} currentUserRole={currentUser?.role} />;
+                            }
+                        }
                         if (teacherForDetails || supervisorForDetails) return <TeacherDetailsPage
                             teacher={teacherForDetails}
                             supervisor={supervisorForDetails}
@@ -2382,6 +2395,7 @@ const App: React.FC = () => {
                             teacherManualBonuses={teacherManualBonuses}
                             currentUserRole={currentUser?.role}
                             onAddTeacherCollection={handleAddTeacherCollection}
+                            onDeleteTeacherCollection={handleDeleteTeacherCollection}
                             onAddManualBonus={handleAddManualBonus}
                             onDeleteManualBonus={handleDeleteManualBonus}
                             onDeleteTeacherAttendance={handleDeleteTeacherAttendance}

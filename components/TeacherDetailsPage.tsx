@@ -40,6 +40,7 @@ interface TeacherDetailsPageProps {
     teacherManualBonuses?: TeacherManualBonus[];
     currentUserRole?: UserRole;
     onAddTeacherCollection?: (collection: Omit<TeacherCollectionRecord, 'id'>) => void;
+    onDeleteTeacherCollection?: (collectionId: string) => void;
     onAddManualBonus?: (bonus: Omit<TeacherManualBonus, 'id'>) => void;
     onDeleteManualBonus?: (bonusId: string) => void;
     onDeleteTeacherAttendance?: (recordId: string) => void;
@@ -90,6 +91,7 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
     teacherManualBonuses = [],
     currentUserRole,
     onAddTeacherCollection,
+    onDeleteTeacherCollection,
     onAddManualBonus,
     onDeleteManualBonus,
     onDeleteTeacherAttendance,
@@ -300,6 +302,8 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
         const dailyRate = effectiveSalary > 0 ? effectiveSalary / workingDays : 0;
         const absenceDeduction = roundToNearest5(dailyRate * absenceDays * (financialSettings.absenceDeductionPercentage / 100));
         const attendanceBonus = roundToNearest5(dailyRate * bonusDays);
+
+
 
         const finalSalary = roundToNearest5(isPartnership
             ? partnershipAmount + manualBonusTotal + attendanceBonus - absenceDeduction
@@ -741,8 +745,21 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                                                         )}
                                                     </div>
                                                 </div>
-                                                <div className="text-left">
+                                                <div className="text-left flex flex-col items-end gap-2">
                                                     <p className="text-lg font-black text-teal-600">{r.amount.toLocaleString()} ج.م</p>
+                                                    {r.type === 'handed_over' && onDeleteTeacherCollection && (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا التحصيل؟')) {
+                                                                    onDeleteTeacherCollection(r.id);
+                                                                }
+                                                            }}
+                                                            className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors"
+                                                            title="حذف"
+                                                        >
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                             {r.notes && (
@@ -776,11 +793,26 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-teal-600 font-extrabold">{r.amount.toLocaleString()} ج.م</td>
                                                     <td className="px-6 py-4 text-sm text-gray-500">{r.notes || '-'}</td>
                                                     <td className="px-6 py-4 whitespace-nowrap text-xs">
-                                                        {r.type === 'handed_over' ? (
-                                                            <span className="px-2 py-1 bg-teal-50 text-teal-600 rounded-full font-bold">تسليم يدوي</span>
-                                                        ) : (
-                                                            <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full font-bold">مدير مباشر</span>
-                                                        )}
+                                                        <div className="flex items-center justify-center gap-2">
+                                                            {r.type === 'handed_over' ? (
+                                                                <span className="px-2 py-1 bg-teal-50 text-teal-600 rounded-full font-bold">تسليم يدوي</span>
+                                                            ) : (
+                                                                <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full font-bold">مدير مباشر</span>
+                                                            )}
+                                                            {r.type === 'handed_over' && onDeleteTeacherCollection && (
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا التحصيل؟')) {
+                                                                            onDeleteTeacherCollection(r.id);
+                                                                        }
+                                                                    }}
+                                                                    className="p-1 text-red-400 hover:text-red-600 transition-colors"
+                                                                    title="حذف"
+                                                                >
+                                                                    <TrashIcon className="w-4 h-4" />
+                                                                </button>
+                                                            )}
+                                                        </div>
                                                     </td>
                                                 </tr>
                                             ))
