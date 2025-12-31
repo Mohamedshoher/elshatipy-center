@@ -14,7 +14,7 @@ export const getGroupTypeFromName = (name: string | undefined): GroupType | null
 
 export const filterSupervisorData = (
     currentUser: CurrentUser | null,
-    activeStudents: Student[],
+    allStudents: Student[],
     groups: Group[],
     teachers: Teacher[],
     expenses: Expense[],
@@ -32,9 +32,14 @@ export const filterSupervisorData = (
         return groupType && sections.includes(groupType);
     });
     const filteredGroupIds = filteredGroups.map(g => g.id);
+    const filteredGroupNames = new Set(filteredGroups.map(g => g.name));
 
-    // 2. Students in those groups
-    const filteredStudents = activeStudents.filter(s => filteredGroupIds.includes(s.groupId));
+    // 2. Students in those groups (including archived)
+    const allFilteredStudents = allStudents.filter(s =>
+        filteredGroupIds.includes(s.groupId) ||
+        (s.isArchived && s.archivedGroupName && filteredGroupNames.has(s.archivedGroupName))
+    );
+    const activeFilteredStudents = allFilteredStudents.filter(s => !s.isArchived && !s.isPending);
 
     // 3. Teachers who teach those groups
     const filteredTeacherIds = filteredGroups.map(g => g.teacherId).filter(id => id);
@@ -57,7 +62,8 @@ export const filterSupervisorData = (
 
     return {
         groups: filteredGroups,
-        students: filteredStudents,
+        students: activeFilteredStudents,
+        allStudents: allFilteredStudents,
         teachers: filteredTeachers,
         expenses: filteredExpenses,
         collections: filteredCollections,
@@ -68,12 +74,21 @@ export const filterSupervisorData = (
 
 export const filterTeacherStudents = (
     currentUser: CurrentUser | null,
-    activeStudents: Student[],
+    allStudents: Student[],
     groups: Group[]
 ) => {
-    if (currentUser?.role !== 'teacher') return [];
-    const teacherGroupIds = groups.filter(g => g.teacherId === currentUser.id).map(g => g.id);
-    return activeStudents.filter(s => teacherGroupIds.includes(s.groupId));
+    if (currentUser?.role !== 'teacher') return { students: [], allStudents: [] };
+    const teacherGroups = groups.filter(g => g.teacherId === currentUser.id);
+    const teacherGroupIds = teacherGroups.map(g => g.id);
+    const teacherGroupNames = new Set(teacherGroups.map(g => g.name));
+
+    const allFiltered = allStudents.filter(s =>
+        teacherGroupIds.includes(s.groupId) ||
+        (s.isArchived && s.archivedGroupName && teacherGroupNames.has(s.archivedGroupName))
+    );
+    const activeFiltered = allFiltered.filter(s => !s.isArchived && !s.isPending);
+
+    return { students: activeFiltered, allStudents: allFiltered };
 };
 
 export const getVisibleGroups = (

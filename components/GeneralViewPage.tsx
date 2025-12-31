@@ -211,7 +211,15 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
 
     const teacherCollectionsSummary = useMemo(() => {
         const collectionsThisMonth = teacherCollections.filter(c => c.month === selectedMonth);
-        const totalReceived = collectionsThisMonth.reduce((sum, c) => sum + c.amount, 0);
+        const handedOverByTeachers = collectionsThisMonth.reduce((sum, c) => sum + c.amount, 0);
+
+        // Director income (collectedBy 'director')
+        const directorIncome = students.flatMap(s => s.fees || [])
+            .filter(f => f.month === selectedMonth && f.paid && f.amountPaid && f.collectedBy === 'director')
+            .reduce((sum, f) => sum + (f.amountPaid || 0), 0);
+
+        // Total received by center = Handed over by teachers + Collected by director
+        const totalReceived = handedOverByTeachers + directorIncome;
 
         const teacherTotals: { [key: string]: number } = {};
         collectionsThisMonth.forEach(collection => {
@@ -226,8 +234,8 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
             amount,
         })).sort((a, b) => b.amount - a.amount);
 
-        return { totalReceived, details };
-    }, [teacherCollections, teachers, selectedMonth]);
+        return { totalReceived, handedOverByTeachers, directorIncome, details };
+    }, [teacherCollections, teachers, selectedMonth, students]);
 
 
     const financialOverview = useMemo(() => {

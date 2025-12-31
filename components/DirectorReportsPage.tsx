@@ -75,7 +75,7 @@ const DirectorReportsPage: React.FC<DirectorReportsPageProps> = ({ groups, stude
 
     const attendanceReport = useMemo(() => {
         const groupData = [...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(group => {
-            const studentsInGroup = students.filter(s => s.groupId === group.id && !s.isArchived);
+            const studentsInGroup = students.filter(s => s.groupId === group.id || (s.isArchived && s.archivedGroupName === group.name));
             let present = 0;
             let absent = 0;
             studentsInGroup.forEach(student => {
@@ -98,7 +98,7 @@ const DirectorReportsPage: React.FC<DirectorReportsPageProps> = ({ groups, stude
 
     const feesReport = useMemo(() => {
         const groupData = [...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(group => {
-            const studentsInGroup = students.filter(s => s.groupId === group.id && !s.isArchived);
+            const studentsInGroup = students.filter(s => s.groupId === group.id || (s.isArchived && s.archivedGroupName === group.name));
             let collected = 0;
             studentsInGroup.forEach(student => {
                 const feeRecord = student.fees.find(f => f.month === selectedMonth);
@@ -107,7 +107,7 @@ const DirectorReportsPage: React.FC<DirectorReportsPageProps> = ({ groups, stude
                 }
             });
             const pendingAmount = studentsInGroup
-                .filter(s => new Date(selectedMonth) >= new Date(s.joiningDate.substring(0, 7)) && !s.fees.some(f => f.month === selectedMonth && f.paid))
+                .filter(s => !s.isArchived && new Date(selectedMonth) >= new Date(s.joiningDate.substring(0, 7)) && !s.fees.some(f => f.month === selectedMonth && f.paid))
                 .reduce((sum, s) => sum + s.monthlyFee, 0);
 
             return { groupId: group.id, groupName: group.name, collected, pendingAmount };
@@ -121,9 +121,8 @@ const DirectorReportsPage: React.FC<DirectorReportsPageProps> = ({ groups, stude
 
     const testsReport = useMemo(() => {
         const allTests = students
-            .filter(s => !s.isArchived)
             .flatMap(student => {
-                const group = groups.find(g => g.id === student.groupId);
+                const group = groups.find(g => g.id === student.groupId) || (student.isArchived ? { name: student.archivedGroupName } : null);
                 return student.tests.map(test => ({
                     ...test,
                     studentName: student.name,

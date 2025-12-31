@@ -316,19 +316,39 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
 
                                     // Calculate collected amount for this teacher (if teacher)
                                     let collectedAmount = 0;
+                                    let teacherTotalRevenue = 0;
                                     if (entity.type === 'teacher') {
-                                        const teacherGroups = groups.filter(g => g.teacherId === entity.id);
-                                        const teacherStudents = students.filter(s => teacherGroups.some(g => g.id === s.groupId));
-                                        collectedAmount = teacherStudents
-                                            .flatMap(s => s.fees)
-                                            .filter(f => f.month === selectedMonth && f.paid && f.amountPaid)
-                                            .reduce((sum, f) => sum + (f.amountPaid || 0), 0);
+                                        const teacherGroupIds = new Set(groups.filter(g => g.teacherId === entity.id).map(g => g.id));
+
+                                        students.forEach(s => {
+                                            const monthFee = s.fees?.find(f => f.month === selectedMonth && f.paid);
+                                            if (monthFee) {
+                                                const amount = monthFee.amountPaid || 0;
+                                                const isCollectedByThisTeacher = monthFee.collectedBy === entity.id;
+                                                const isCollectedByDirector = monthFee.collectedBy === 'director';
+                                                const isInTeacherGroup = teacherGroupIds.has(s.groupId);
+
+                                                if (isCollectedByThisTeacher) {
+                                                    collectedAmount += amount;
+                                                    teacherTotalRevenue += amount;
+                                                } else if (isCollectedByDirector && isInTeacherGroup) {
+                                                    teacherTotalRevenue += amount;
+                                                } else if (!monthFee.collectedBy && isInTeacherGroup) {
+                                                    // Legacy fallback
+                                                    collectedAmount += amount;
+                                                    teacherTotalRevenue += amount;
+                                                }
+                                            }
+                                        });
                                     }
+
+                                    // Use teacherTotalRevenue for partnership calculations
+                                    const revenueForCalculation = teacherTotalRevenue;
 
                                     const isPartnership = entity.type === 'teacher' && (entity as Teacher).paymentType === PaymentType.PARTNERSHIP;
                                     const baseSalary = isPartnership ? 0 : (entity.salary || 0);
                                     const partnershipPercentage = isPartnership ? ((entity as Teacher).partnershipPercentage || 0) : 0;
-                                    const partnershipAmount = isPartnership ? (collectedAmount * partnershipPercentage / 100) : 0;
+                                    const partnershipAmount = isPartnership ? (revenueForCalculation * partnershipPercentage / 100) : 0;
 
                                     const adjustments = teacherPayrollAdjustments.find(p => p.teacherId === entity.id && p.month === selectedMonth) || { bonus: 0, isPaid: false };
 
@@ -401,12 +421,14 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
                                     if (isPartnership) {
                                         whatsappMessage += `
 نوع المحاسبة: شراكة (${partnershipPercentage}%)
-المبلغ المحصّل: ${collectedAmount.toLocaleString()}
-نصيبك من المحصل: ${partnershipAmount.toFixed(2)}
+إجمالي دخل المجموعات: ${revenueForCalculation.toLocaleString()}
+ما حصلته أنت: ${collectedAmount.toLocaleString()}
+نصيبك من الدخل: ${partnershipAmount.toFixed(2)}
 `;
                                     } else {
                                         whatsappMessage += `
 الراتب الأساسي: ${baseSalary.toLocaleString()}
+ما حصلته أنت: ${collectedAmount.toLocaleString()}
 `;
                                     }
 

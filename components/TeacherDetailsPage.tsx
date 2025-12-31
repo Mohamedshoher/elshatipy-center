@@ -248,19 +248,27 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                 groups.filter(g => g.teacherId === teacher.id).map(g => g.id)
             );
 
-            const teacherStudents = students.filter(s => teacherGroupIds.has(s.groupId));
             const monthPrefix = selectedMonth;
 
-            teacherStudents.forEach(s => {
+            students.forEach(s => {
                 const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
                 if (monthFee) {
                     const amount = monthFee.amountPaid || 0;
-                    totalCollectedRevenue += amount;
-                    if (monthFee.collectedBy === 'director') {
-                        collectedByDirector += amount;
-                    } else {
-                        // Assume collected by teacher for legacy or if explicitly theirs
+
+                    // If collected by this teacher, it counts towards their handed-over balance
+                    if (monthFee.collectedBy === teacher.id) {
                         collectedByTeacher += amount;
+                        totalCollectedRevenue += amount;
+                    }
+                    // If collected by director but student is in this teacher's group, it counts towards total revenue for commission/partnership
+                    else if (monthFee.collectedBy === 'director' && teacherGroupIds.has(s.groupId)) {
+                        collectedByDirector += amount;
+                        totalCollectedRevenue += amount;
+                    }
+                    // Legacy support or default: if student is in this teacher's group and no collector is specified
+                    else if (!monthFee.collectedBy && teacherGroupIds.has(s.groupId)) {
+                        collectedByTeacher += amount;
+                        totalCollectedRevenue += amount;
                     }
                 }
             });

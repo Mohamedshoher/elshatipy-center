@@ -32,7 +32,15 @@ const FinanceIncomeModal: React.FC<FinanceIncomeModalProps> = ({ isOpen, onClose
       student.fees
         .filter(fee => fee.month === month && fee.paid && fee.amountPaid)
         .forEach(fee => {
-          const groupName = groupMap.get(student.groupId) || 'بدون مجموعة';
+          let groupName = groupMap.get(student.groupId);
+
+          // If student is archived or group not found, use the saved archivedGroupName
+          if (!groupName && student.isArchived && student.archivedGroupName) {
+            groupName = student.archivedGroupName;
+          }
+
+          if (!groupName) groupName = 'بدون مجموعة';
+
           if (!grouped[groupName]) {
             grouped[groupName] = { total: 0, count: 0 };
           }
