@@ -99,6 +99,11 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
       return;
     }
 
+    if (formData.type === 'youtube_shorts' && (!formData.youtubeShortsUrls || formData.youtubeShortsUrls.filter(url => url.trim() !== '').length === 0)) {
+      alert('يرجى إضافة رابط فيديو شورتس واحد على الأقل');
+      return;
+    }
+
     onSave(formData);
   };
 
@@ -132,6 +137,7 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
               <option value="text">نص</option>
               <option value="image">صورة</option>
               <option value="video">فيديو YouTube</option>
+              <option value="youtube_shorts">فيديوهات شورتس (YouTube Shorts)</option>
               <option value="testimonial">شهادة عميل</option>
               <option value="cta">دعوة للعمل (زر)</option>
               <option value="advertisement">إعلان</option>
@@ -263,6 +269,49 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
                   />
                 </div>
               )}
+            </div>
+          )}
+
+          {formData.type === 'youtube_shorts' && (
+            <div className="space-y-4">
+              <label className="block text-sm font-semibold text-gray-700 mb-2">
+                روابط YouTube Shorts *
+              </label>
+              <div className="space-y-3">
+                {(formData.youtubeShortsUrls || []).map((url, index) => (
+                  <div key={index} className="flex gap-2">
+                    <input
+                      type="url"
+                      value={url}
+                      onChange={e => {
+                        const newUrls = [...(formData.youtubeShortsUrls || [])];
+                        newUrls[index] = e.target.value;
+                        handleInputChange('youtubeShortsUrls', newUrls);
+                      }}
+                      placeholder="https://www.youtube.com/shorts/..."
+                      className="flex-1 p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                    />
+                    <button
+                      onClick={() => {
+                        const newUrls = (formData.youtubeShortsUrls || []).filter((_, i) => i !== index);
+                        handleInputChange('youtubeShortsUrls', newUrls);
+                      }}
+                      className="p-3 bg-red-100 text-red-600 rounded-lg hover:bg-red-200 transition"
+                    >
+                      <XIcon className="w-5 h-5" />
+                    </button>
+                  </div>
+                ))}
+              </div>
+              <button
+                onClick={() => {
+                  handleInputChange('youtubeShortsUrls', [...(formData.youtubeShortsUrls || []), '']);
+                }}
+                className="w-full py-3 border-2 border-dashed border-blue-200 rounded-lg text-blue-600 font-bold hover:bg-blue-50 transition-colors flex items-center justify-center gap-2"
+              >
+                <span>➕</span> إضافة فيديو شورتس جديد
+              </button>
+              <p className="text-xs text-gray-500">ملاحظة: تأكد من أن الروابط بصيغة YouTube Shorts.</p>
             </div>
           )}
 

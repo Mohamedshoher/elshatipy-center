@@ -24,6 +24,7 @@ const SectionPreview: React.FC<SectionPreviewProps> = ({
       cta: 'دعوة للعمل',
       advertisement: 'إعلان',
       slider: 'سلايدر صور (Slideshow)',
+      youtube_shorts: 'فيديوهات شورتس (YouTube Shorts)',
     };
     return labels[type] || type;
   };
@@ -36,6 +37,8 @@ const SectionPreview: React.FC<SectionPreviewProps> = ({
         return `صورة${section.imageCaption ? ': ' + section.imageCaption : ''}`;
       case 'video':
         return 'فيديو YouTube';
+      case 'youtube_shorts':
+        return `شورتس: ${(section.youtubeShortsUrls || []).filter(u => u).length} فيديو`;
       case 'testimonial':
         return `"${section.testimonialText?.substring(0, 50)}..."`;
       case 'cta':

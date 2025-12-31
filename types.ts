@@ -352,7 +352,7 @@ export interface DirectorNotification {
 }
 
 // LANDING PAGE CONTENT TYPES
-export type PageSectionType = 'text' | 'image' | 'video' | 'testimonial' | 'cta' | 'advertisement' | 'slider';
+export type PageSectionType = 'text' | 'image' | 'video' | 'testimonial' | 'cta' | 'advertisement' | 'slider' | 'youtube_shorts';
 
 export interface SliderImage {
   id: string;
@@ -400,6 +400,9 @@ export interface PageSection {
   // نوع "slider": شريط صور متحرّك
   sliderImages?: SliderImage[];  // قائمة الصور في السلايدر
   sliderInterval?: number;       // مدة العرض بالثواني
+
+  // نوع "youtube_shorts": فيديوهات الشورتس
+  youtubeShortsUrls?: string[];  // قائمة روابط فيديوهات الشورتس
 
   imagePosition?: string;        // وضعية الصورة (CSS object-position مثل 'center 20%')
 

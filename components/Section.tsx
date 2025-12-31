@@ -212,6 +212,32 @@ const Section: React.FC<SectionProps> = ({ section }) => {
           <Slider section={section} />
         </div>
       )}
+
+      {section.type === 'youtube_shorts' && (
+        <div className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-slate-50 to-blue-50">
+          <div className="max-w-7xl mx-auto">
+            {section.title && (
+              <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-10 text-center">
+                {section.title}
+              </h2>
+            )}
+            {section.description && (
+              <p className="text-xl text-gray-700 mb-12 text-center font-medium max-w-3xl mx-auto">
+                {section.description}
+              </p>
+            )}
+            {section.youtubeShortsUrls && section.youtubeShortsUrls.length > 0 && (
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
+                {section.youtubeShortsUrls.filter(url => url.trim() !== '').map((url, idx) => (
+                  <div key={idx} className="aspect-[9/16] rounded-2xl overflow-hidden shadow-xl ring-1 ring-black/5 transform hover:scale-[1.03] transition-all duration-300">
+                    <YouTubeLite url={url} title={`${section.title} - ${idx + 1}`} isShorts />
+                  </div>
+                ))}
+              </div>
+            )}
+          </div>
+        </div>
+      )}
     </div>
   );
 };
@@ -219,10 +245,11 @@ const Section: React.FC<SectionProps> = ({ section }) => {
 export default Section;
 
 // YouTube Lite Component for Performance
-const YouTubeLite: React.FC<{ url: string; title: string }> = ({ url, title }) => {
+const YouTubeLite: React.FC<{ url: string; title: string; isShorts?: boolean }> = ({ url, title, isShorts }) => {
   const [isLoaded, setIsLoaded] = React.useState(false);
 
   const videoId = React.useMemo(() => {
+    if (url.includes('shorts/')) return url.split('shorts/')[1]?.split('?')[0];
     if (url.includes('youtu.be/')) return url.split('youtu.be/')[1]?.split('?')[0];
     if (url.includes('v=')) return url.split('v=')[1]?.split('&')[0];
     if (url.includes('embed/')) return url.split('embed/')[1]?.split('?')[0];
@@ -236,7 +263,7 @@ const YouTubeLite: React.FC<{ url: string; title: string }> = ({ url, title }) =
       <iframe
         width="100%"
         height="100%"
-        src={`https://www.youtube.com/embed/${videoId}?autoplay=1`}
+        src={`https://www.youtube.com/embed/${videoId}?autoplay=1&rel=0&modestbranding=1`}
         title={title}
         frameBorder="0"
         allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope"
@@ -255,13 +282,13 @@ const YouTubeLite: React.FC<{ url: string; title: string }> = ({ url, title }) =
         <img
           src={thumbnailUrl}
           alt={title}
-          className="w-full h-full object-cover opacity-60 group-hover/video:opacity-80 transition-opacity"
+          className={`w-full h-full object-cover ${isShorts ? 'opacity-90 group-hover/video:opacity-100' : 'opacity-60 group-hover/video:opacity-80'} transition-opacity`}
           loading="lazy"
         />
       )}
-      <div className="absolute inset-0 bg-black/20 group-hover/video:bg-black/40 transition-colors"></div>
-      <div className="relative w-20 h-20 bg-red-600 rounded-full flex items-center justify-center shadow-2xl group-hover/video:scale-110 transition-transform">
-        <svg className="w-10 h-10 text-white translate-x-1" fill="currentColor" viewBox="0 0 24 24">
+      <div className={`absolute inset-0 bg-black/20 ${isShorts ? 'group-hover/video:bg-black/0' : 'group-hover/video:bg-black/40'} transition-colors`}></div>
+      <div className={`${isShorts ? 'w-14 h-14' : 'w-20 h-20'} bg-red-600 rounded-full flex items-center justify-center shadow-2xl group-hover/video:scale-110 transition-transform`}>
+        <svg className={`${isShorts ? 'w-7 h-7' : 'w-10 h-10'} text-white translate-x-1`} fill="currentColor" viewBox="0 0 24 24">
           <path d="M8 5v14l11-7z" />
         </svg>
       </div>
