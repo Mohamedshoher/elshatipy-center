@@ -181,7 +181,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent, students = []
                   animationDelay: `${index * 100}ms`,
                 }}
               >
-                <Section section={section} />
+                <Section section={section} students={students} />
               </div>
             ))}
         </div>

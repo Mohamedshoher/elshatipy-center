@@ -178,7 +178,7 @@ export interface Teacher {
   password?: string;
 }
 
-export type GroupType = 'all' | 'قرآن' | 'نور بيان' | 'تلقين' | 'إقراء' | 'orphans' | 'invalid_phone';
+export type GroupType = 'all' | 'قرآن' | 'نور بيان' | 'تلقين' | 'إقراء' | 'orphans' | 'invalid_phone' | 'with_badges';
 
 export interface Supervisor {
   id: string;
@@ -363,7 +363,7 @@ export interface DirectorNotification {
 }
 
 // LANDING PAGE CONTENT TYPES
-export type PageSectionType = 'text' | 'image' | 'video' | 'testimonial' | 'cta' | 'advertisement' | 'slider' | 'youtube_shorts';
+export type PageSectionType = 'text' | 'image' | 'video' | 'testimonial' | 'cta' | 'advertisement' | 'slider' | 'youtube_shorts' | 'student_certificates';
 
 export interface SliderImage {
   id: string;

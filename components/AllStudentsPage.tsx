@@ -32,6 +32,7 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
       .filter(s => {
         if (typeFilter === 'all') return true;
         if (typeFilter === 'orphans') return s.isOrphan === true;
+        if (typeFilter === 'with_badges') return s.badges && s.badges.length > 0;
         if (typeFilter === 'invalid_phone') {
           const digits = s.phone ? s.phone.replace(/\D/g, '') : '';
           return !s.phone || digits.length < 12;
@@ -43,6 +44,15 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
 
     // Sort by relevance to search term, then by name
     filtered.sort((a, b) => {
+      // If filtering by badges, sort by badge count (most badges first)
+      if (typeFilter === 'with_badges') {
+        const aBadgeCount = a.badges?.length || 0;
+        const bBadgeCount = b.badges?.length || 0;
+        if (aBadgeCount !== bBadgeCount) {
+          return bBadgeCount - aBadgeCount; // Descending order
+        }
+      }
+
       if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         const aName = a.name.toLowerCase();
@@ -99,6 +109,7 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
                 <option value="تلقين">تلقين</option>
                 <option value="إقراء">إقراء</option>
                 <option value="orphans">أيتام</option>
+                <option value="with_badges">🏆 طلاب الأوسمة</option>
                 <option value="invalid_phone"> هواتف غير مكتملة</option>
               </select>
               <div className="pointer-events-none absolute inset-y-0 left-0 flex items-center px-2 text-gray-700">

@@ -2333,7 +2333,7 @@ const App: React.FC = () => {
                 {/* Landing Page - Accessible to all authenticated users */}
                 <Route path="/" element={
                     <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>جاري التحميل...</p></div>}>
-                        <LandingPage />
+                        <LandingPage students={activeStudents} />
                     </Suspense>
                 } />
                 {/* Main Views */}

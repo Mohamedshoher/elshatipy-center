@@ -142,6 +142,7 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
               <option value="cta">دعوة للعمل (زر)</option>
               <option value="advertisement">إعلان</option>
               <option value="slider">سلايدر صور (Slideshow)</option>
+              <option value="student_certificates">🎖️ شهادات تقدير الطلاب</option>
             </select>
           </div>
 
@@ -545,6 +546,33 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
                 />
                 <p className="text-[10px] text-blue-600 mt-1 italic">
                   * سيتم الانتقال طلاحقاً بين الصور كل {formData.sliderInterval || 5} ثوانٍ
+                </p>
+              </div>
+            </div>
+          )}
+
+          {formData.type === 'student_certificates' && (
+            <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
+              <h3 className="text-lg font-bold text-yellow-800 mb-2">🎖️ إعدادات قسم شهادات التقدير</h3>
+              <p className="text-sm text-yellow-700 mb-4">
+                سيقوم هذا القسم تلقائياً بعرض الطلاب الحاصلين على أوسمة في شكل شهادات تقدير متحركة.
+                سيتم ترتيبهم حسب الأحدث حصولاً على الأوسمة أو الأكثر تميزاً.
+              </p>
+
+              <div className="bg-white p-4 rounded-lg border border-yellow-100">
+                <label className="block text-sm font-semibold text-gray-700 mb-2">
+                  عدد الشهادات (الطلاب) للعرض *
+                </label>
+                <input
+                  type="number"
+                  value={formData.sliderInterval || 10} // Using sliderInterval to store count for simplicity, or add new field
+                  onChange={e => handleInputChange('sliderInterval', parseInt(e.target.value) || 10)}
+                  min="3"
+                  max="50"
+                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
+                />
+                <p className="text-xs text-gray-500 mt-1">
+                  الحد الأقصى لعدد الطلاب الذين سيظهرون في السلايدر.
                 </p>
               </div>
             </div>

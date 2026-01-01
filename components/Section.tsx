@@ -1,12 +1,14 @@
 import React from 'react';
-import type { PageSection } from '../types';
+import type { PageSection, Student } from '../types';
 import Slider from './Slider';
+import BadgeCertificatesSlider from './BadgeCertificatesSlider';
 
 interface SectionProps {
   section: PageSection;
+  students?: Student[]; // Optional because some contexts might not have students
 }
 
-const Section: React.FC<SectionProps> = ({ section }) => {
+const Section: React.FC<SectionProps> = ({ section, students = [] }) => {
   const getColorClass = (color?: string) => {
     switch (color) {
       case 'green':
@@ -237,6 +239,10 @@ const Section: React.FC<SectionProps> = ({ section }) => {
             )}
           </div>
         </div>
+      )}
+
+      {section.type === 'student_certificates' && (
+        <BadgeCertificatesSlider section={section} students={students || []} />
       )}
     </div>
   );
