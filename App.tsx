@@ -1,6 +1,5 @@
-
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus, Donation, Parent, UserRole } from './types';
+import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus, Donation, Parent, UserRole, Badge } from './types';
 import { ExpenseCategory, TeacherAttendanceStatus, DayOfWeek, TestType as TestTypeEnum, DirectorNotificationType } from './types';
 import { getCairoNow, getCairoDateString, getYesterdayDateString, getCairoTimeInMinutes, isCairoAfterMidnight, isCairoAfter12_05, getCairoDayOfWeek, isCairoWorkday } from './services/cairoTimeHelper';
 
@@ -208,7 +207,7 @@ const App: React.FC = () => {
     const [isSidebarOpen, setIsSidebarOpen] = useState(false);
     const [isSearchVisible, setIsSearchVisible] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
-    const [detailsModalState, setDetailsModalState] = useState<{ student: Student; initialTab: 'attendanceLog' | 'progressPlan' | 'tests' | 'fees' | 'notes' | 'reports'; } | null>(null);
+    const [detailsModalState, setDetailsModalState] = useState<{ student: Student; initialTab: 'attendanceLog' | 'progressPlan' | 'tests' | 'fees' | 'notes' | 'reports' | 'badges'; } | null>(null);
 
     const isOnline = useOnlineStatus();
 
@@ -241,7 +240,7 @@ const App: React.FC = () => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                 setter(data);
             }, (error) => {
-                console.error(`Error fetching public ${name}:`, error.message);
+                console.error(`Error fetching public ${name}: `, error.message);
             })
         );
 
@@ -543,7 +542,7 @@ const App: React.FC = () => {
 
                 try {
                     await batch.commit();
-                    console.log(`Cleaned up ${directorNotificationsToDelete.length} director and ${teacherNotificationsToDelete.length} teacher/group notifications.`);
+                    console.log(`Cleaned up ${directorNotificationsToDelete.length} director and ${teacherNotificationsToDelete.length} teacher notifications.`);
                 } catch (error) {
                     console.error("Error cleaning up old notifications:", error);
                 }
@@ -693,7 +692,7 @@ const App: React.FC = () => {
         );
 
         if (isDuplicate) {
-            alert(`الطالب "${studentData.name}" مسجل بالفعل. يرجى استخدام اسم آخر.`);
+            alert(`الطالب "${studentData.name}" مسجل بالفعل.يرجى استخدام اسم آخر.`);
             return;
         }
 
@@ -776,7 +775,7 @@ const App: React.FC = () => {
             const errorMessage = error?.code === 'permission-denied'
                 ? 'ليس لديك صلاحية لحفظ بيانات الطالب. يرجى التواصل مع المدير.'
                 : error?.message
-                    ? `حدث خطأ: ${error.message}`
+                    ? `حدث خطأ: ${error.message} `
                     : 'حدث خطأ أثناء حفظ بيانات الطالب.';
             alert(errorMessage);
         }
@@ -833,7 +832,7 @@ const App: React.FC = () => {
         const student = students.find(s => s.id === studentId);
         if (!student) return;
 
-        const rejectionReason = prompt(`يرجى إدخال سبب رفض الطالب "${student.name}":`);
+        const rejectionReason = prompt(`يرجى إدخال سبب رفض الطالب "${student.name}": `);
         if (rejectionReason === null || rejectionReason.trim() === '') {
             return;
         }
@@ -843,10 +842,10 @@ const App: React.FC = () => {
                 if (student.addedBy) {
                     const teacher = teachers.find(t => t.id === student.addedBy);
                     if (teacher) {
-                        const rejectorName = currentUser.role === 'director' ? 'المدير' : `المشرف ${currentUser.name}`;
+                        const rejectorName = currentUser.role === 'director' ? 'المدير' : `المشرف ${currentUser.name} `;
                         await addDoc(collection(db, 'notifications'), {
                             date: getCairoNow().toISOString(),
-                            content: `تم رفض الطالب "${student.name}" من قبل ${rejectorName}.\nسبب الرفض: ${rejectionReason.trim()}`,
+                            content: `تم رفض الطالب "${student.name}" من قبل ${rejectorName}.\nسبب الرفض: ${rejectionReason.trim()} `,
                             senderName: rejectorName,
                             target: { type: 'teacher', id: student.addedBy },
                             readBy: [],
@@ -890,7 +889,7 @@ const App: React.FC = () => {
             await addDoc(collection(db, 'notes'), {
                 studentId, content,
                 authorId: currentUser.role === 'director' ? 'director' : currentUser.id,
-                authorName: currentUser.role === 'director' ? 'المدير' : (currentUser.role === 'supervisor' ? `المشرف ${currentUser.name}` : currentUser.name),
+                authorName: currentUser.role === 'director' ? 'المدير' : (currentUser.role === 'supervisor' ? `المشرف ${currentUser.name} ` : currentUser.name),
                 date: getCairoNow().toISOString(),
                 isAcknowledged: false,
             });
@@ -1019,7 +1018,7 @@ const App: React.FC = () => {
 
         // Store the data we need before closing the modal
         const studentId = studentToArchive.id;
-        const archivedByValue = currentUser?.role === 'director' ? 'director' : (currentUser?.role === 'supervisor' ? `supervisor:${currentUser.id}` : currentUser?.id);
+        const archivedByValue = currentUser?.role === 'director' ? 'director' : (currentUser?.role === 'supervisor' ? `supervisor:${currentUser.id} ` : currentUser?.id);
 
         // Check for unpaid fees with 10+ attendance
         const debtMonths: string[] = [];
@@ -1155,6 +1154,33 @@ const App: React.FC = () => {
             await updateDoc(doc(db, 'students', details.studentId), { fees });
         } catch (error) { console.error("Error saving fee payment: ", error); }
         // Modal is now closed before this function is called, so no need to close it here
+    };
+
+    const handleAddBadge = async (studentId: string, badge: Omit<Badge, 'id' | 'dateEarned'>) => {
+        try {
+            const studentRef = doc(db, 'students', studentId);
+            const student = students.find(s => s.id === studentId);
+            const newBadge: Badge = {
+                ...badge,
+                id: Math.random().toString(36).substr(2, 9),
+                dateEarned: new Date().toISOString().split('T')[0]
+            };
+            const badges = [...(student?.badges || []), newBadge];
+            await updateDoc(studentRef, { badges });
+        } catch (error) {
+            console.error("Error adding badge: ", error);
+        }
+    };
+
+    const handleRemoveBadge = async (studentId: string, badgeId: string) => {
+        try {
+            const studentRef = doc(db, 'students', studentId);
+            const student = students.find(s => s.id === studentId);
+            const badges = (student?.badges || []).filter(b => b.id !== badgeId);
+            await updateDoc(studentRef, { badges });
+        } catch (error) {
+            console.error("Error removing badge: ", error);
+        }
     };
 
     const handleCancelFeePayment = async (studentId: string, month: string) => {
@@ -1336,7 +1362,7 @@ const App: React.FC = () => {
             // alert("تم حفظ التبرع بنجاح"); // Optional: Feedback to user
         } catch (error) {
             console.error("Error adding donation: ", error);
-            alert(`حدث خطأ أثناء حفظ التبرع: ${error instanceof Error ? error.message : 'Unknown error'}`);
+            alert(`حدث خطأ أثناء حفظ التبرع: ${error instanceof Error ? error.message : 'Unknown error'} `);
         }
     };
 
@@ -1412,7 +1438,7 @@ const App: React.FC = () => {
                         else if (status === TeacherAttendanceStatus.BONUS_HALF_DAY) bonusType = 'نصف يوم إضافي';
                         else if (status === TeacherAttendanceStatus.BONUS_QUARTER_DAY) bonusType = 'ربع يوم إضافي';
 
-                        const notificationContent = `تم منح المدرس ${teacher.name} مكافأة: ${bonusType}${reason ? `\nالسبب: ${reason}` : ''}`;
+                        const notificationContent = `تم منح المدرس ${teacher.name} مكافأة: ${bonusType}${reason ? `\nالسبب: ${reason}` : ''} `;
 
                         // Send to all active teachers
                         const activeTeachers = teachers.filter(t => t.status === 'active');
@@ -1477,7 +1503,7 @@ const App: React.FC = () => {
 
             // إشعار عام للجميع (مدرسين ومديرين)
             const teacher = teachers.find(t => t.id === bonusData.teacherId);
-            const content = `🎉 خبر سار: حصل المدرس/ة ${teacher?.name || '...'} على مكافأة تشجيعية تقديراً لجهوده المتميزة. بارك الله في عملكم جميعاً.`;
+            const content = `🎉 خبر سار: حصل المدرس / ة ${teacher?.name || '...'} على مكافأة تشجيعية تقديراً لجهوده المتميزة.بارك الله في عملكم جميعاً.`;
 
             await addDoc(collection(db, "notifications"), {
                 date: getCairoNow().toISOString(),
@@ -1567,7 +1593,7 @@ const App: React.FC = () => {
                 const expenseQuery = query(
                     collection(db, "expenses"),
                     where("category", "==", ExpenseCategory.STAFF_SALARY),
-                    where("description", "==", `راتب الموظف: ${staffName} (${staffId}) - شهر ${month}`)
+                    where("description", "==", `راتب الموظف: ${staffName} (${staffId}) - شهر ${month} `)
                 );
                 const expenseSnapshot = await getDocs(expenseQuery);
                 if (!expenseSnapshot.empty) {
@@ -1878,7 +1904,7 @@ const App: React.FC = () => {
             <div className="min-h-screen bg-slate-50 overflow-x-hidden" dir="rtl">
                 <Suspense fallback={<div className="min-h-screen flex items-center justify-center bg-slate-50"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>}>
                     {isLanding ? (
-                        <LandingPage />
+                        <LandingPage students={students} />
                     ) : (
                         <div className="min-h-screen bg-[#0f172a] flex flex-col relative overflow-hidden" dir="rtl">
                             {/* Modern Background Elements */}
@@ -1984,7 +2010,7 @@ const App: React.FC = () => {
         let isSubView = false;
         let searchPlaceholder = 'البحث...';
 
-        if (currentUser.role === 'supervisor') title = `مركز الشاطبي - المشرف: ${currentUser.name}`;
+        if (currentUser.role === 'supervisor') title = `مركز الشاطبي - المشرف: ${currentUser.name} `;
 
         if (path === '/archive') { title = 'الأرشيف'; isSubView = true; }
         else if (path === '/debtors') { title = 'المدينون'; isSubView = true; }
@@ -1997,16 +2023,16 @@ const App: React.FC = () => {
         else if (path === '/reports') { title = 'التقارير العامة'; isSubView = true; }
         else if (path === '/unpaid') { title = 'الطلاب غير المسددين'; isSubView = true; }
 
-        if (viewingGroup) { title = `تقرير: ${viewingGroup.name}`; isSubView = true; }
-        else if (viewingTeacherReportId) { const teacher = teachers.find(t => t.id === viewingTeacherReportId); title = `تقرير: ${teacher?.name || 'مدرس'}`; isSubView = true; }
+        if (viewingGroup) { title = `تقرير: ${viewingGroup.name} `; isSubView = true; }
+        else if (viewingTeacherReportId) { const teacher = teachers.find(t => t.id === viewingTeacherReportId); title = `تقرير: ${teacher?.name || 'مدرس'} `; isSubView = true; }
 
         if (!isSubView) {
             const studentCount = activeView === 'students' ? getFilteredStudentCount() : (currentUser.role === 'director' ? activeStudents.length : (currentUser.role === 'supervisor' ? (supervisorFilteredData?.students.length || 0) : teacherStudents.students.length));
             const groupCount = currentUser.role === 'director' ? groups.length : (currentUser.role === 'supervisor' ? (supervisorFilteredData?.groups.length || 0) : visibleGroups.length);
 
             const titleMap: Record<ActiveView, string> = {
-                students: `الطلاب (${studentCount})`,
-                groups: `المجموعات (${groupCount})`,
+                students: `الطلاب(${studentCount})`,
+                groups: `المجموعات(${groupCount})`,
                 attendance_report: 'تقرير الحضور',
                 tests_report: 'تقرير الاختبارات',
                 financial_report: 'المصروفات'
@@ -2092,7 +2118,7 @@ const App: React.FC = () => {
 
             if (viewingGroup || path === '/archive') {
                 leftContent = backButton;
-                centerContent = <h1 className="text-xl sm:text-2xl font-bold text-gray-800 truncate px-2">{viewingGroup ? `تقرير: ${viewingGroup.name}` : 'الأرشيف'}</h1>;
+                centerContent = <h1 className="text-xl sm:text-2xl font-bold text-gray-800 truncate px-2">{viewingGroup ? `تقرير: ${viewingGroup.name} ` : 'الأرشيف'}</h1>;
             } else {
                 leftContent = (
                     <div className="flex gap-2">
@@ -2267,6 +2293,8 @@ const App: React.FC = () => {
                             onTogglePlanCompletion={handleTogglePlanCompletion}
                             onDeletePlanRecord={handleDeletePlanRecord}
                             onCancelFeePayment={handleCancelFeePayment}
+                            onAddBadge={handleAddBadge}
+                            onRemoveBadge={handleRemoveBadge}
                             onBack={() => handleBackButton()}
                         />;
                         if (viewingTeacherReportId) {
@@ -2427,6 +2455,8 @@ const App: React.FC = () => {
                             onTogglePlanCompletion={handleTogglePlanCompletion}
                             onDeletePlanRecord={handleDeletePlanRecord}
                             onCancelFeePayment={handleCancelFeePayment}
+                            onAddBadge={handleAddBadge}
+                            onRemoveBadge={handleRemoveBadge}
                             onBack={() => handleBackButton()}
                         />;
                         if (viewingTeacherReportId) {
@@ -2529,6 +2559,8 @@ const App: React.FC = () => {
                             onTogglePlanCompletion={handleTogglePlanCompletion}
                             onDeletePlanRecord={handleDeletePlanRecord}
                             onCancelFeePayment={handleCancelFeePayment}
+                            onAddBadge={handleAddBadge}
+                            onRemoveBadge={handleRemoveBadge}
                             onBack={() => handleBackButton()}
                         />;
                         return <Navigate to="/students" replace />;
@@ -2547,7 +2579,7 @@ const App: React.FC = () => {
 
         try {
             const result = await generateAllParents(students, parents);
-            alert(`تمت العملية بنجاح! \n\n✅ تم التحديث/الإنشاء: ${result.createdCount}\n⏭️ تم التخطي (موجود مسبقاً): ${result.validSkipped}\n❌ أرقام غير صالحة: ${result.invalidCount}`);
+            alert(`تمت العملية بنجاح! \n\n✅ تم التحديث / الإنشاء: ${result.createdCount} \n⏭️ تم التخطي(موجود مسبقاً): ${result.validSkipped} \n❌ أرقام غير صالحة: ${result.invalidCount} `);
         } catch (error) {
             console.error("Error generating parents:", error);
             alert("حدث خطأ أثناء المعالجة.");
@@ -2603,7 +2635,7 @@ const App: React.FC = () => {
                                             : (currentUser.role === 'parent'
                                                 ? (parentViewingLandingPage ? (
                                                     <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>جاري التحميل...</p></div>}>
-                                                        <LandingPage onBackToParent={() => setParentViewingLandingPage(false)} />
+                                                        <LandingPage onBackToParent={() => setParentViewingLandingPage(false)} students={students} />
                                                     </Suspense>
                                                 ) : (
                                                     <ParentView
@@ -2620,7 +2652,7 @@ const App: React.FC = () => {
                                                 : (teachers.length > 0 ? (
                                                     teacherViewingLandingPage ? (
                                                         <Suspense fallback={<div className="min-h-screen flex items-center justify-center"><p>جاري التحميل...</p></div>}>
-                                                            <LandingPage onBackToParent={() => setTeacherViewingLandingPage(false)} />
+                                                            <LandingPage onBackToParent={() => setTeacherViewingLandingPage(false)} students={students} />
                                                         </Suspense>
                                                     ) : renderTeacherContent()
                                                 ) : <div className="flex items-center justify-center h-64"><div className="animate-spin rounded-full h-12 w-12 border-b-2 border-blue-600"></div></div>)))

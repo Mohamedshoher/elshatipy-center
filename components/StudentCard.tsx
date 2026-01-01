@@ -21,7 +21,7 @@ interface StudentCardProps {
   onToggleAttendance: (studentId: string, date: string, status: AttendanceStatus) => void;
   onArchive: (studentId: string) => void;
   currentUserRole: UserRole;
-  onViewDetails: (student: Student, tab?: 'attendanceLog' | 'progressPlan' | 'tests' | 'fees' | 'notes' | 'reports') => void;
+  onViewDetails: (student: Student, tab?: 'attendanceLog' | 'progressPlan' | 'tests' | 'fees' | 'notes' | 'reports' | 'badges') => void;
   onDeletePermanently?: (studentId: string) => void;
   onMarkWeeklyReportSent?: (studentId: string) => void;
 }
@@ -61,8 +61,19 @@ const StudentCard: React.FC<StudentCardProps> = ({ student, groupName, onEdit, o
           <div className="w-full flex items-center justify-between gap-3">
             <div className="flex items-center gap-3 min-w-0 flex-1">
               <UserIcon className="w-8 h-8 text-blue-500 flex-shrink-0" />
-              <div className="flex items-baseline gap-3 min-w-0 flex-1">
-                <h3 className={`${student.name.length > 25 ? 'text-base' : (student.name.length > 18 ? 'text-lg' : 'text-xl')} font-bold text-gray-800`}>{student.name}</h3>
+              <div className="flex flex-col min-w-0 flex-1">
+                <div className="flex items-center gap-2">
+                  <h3 className={`${student.name.length > 25 ? 'text-base' : (student.name.length > 18 ? 'text-lg' : 'text-xl')} font-bold text-gray-800 truncate`}>{student.name}</h3>
+                  {student.badges && student.badges.length > 0 && (
+                    <div className="flex -space-x-1 overflow-hidden" dir="ltr">
+                      {student.badges.slice(0, 3).map((badge) => (
+                        <span key={badge.id} title={badge.title} className="inline-block bg-yellow-50 rounded-full text-[10px] w-5 h-5 flex items-center justify-center border border-yellow-100 shadow-xs">
+                          {badge.icon}
+                        </span>
+                      ))}
+                    </div>
+                  )}
+                </div>
                 {groupName && (
                   <span className="text-xs text-gray-500 whitespace-nowrap mr-auto">{groupName}</span>
                 )}

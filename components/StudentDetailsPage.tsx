@@ -1,7 +1,8 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Student, TestRecord, TestType, TestGrade, AttendanceStatus, FeePayment, Note, WeeklySchedule, DayOfWeek, ProgressPlan, CurrentUser, ProgressPlanRecord } from '../types';
+import type { Student, TestRecord, TestType, TestGrade, AttendanceStatus, FeePayment, Note, WeeklySchedule, DayOfWeek, ProgressPlan, CurrentUser, ProgressPlanRecord, Badge } from '../types';
 import { TestType as TestTypeEnum, TestGrade as TestGradeEnum, AttendanceStatus as AttendanceStatusEnum } from '../types';
+import AwardIcon from './icons/AwardIcon';
 import DocumentReportIcon from './icons/DocumentReportIcon';
 import CalendarCheckIcon from './icons/CalendarCheckIcon';
 import ClipboardListIcon from './icons/ClipboardListIcon';
@@ -16,7 +17,7 @@ import CheckIcon from './icons/CheckIcon';
 
 interface StudentDetailsPageProps {
     student: Student;
-    initialTab: 'attendanceLog' | 'progressPlan' | 'tests' | 'fees' | 'notes' | 'reports';
+    initialTab: 'attendanceLog' | 'progressPlan' | 'tests' | 'fees' | 'notes' | 'reports' | 'badges';
     currentUser: CurrentUser | null;
     notes: Note[];
     onOpenFeeModal: (studentId: string, month: string, amount: number) => void;
@@ -28,8 +29,17 @@ interface StudentDetailsPageProps {
     onTogglePlanCompletion: (studentId: string, planId: string) => void;
     onDeletePlanRecord: (studentId: string, planId: string) => void;
     onCancelFeePayment: (studentId: string, month: string) => void;
+    onAddBadge: (studentId: string, badge: Omit<Badge, 'id' | 'dateEarned'>) => void;
+    onRemoveBadge: (studentId: string, badgeId: string) => void;
     onBack: () => void;
 }
+
+const PREDEFINED_BADGES: Omit<Badge, 'id' | 'dateEarned'>[] = [
+    { title: 'حافظ الأسبوع', icon: '📖', description: 'للمتميزين في الحفظ الأسبوعي', criteria: 'حفظ أكثر من 5 صفحات', type: 'honor_roll' },
+    { title: 'المواظب المثالي', icon: '⏰', description: 'للحضور المبكر والمستمر', criteria: 'حضور كامل الشهر بدون تأخير', type: 'attendance_star' },
+    { title: 'نجم الحكاية', icon: '⭐', description: 'للمشاركة الفعالة في الأنشطة', criteria: 'مشاركة متميزة', type: 'diligent_student' },
+    { title: 'الأدب الجم', icon: '💎', description: 'لحسن الخلق والتعامل', criteria: 'خلق رفيع', type: 'diligent_student' },
+];
 
 const testTypeLabels: Record<TestType, string> = {
     [TestTypeEnum.NEW]: 'جديد',
@@ -46,7 +56,7 @@ const testGradeInfo: Record<TestGrade, { label: string; className: string }> = {
 };
 
 const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
-    const { student, initialTab, currentUser, notes, onOpenFeeModal, onAddTest, onDeleteTest, onAddNote, onSaveProgressPlan, onUpdatePlanRecord, onTogglePlanCompletion, onDeletePlanRecord, onCancelFeePayment, onBack } = props;
+    const { student, initialTab, currentUser, notes, onOpenFeeModal, onAddTest, onDeleteTest, onAddNote, onSaveProgressPlan, onUpdatePlanRecord, onTogglePlanCompletion, onDeletePlanRecord, onCancelFeePayment, onAddBadge, onRemoveBadge, onBack } = props;
 
     const [activeTab, setActiveTab] = useState(initialTab);
     const [suraName, setSuraName] = useState('');
@@ -265,7 +275,7 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
         setNewNote('');
     };
 
-    const getTabClass = (tabName: 'fees' | 'reports' | 'tests' | 'attendanceLog' | 'notes' | 'progressPlan') => {
+    const getTabClass = (tabName: 'fees' | 'reports' | 'tests' | 'attendanceLog' | 'notes' | 'progressPlan' | 'badges') => {
         const baseClass = "py-3 px-2 font-semibold text-center transition-colors duration-200 focus:outline-none flex-shrink-0 flex items-center justify-center gap-2 flex-grow text-sm";
         if (activeTab === tabName) {
             return `${baseClass} border-b-2 border-blue-600 text-blue-600 bg-blue-50`;
@@ -418,6 +428,10 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
                         <button onClick={() => setActiveTab('reports')} className={getTabClass('reports')} title="التقرير الشامل">
                             <DocumentReportIcon className="w-5 h-5" />
                             <span className="hidden sm:inline">التقرير الشامل</span>
+                        </button>
+                        <button onClick={() => setActiveTab('badges')} className={getTabClass('badges')} title="الأوسمة">
+                            <AwardIcon className="w-5 h-5 text-yellow-500" />
+                            <span className="hidden sm:inline">الأوسمة</span>
                         </button>
                     </div>
                 </div>
@@ -842,6 +856,76 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
                                 </button>
                             </div>
                         </div>
+                    </div>
+                )}
+
+                {activeTab === 'badges' && (
+                    <div className="max-w-4xl mx-auto space-y-8">
+                        <section>
+                            <h4 className="font-bold text-gray-700 mb-6 px-2 flex items-center gap-2">
+                                <AwardIcon className="w-6 h-6 text-yellow-500" />
+                                <span>الأوسمة والمكافآت الحالية</span>
+                            </h4>
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                {student.badges && student.badges.length > 0 ? (
+                                    student.badges.map((badge) => (
+                                        <div key={badge.id} className="bg-white p-5 rounded-2xl shadow-sm border border-gray-100 flex flex-col items-center text-center gap-3 relative group overflow-hidden">
+                                            <div className="absolute top-0 left-0 w-1 h-full bg-yellow-400"></div>
+                                            <span className="text-4xl mb-2">{badge.icon}</span>
+                                            <h5 className="font-bold text-gray-800">{badge.title}</h5>
+                                            <p className="text-xs text-gray-500">{badge.description}</p>
+                                            <span className="text-[10px] text-gray-400 mt-2 bg-gray-50 px-2 py-1 rounded-full">حصل عليه في: {badge.dateEarned}</span>
+
+                                            {(currentUser?.role === 'director' || currentUser?.role === 'supervisor') && (
+                                                <button
+                                                    onClick={() => {
+                                                        if (window.confirm('هل تريد فعلاً سحب هذا الوسام من الطالب؟')) {
+                                                            onRemoveBadge(student.id, badge.id);
+                                                        }
+                                                    }}
+                                                    className="opacity-0 group-hover:opacity-100 absolute top-2 right-2 p-2 bg-red-50 text-red-500 rounded-lg transition-all hover:bg-red-100"
+                                                    title="سحب الوسام"
+                                                >
+                                                    <TrashIcon className="w-4 h-4" />
+                                                </button>
+                                            )}
+                                        </div>
+                                    ))
+                                ) : (
+                                    <div className="col-span-full py-12 text-center bg-white rounded-2xl border border-dashed border-gray-200">
+                                        <AwardIcon className="w-12 h-12 text-gray-200 mx-auto mb-3" />
+                                        <p className="text-gray-400">لا يوجد أوسمة بعد. حفز الطالب بمنحه أول وسام!</p>
+                                    </div>
+                                )}
+                            </div>
+                        </section>
+
+                        {(currentUser?.role === 'director' || currentUser?.role === 'supervisor') && (
+                            <section className="bg-blue-50/50 p-6 rounded-3xl border border-blue-100">
+                                <h4 className="font-bold text-blue-900 mb-6 flex items-center gap-2">
+                                    <AwardIcon className="w-6 h-6" />
+                                    <span>منح وسام جديد</span>
+                                </h4>
+                                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                                    {PREDEFINED_BADGES.map((badge, idx) => (
+                                        <button
+                                            key={idx}
+                                            onClick={() => {
+                                                onAddBadge(student.id, badge);
+                                                alert(`تم منح وسام "${badge.title}" للطالب بنجاح!`);
+                                            }}
+                                            className="flex items-center gap-4 bg-white p-4 rounded-xl border border-blue-100 hover:border-blue-300 hover:shadow-md transition-all text-right active:scale-95 group"
+                                        >
+                                            <span className="text-3xl grayscale group-hover:grayscale-0 transition-all">{badge.icon}</span>
+                                            <div>
+                                                <h6 className="font-bold text-gray-800">{badge.title}</h6>
+                                                <p className="text-xs text-gray-500 leading-relaxed">{badge.description}</p>
+                                            </div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </section>
+                        )}
                     </div>
                 )}
             </main>

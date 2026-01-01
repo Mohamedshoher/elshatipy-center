@@ -121,10 +121,12 @@ export interface ProgressPlanRecord {
 
 export interface Badge {
   id: string;
-  type: 'honor_roll' | 'attendance_star' | 'fast_learner' | 'diligent_student' | 'top_save';
+  type: string;
   dateEarned: string; // YYYY-MM-DD
   title: string;
   icon: string;
+  description?: string;
+  criteria?: string;
 }
 
 export interface Student {

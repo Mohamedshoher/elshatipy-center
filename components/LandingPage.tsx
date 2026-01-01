@@ -2,15 +2,17 @@ import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLandingPageContent } from '../hooks/useLandingPageContent';
 import { useLocalStorage } from '../hooks/useLocalStorage';
-import { CurrentUser } from '../types';
+import { CurrentUser, Student } from '../types';
 import Section from './Section';
 import Skeleton from './Skeleton';
+import Leaderboard from './Leaderboard';
 
 interface LandingPageProps {
   onBackToParent?: () => void;
+  students?: Student[];
 }
 
-const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
+const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent, students = [] }) => {
   const navigate = useNavigate();
   const { publishedContent, loadingPublished, errorPublished } = useLandingPageContent();
   const [currentUser] = useLocalStorage<CurrentUser | null>('shatibi-center-currentUser', null);
