@@ -43,7 +43,7 @@ const Section: React.FC<SectionProps> = ({ section }) => {
         <div className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-white via-blue-50/30 to-indigo-50/30">
           <div className="max-w-4xl mx-auto">
             {section.title && (
-              <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-6 text-center">
+              <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent py-2 mb-6 text-center">
                 {section.title}
               </h2>
             )}
@@ -65,7 +65,7 @@ const Section: React.FC<SectionProps> = ({ section }) => {
         <div className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-slate-50 to-blue-50">
           <div className="max-w-5xl mx-auto">
             {section.title && (
-              <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-8 text-center">
+              <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent py-2 mb-8 text-center">
                 {section.title}
               </h2>
             )}
@@ -118,7 +118,7 @@ const Section: React.FC<SectionProps> = ({ section }) => {
         <div className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-blue-50 via-indigo-50 to-purple-50">
           <div className="max-w-3xl mx-auto">
             {section.title && (
-              <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-12 text-center">
+              <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent py-2 mb-12 text-center">
                 {section.title}
               </h2>
             )}
@@ -217,7 +217,7 @@ const Section: React.FC<SectionProps> = ({ section }) => {
         <div className="py-16 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-slate-50 to-blue-50">
           <div className="max-w-7xl mx-auto">
             {section.title && (
-              <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent mb-10 text-center">
+              <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-600 to-indigo-600 bg-clip-text text-transparent py-2 mb-10 text-center">
                 {section.title}
               </h2>
             )}

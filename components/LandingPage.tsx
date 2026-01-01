@@ -1,6 +1,8 @@
 import React from 'react';
 import { useNavigate } from 'react-router-dom';
 import { useLandingPageContent } from '../hooks/useLandingPageContent';
+import { useLocalStorage } from '../hooks/useLocalStorage';
+import { CurrentUser } from '../types';
 import Section from './Section';
 import Skeleton from './Skeleton';
 
@@ -11,6 +13,21 @@ interface LandingPageProps {
 const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
   const navigate = useNavigate();
   const { publishedContent, loadingPublished, errorPublished } = useLandingPageContent();
+  const [currentUser] = useLocalStorage<CurrentUser | null>('shatibi-center-currentUser', null);
+
+  const isLoggedIn = !!currentUser;
+  const showBackButton = isLoggedIn || !!onBackToParent;
+
+  const handleAction = () => {
+    if (onBackToParent) {
+      onBackToParent();
+    } else if (isLoggedIn) {
+      // Navigate to dashboard based on role
+      navigate('/students');
+    } else {
+      navigate('/login');
+    }
+  };
 
   if (loadingPublished) {
     return (
@@ -62,8 +79,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
           <div className="flex justify-between items-center gap-2">
             {/* الشعار */}
             <div className="flex items-center gap-2 sm:gap-3 shrink-0">
-              <div className="w-10 h-10 sm:w-12 sm:h-12 bg-gradient-to-br from-blue-600 to-indigo-700 rounded-xl flex items-center justify-center shadow-lg transform hover:scale-105 transition-transform">
-                <span className="text-xl sm:text-2xl">🕌</span>
+              <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-xl flex items-center justify-center overflow-hidden shadow-lg transform hover:scale-105 transition-transform">
+                <img src="/logo.png" alt="شعار مركز الشاطبي" className="w-full h-full object-cover" />
               </div>
               <div className="leading-tight">
                 <h1 className="text-lg sm:text-2xl font-bold bg-gradient-to-r from-blue-600 to-indigo-700 bg-clip-text text-transparent truncate max-w-[150px] sm:max-w-none">
@@ -75,26 +92,22 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
 
             {/* أزرار الدخول */}
             <div className="flex gap-2 sm:gap-3 items-center">
-              {onBackToParent ? (
+              {showBackButton ? (
                 <button
-                  onClick={onBackToParent}
-                  className="group flex items-center gap-2 px-4 py-2 sm:px-6 sm:py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 shadow-md hover:shadow-lg text-sm sm:text-base"
+                  onClick={handleAction}
+                  className="px-6 py-2 sm:px-8 sm:py-2.5 bg-gradient-to-r from-indigo-600 to-purple-600 hover:from-indigo-700 hover:to-purple-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 shadow-md hover:shadow-lg text-sm sm:text-base"
                 >
-                  <span className="group-hover:-translate-x-1 transition-transform">←</span>
-                  <span className="hidden sm:inline">العودة إلى صفحتي</span>
-                  <span className="sm:hidden">عودة</span>
+                  عودة
                 </button>
               ) : (
-                <>
-                  <button
-                    onClick={() => navigate('/login')}
-                    className="flex items-center justify-center p-2 sm:px-6 sm:py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 shadow-md hover:shadow-lg text-sm sm:text-base ring-2 ring-white/50"
-                    title="تسجيل الدخول"
-                  >
-                    <span className="text-lg sm:mr-2">🔐</span>
-                    <span className="hidden sm:inline">تسجيل الدخول</span>
-                  </button>
-                </>
+                <button
+                  onClick={handleAction}
+                  className="px-6 py-2 sm:px-8 sm:py-2.5 bg-gradient-to-r from-blue-600 to-indigo-600 hover:from-blue-700 hover:to-indigo-700 text-white font-bold rounded-xl transition-all transform hover:scale-105 shadow-md hover:shadow-lg text-sm sm:text-base ring-2 ring-white/50"
+                  title="تسجيل الدخول"
+                >
+                  <span className="sm:hidden">دخول</span>
+                  <span className="hidden sm:inline">تسجيل الدخول</span>
+                </button>
               )}
             </div>
           </div>
@@ -194,8 +207,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
           <div className="text-center animate-in fade-in duration-700">
             {/* Logo */}
             <div className="flex justify-center mb-6">
-              <div className="w-16 h-16 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-2xl flex items-center justify-center shadow-2xl transform hover:scale-110 transition-transform">
-                <span className="text-3xl">🕌</span>
+              <div className="w-16 h-16 rounded-2xl flex items-center justify-center overflow-hidden shadow-2xl transform hover:scale-110 transition-transform">
+                <img src="/logo.png" alt="شعار مركز الشاطبي" className="w-full h-full object-cover" />
               </div>
             </div>
 
@@ -216,7 +229,7 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent }) => {
 
             {/* Copyright */}
             <p className="text-blue-300 text-sm">
-              © 2025 جميع الحقوق محفوظة - مركز الشاطبي
+              © {new Date().getFullYear()} جميع الحقوق محفوظة - مركز الشاطبي
             </p>
           </div>
         </div>

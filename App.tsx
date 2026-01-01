@@ -1889,8 +1889,8 @@ const App: React.FC = () => {
                             {/* Header for Login Page */}
                             <header className="w-full px-6 py-4 flex items-center justify-between z-20 bg-white/5 backdrop-blur-xl border-b border-white/10 shadow-2xl">
                                 <div className="flex items-center gap-3">
-                                    <div className="w-10 h-10 bg-gradient-to-br from-blue-500 to-indigo-600 rounded-xl flex items-center justify-center shadow-lg shadow-blue-500/30">
-                                        <svg viewBox="0 0 24 24" className="w-6 h-6 text-white fill-current"><path d="M12 3L4 9v12h16V9l-8-6zm0 2.2L18 10.1V19h-3v-5H9v5H6V10.1l6-4.9z" /></svg>
+                                    <div className="w-10 h-10 rounded-xl flex items-center justify-center overflow-hidden shadow-lg shadow-blue-500/30">
+                                        <img src="/logo.png" alt="Logo" className="w-full h-full object-cover" />
                                     </div>
                                     <span className="text-xl font-bold text-white tracking-tight hidden xs:block">مركز الشاطبي</span>
                                 </div>
@@ -1975,7 +1975,7 @@ const App: React.FC = () => {
                 // نظرأً لأن الموقع RTL:
                 // leftContent يظهر في اليمين (البداية) -> نضع فيه زر الرئيسية
                 // rightContent يظهر في اليسار (النهاية) -> نضع فيه زر الخروج
-                return <Header leftContent={homeButtonContent} centerContent={centerInfoContent} rightContent={logoutButtonContent} />;
+                return <Header leftContent={homeButtonContent} centerContent={centerInfoContent} rightContent={logoutButtonContent} showLogo={true} />;
             }
         }
 
@@ -2045,7 +2045,6 @@ const App: React.FC = () => {
                 if (path === '/teacher-manager') {
                     rightContent = (
                         <div className="flex items-center gap-2">
-                            {directorBell}
                             <button onClick={handleOpenAddTeacherForm} className="p-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700 transition-all"> <UserPlusIcon className="w-6 h-6" /> </button>
                         </div>
                     );
@@ -2068,24 +2067,24 @@ const App: React.FC = () => {
                             <div className="absolute right-3 top-1/2 -translate-y-1/2 text-gray-400 pointer-events-none"> <SearchIcon className="w-5 h-5" /> </div>
                         </div>
                     );
-                    rightContent = directorBell;
+                    rightContent = activeView === 'groups' ? null : directorBell;
                 } else {
                     let actionButton = null;
                     if (activeView === 'students') {
+                        actionButton = (
+                            <button onClick={handleOpenAddStudentForm} className="p-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700 transition-all"> <UserPlusIcon className="w-6 h-6" /> </button>
+                        );
+                    } else if (activeView === 'groups') {
                         actionButton = (
                             <div className="flex gap-2">
                                 {currentUser.role === 'director' && (
                                     <button onClick={handleGenerateAllParents} className="p-2 rounded-lg bg-purple-600 text-white shadow hover:bg-purple-700 transition-all" title="تحديث حسابات أولياء الأمور"> <UsersIcon className="w-6 h-6" /> </button>
                                 )}
-                                <button onClick={handleOpenAddStudentForm} className="p-2 rounded-lg bg-blue-600 text-white shadow hover:bg-blue-700 transition-all"> <UserPlusIcon className="w-6 h-6" /> </button>
+                                <button onClick={() => setIsGroupManagerOpen(true)} className="p-2 rounded-lg text-blue-600 bg-blue-100 shadow hover:bg-blue-200 transition-all"> <UsersIcon className="w-6 h-6" /> </button>
                             </div>
                         );
-                    } else if (activeView === 'groups') {
-                        actionButton = (
-                            <button onClick={() => setIsGroupManagerOpen(true)} className="p-2 rounded-lg text-blue-600 bg-blue-100 shadow hover:bg-blue-200 transition-all"> <UsersIcon className="w-6 h-6" /> </button>
-                        );
                     }
-                    rightContent = <div className="flex items-center gap-2">{actionButton}{directorBell}</div>;
+                    rightContent = <div className="flex items-center gap-2">{actionButton}{activeView === 'groups' ? null : directorBell}</div>;
                 }
             }
         } else { // Teacher view

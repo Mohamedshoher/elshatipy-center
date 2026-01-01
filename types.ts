@@ -119,6 +119,14 @@ export interface ProgressPlanRecord {
   modifiedDate?: string; // ISO String
 }
 
+export interface Badge {
+  id: string;
+  type: 'honor_roll' | 'attendance_star' | 'fast_learner' | 'diligent_student' | 'top_save';
+  dateEarned: string; // YYYY-MM-DD
+  title: string;
+  icon: string;
+}
+
 export interface Student {
   id: string;
   name: string;
@@ -144,6 +152,7 @@ export interface Student {
   debtMonths?: string[]; // Array of months (YYYY-MM) with unpaid fees
   lastWeeklyReportDate?: string;
   isOrphan?: boolean; // If true, the student is an orphan
+  badges?: Badge[]; // Array of earned badges
 }
 
 export enum TeacherStatus {
