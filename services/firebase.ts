@@ -15,6 +15,7 @@ const firebaseConfig = {
 };
 
 import { getMessaging } from "firebase/messaging";
+import { getAnalytics, isSupported } from "firebase/analytics";
 
 // تهيئة Firebase
 const app = initializeApp(firebaseConfig);
@@ -25,7 +26,15 @@ const db = getFirestore(app);
 const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
 const storage = getStorage(app);
 
-export { db, messaging, storage };
+// تهيئة Analytics (فقط في المتصفح)
+let analytics;
+isSupported().then(supported => {
+  if (supported && typeof window !== 'undefined') {
+    analytics = getAnalytics(app);
+  }
+});
+
+export { db, messaging, storage, analytics };
 
 // ===== LANDING PAGE IMAGE UPLOAD FUNCTIONS =====
 
