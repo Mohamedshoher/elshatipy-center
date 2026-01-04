@@ -296,6 +296,16 @@ export interface TeacherCollectionRecord {
   notes?: string;
 }
 
+export interface SalaryPayment {
+  id: string;
+  teacherId: string;
+  month: string; // YYYY-MM payment is for
+  amount: number;
+  date: string; // YYYY-MM-DD
+  addedBy: string; // 'director'
+  notes?: string;
+}
+
 export interface TeacherManualBonus {
   id: string;
   teacherId: string;

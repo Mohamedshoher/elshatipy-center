@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus, Donation, Parent, UserRole, Badge } from './types';
+import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus, Donation, Parent, UserRole, Badge, SalaryPayment } from './types';
 import { ExpenseCategory, TeacherAttendanceStatus, DayOfWeek, TestType as TestTypeEnum, DirectorNotificationType } from './types';
 import { getCairoNow, getCairoDateString, getYesterdayDateString, getCairoTimeInMinutes, isCairoAfterMidnight, isCairoAfter12_05, getCairoDayOfWeek, isCairoWorkday } from './services/cairoTimeHelper';
 
@@ -121,7 +121,10 @@ const App: React.FC = () => {
     const [teacherPayrollAdjustments, setTeacherPayrollAdjustments] = useState<TeacherPayrollAdjustment[]>([]);
     const [teacherCollections, setTeacherCollections] = useState<TeacherCollectionRecord[]>([]);
     const [teacherManualBonuses, setTeacherManualBonuses] = useState<TeacherManualBonus[]>([]);
+    const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>([]);
     const [donations, setDonations] = useState<Donation[]>([]);
+
+
     const [financialSettings, setFinancialSettings] = useState<FinancialSettings>({ workingDaysPerMonth: 22, absenceDeductionPercentage: 100 });
 
     // --- Loading State ---
@@ -355,7 +358,7 @@ const App: React.FC = () => {
     useEffect(() => {
         if (!currentUser) return;
 
-        const isFinanceRelatedPage = ['/finance', '/director-reports', '/financial-report', '/teacher-manager', '/general-view', '/fee-collection'].includes(location.pathname);
+        const isFinanceRelatedPage = ['/finance', '/director-reports', '/financial-report', '/teacher-manager', '/general-view', '/fee-collection'].includes(location.pathname) || !!teacherForDetails || !!supervisorForDetails;
         if (!isFinanceRelatedPage) {
             // We don't clear the state here to avoid flickering, but we don't start new listeners
             return;
@@ -368,6 +371,7 @@ const App: React.FC = () => {
             { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments },
             { name: 'teacherCollections', setter: setTeacherCollections },
             { name: 'teacherManualBonuses', setter: setTeacherManualBonuses },
+            { name: 'salaryPayments', setter: setSalaryPayments },
             { name: 'donations', setter: setDonations, directorOnly: true },
         ];
 
@@ -387,7 +391,7 @@ const App: React.FC = () => {
         });
 
         return () => unsubscribers.forEach(unsub => unsub());
-    }, [currentUser, location.pathname]);
+    }, [currentUser, location.pathname, teacherForDetails, supervisorForDetails]);
 
     // 2d. Fragmented Snapshot for Archived Students (Lazy Loaded)
     useEffect(() => {
@@ -1497,6 +1501,56 @@ const App: React.FC = () => {
         }
     }, []);
 
+    const handleAddSalaryPayment = useCallback(async (paymentData: Omit<SalaryPayment, 'id'>) => {
+        try {
+            await addDoc(collection(db, 'salaryPayments'), paymentData);
+        } catch (error) {
+            console.error("Error adding salary payment:", error);
+            alert("حدث خطأ أثناء تسجيل صرف الراتب.");
+        }
+    }, []);
+
+    const handleDeleteSalaryPayment = useCallback(async (paymentId: string) => {
+        if (window.confirm("هل أنت متأكد من رغبتك في حذف سجل صرف الراتب هذا؟")) {
+            try {
+                await deleteDoc(doc(db, 'salaryPayments', paymentId));
+            } catch (error) {
+                console.error("Error deleting salary payment:", error);
+                alert("حدث خطأ أثناء حذف السجل.");
+            }
+        }
+    }, []);
+
+    const handleDeleteDirectorCollection = useCallback(async (collectionId: string) => {
+        // ID format: dir-{studentId}-{month}
+        const parts = collectionId.split('-');
+        if (parts.length < 3 || parts[0] !== 'dir') return;
+        const studentId = parts[1];
+        const month = parts.slice(2).join('-');
+
+        try {
+            const studentRef = doc(db, 'students', studentId);
+            const studentDoc = await getDoc(studentRef);
+            if (!studentDoc.exists()) return;
+
+            const studentData = studentDoc.data() as Student;
+            const updatedFees = studentData.fees.map(fee => {
+                if (fee.month === month) {
+                    const { paymentDate, amountPaid, receiptNumber, collectedBy, collectedByName, ...rest } = fee;
+                    return {
+                        ...rest,
+                        paid: false,
+                    };
+                }
+                return fee;
+            });
+            await updateDoc(studentRef, { fees: updatedFees });
+        } catch (error) {
+            console.error("Error deleting director collection:", error);
+            alert("حدث خطأ أثناء حذف السجل.");
+        }
+    }, [students]);
+
     const handleAddManualBonus = useCallback(async (bonusData: Omit<TeacherManualBonus, 'id'>) => {
         try {
             const docRef = await addDoc(collection(db, 'teacherManualBonuses'), bonusData);
@@ -2277,6 +2331,7 @@ const App: React.FC = () => {
                             onDeleteManualBonus={handleDeleteManualBonus}
                             onDeleteTeacherAttendance={handleDeleteTeacherAttendance}
                             onResetPayment={handleResetTeacherPayment}
+                            onDeleteDirectorCollection={handleDeleteDirectorCollection}
                             onBack={() => handleBackButton()}
                         />;
                         if (detailsModalState) return <StudentDetailsPage
@@ -2428,10 +2483,12 @@ const App: React.FC = () => {
                             onSetTeacherAttendance={handleSetTeacherAttendance}
                             onUpdatePayrollAdjustments={handleUpdatePayrollAdjustments}
                             onLogExpense={handleLogExpense}
+                            onDeleteExpense={handleDeleteExpense}
                             onViewTeacherReport={handleViewTeacherReport}
                             onSendNotificationToAll={handleSendNotificationToAll}
                             teacherCollections={teacherCollections}
                             teacherManualBonuses={teacherManualBonuses}
+                            salaryPayments={salaryPayments}
                             currentUserRole={currentUser?.role}
                             onAddTeacherCollection={handleAddTeacherCollection}
                             onDeleteTeacherCollection={handleDeleteTeacherCollection}
@@ -2439,6 +2496,9 @@ const App: React.FC = () => {
                             onDeleteManualBonus={handleDeleteManualBonus}
                             onDeleteTeacherAttendance={handleDeleteTeacherAttendance}
                             onResetPayment={handleResetTeacherPayment}
+                            onDeleteDirectorCollection={handleDeleteDirectorCollection}
+                            onAddSalaryPayment={handleAddSalaryPayment}
+                            onDeleteSalaryPayment={handleDeleteSalaryPayment}
                             onBack={() => handleBackButton()}
                         />;
                         if (detailsModalState) return <StudentDetailsPage

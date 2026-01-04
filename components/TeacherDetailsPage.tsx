@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useEffect } from 'react';
-import type { Teacher, Group, TeacherAttendanceRecord, TeacherPayrollAdjustment, Expense, FinancialSettings, Student, Supervisor, TeacherCollectionRecord, TeacherManualBonus, CurrentUser, UserRole } from '../types';
+import type { Teacher, Group, TeacherAttendanceRecord, TeacherPayrollAdjustment, Expense, FinancialSettings, Student, Supervisor, TeacherCollectionRecord, TeacherManualBonus, CurrentUser, UserRole, SalaryPayment } from '../types';
 import { TeacherStatus, ExpenseCategory, TeacherAttendanceStatus, PaymentType, roundToNearest5 } from '../types';
 import PhoneIcon from './icons/PhoneIcon';
 import EditIcon from './icons/EditIcon';
@@ -34,10 +34,12 @@ interface TeacherDetailsPageProps {
     onSetTeacherAttendance: (teacherId: string, date: string, status: TeacherAttendanceStatus, reason?: string) => void;
     onUpdatePayrollAdjustments: (adjustment: Partial<TeacherPayrollAdjustment> & Pick<TeacherPayrollAdjustment, 'teacherId' | 'month'> & { isPaid?: boolean }) => void;
     onLogExpense: (expense: Omit<Expense, 'id'>) => void;
+    onDeleteExpense?: (expenseId: string) => void;
     onViewTeacherReport: (teacherId: string) => void;
     onSendNotificationToAll: (content: string) => void;
     teacherCollections?: TeacherCollectionRecord[];
     teacherManualBonuses?: TeacherManualBonus[];
+    salaryPayments?: SalaryPayment[];
     currentUserRole?: UserRole;
     onAddTeacherCollection?: (collection: Omit<TeacherCollectionRecord, 'id'>) => void;
     onDeleteTeacherCollection?: (collectionId: string) => void;
@@ -45,6 +47,9 @@ interface TeacherDetailsPageProps {
     onDeleteManualBonus?: (bonusId: string) => void;
     onDeleteTeacherAttendance?: (recordId: string) => void;
     onResetPayment?: (employeeId: string, month: string, employeeName: string) => void;
+    onDeleteDirectorCollection?: (collectionId: string) => void;
+    onAddSalaryPayment?: (payment: Omit<SalaryPayment, 'id'>) => void;
+    onDeleteSalaryPayment?: (paymentId: string) => void;
 }
 
 const getAbsenceValue = (status: TeacherAttendanceStatus): number => {
@@ -85,10 +90,12 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
     onSetTeacherAttendance,
     onUpdatePayrollAdjustments,
     onLogExpense,
+    onDeleteExpense,
     onViewTeacherReport,
     onSendNotificationToAll,
     teacherCollections = [],
     teacherManualBonuses = [],
+    salaryPayments = [],
     currentUserRole,
     onAddTeacherCollection,
     onDeleteTeacherCollection,
@@ -96,6 +103,9 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
     onDeleteManualBonus,
     onDeleteTeacherAttendance,
     onResetPayment,
+    onDeleteDirectorCollection,
+    onAddSalaryPayment,
+    onDeleteSalaryPayment,
 }) => {
     const [activeTab, setActiveTab] = useState<'payroll' | 'attendance' | 'groups' | 'collections'>('collections');
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
@@ -236,12 +246,13 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
     }, [employeeId, teacherAttendance, selectedMonth]);
 
     const payrollData = useMemo(() => {
-        if (!employeeId) return { baseSalary: 0, adjustments: { bonus: 0, isPaid: false }, absenceDays: 0, bonusDays: 0, absenceDeduction: 0, attendanceBonus: 0, manualBonusTotal: 0, finalSalary: 0, isPaid: false, isPartnership: false, partnershipAmount: 0, collectedAmount: 0, totalHandedOver: 0, remainingBalance: 0 };
+        if (!employeeId) return { baseSalary: 0, adjustments: { bonus: 0, isPaid: false }, absenceDays: 0, bonusDays: 0, absenceDeduction: 0, attendanceBonus: 0, manualBonusTotal: 0, finalSalary: 0, isPaid: false, isPartnership: false, partnershipAmount: 0, collectedAmount: 0, totalHandedOver: 0, deliveryDeficit: 0, collectedByTeacher: 0, collectedByDirector: 0, totalCollectedRevenue: 0, groupExpensesAmount: 0, receivedFromDirectorAmount: 0, totalExpectedExpenses: 0, groupDeficit: 0 };
 
         // Calculate collected amount - differentiate between teacher and director collection
         let collectedByTeacher = 0;
         let collectedByDirector = 0;
         let totalCollectedRevenue = 0;
+        let totalExpectedExpenses = 0;
 
         if (!isSupervisor && teacher) {
             const teacherGroupIds = new Set(
@@ -251,30 +262,40 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
             const monthPrefix = selectedMonth;
 
             students.forEach(s => {
-                const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
-                if (monthFee) {
-                    const amount = monthFee.amountPaid || 0;
+                // Only consider students in the teacher's groups
+                if (teacherGroupIds.has(s.groupId)) {
+                    const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
+                    const hasPaidCurrentMonth = !!monthFee;
 
-                    // If collected by this teacher, it counts towards their handed-over balance
-                    if (monthFee.collectedBy === teacher.id) {
-                        collectedByTeacher += amount;
-                        totalCollectedRevenue += amount;
+                    // Add monthly fee to expected expenses if active or if archived but paid
+                    if (!s.isArchived || hasPaidCurrentMonth) {
+                        totalExpectedExpenses += (s.monthlyFee || 0);
                     }
-                    // If collected by director but student is in this teacher's group, it counts towards total revenue for commission/partnership
-                    else if (monthFee.collectedBy === 'director' && teacherGroupIds.has(s.groupId)) {
-                        collectedByDirector += amount;
-                        totalCollectedRevenue += amount;
-                    }
-                    // Legacy support or default: if student is in this teacher's group and no collector is specified
-                    else if (!monthFee.collectedBy && teacherGroupIds.has(s.groupId)) {
-                        collectedByTeacher += amount;
-                        totalCollectedRevenue += amount;
+
+                    if (monthFee) {
+                        const amount = monthFee.amountPaid || 0;
+
+                        // If collected by this teacher, it counts towards their handed-over balance
+                        if (monthFee.collectedBy === teacher.id) {
+                            collectedByTeacher += amount;
+                            totalCollectedRevenue += amount;
+                        }
+                        // If collected by director but student is in this teacher's group, it counts towards total revenue for commission/partnership
+                        else if (monthFee.collectedBy === 'director') {
+                            collectedByDirector += amount;
+                            totalCollectedRevenue += amount;
+                        }
+                        // Legacy support or default
+                        else if (!monthFee.collectedBy) {
+                            collectedByTeacher += amount;
+                            totalCollectedRevenue += amount;
+                        }
                     }
                 }
             });
         }
 
-        const collectedAmount = collectedByTeacher; // For compatibility with existing labels if needed, but we'll use clearer names
+        const collectedAmount = collectedByTeacher; // Legacy alias
 
         const isPartnership = !isSupervisor && teacher?.paymentType === PaymentType.PARTNERSHIP;
         const baseSalary = isPartnership ? 0 : employeeSalary;
@@ -284,7 +305,21 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
         // Calculate handed over and remaining balance for partnership
         const collectionsForMonth = teacherCollections.filter(c => c.teacherId === employeeId && c.month === selectedMonth);
         const totalHandedOver = collectionsForMonth.reduce((sum, c) => sum + c.amount, 0);
-        const remainingBalance = collectedByTeacher - totalHandedOver;
+
+        // Delivery Deficit: What teacher collected - What teacher handed over
+        const deliveryDeficit = collectedByTeacher - totalHandedOver;
+
+        // Group Deficit: Total Expected - Total Collected (by anyone)
+        const groupDeficit = totalExpectedExpenses - totalCollectedRevenue;
+
+        // New Calculations for specific notes
+        const groupExpensesAmount = collectionsForMonth
+            .filter(c => c.notes && c.notes.includes('مصروفات المجموعة'))
+            .reduce((sum, c) => sum + c.amount, 0);
+
+        const receivedFromDirectorAmount = collectionsForMonth
+            .filter(c => c.notes && (c.notes.includes('استلام من المدير') || c.notes.includes('من المدير')))
+            .reduce((sum, c) => sum + c.amount, 0);
 
         // Calculate manual bonuses for this month
         const manualBonusesForMonth = teacherManualBonuses.filter(b => b.teacherId === employeeId && b.month === selectedMonth);
@@ -331,11 +366,15 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
             partnershipAmount,
             collectedAmount,
             totalHandedOver,
-            remainingBalance,
+            deliveryDeficit, // Formerly remainingBalance
             partnershipPercentage,
             collectedByTeacher,
             collectedByDirector,
-            totalCollectedRevenue
+            totalCollectedRevenue,
+            groupExpensesAmount,
+            receivedFromDirectorAmount,
+            totalExpectedExpenses,
+            groupDeficit
         };
     }, [employeeId, employeeSalary, selectedMonth, teacherPayrollAdjustments, attendanceForMonth, financialSettings, teacherCollections, teacherManualBonuses, teacher, isSupervisor, groups, students]);
 
@@ -379,22 +418,91 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
             .sort((a, b) => b.date.localeCompare(a.date));
     }, [teacherManualBonuses, employeeId, selectedMonth]);
 
+    const totalPaidSalary = useMemo(() => {
+        return salaryPayments
+            .filter(p => p.teacherId === employeeId && p.month === selectedMonth)
+            .reduce((sum, p) => sum + p.amount, 0);
+    }, [salaryPayments, employeeId, selectedMonth]);
+
+    const handleAddSalaryPaymentWrapper = () => {
+        if (!onAddSalaryPayment || !employeeId) return;
+        const amount = parseFloat(prompt('أدخل المبلغ المراد صرفه:') || '0');
+        if (amount > 0) {
+            onAddSalaryPayment({
+                teacherId: employeeId,
+                month: selectedMonth,
+                amount: amount,
+                date: new Date().toISOString().split('T')[0],
+                addedBy: 'director', // In a real app, use currentUser ID
+                notes: 'صرف يدوي'
+            });
+        }
+    };
+
+    const handleCancelPayment = () => {
+        if (!employeeId) return;
+        if (window.confirm('هل أنت متأكد من إلغاء حالة "تم الصرف" لهذا الشهر؟\nملاحظة: السجلات المالية (الدفعات) لن تحذف تلقائياً وعليك حذفها يدوياً من الجدول إذا أردت استرداد المبلغ.')) {
+            onUpdatePayrollAdjustments({
+                teacherId: employeeId,
+                month: selectedMonth,
+                isPaid: false
+            });
+        }
+    };
+
     const handlePayEmployee = (finalSalary: number) => {
         if (!employeeId || finalSalary <= 0) return;
-        const category = isSupervisor ? ExpenseCategory.SUPERVISOR_SALARY : ExpenseCategory.TEACHER_SALARY;
-        const descRole = isSupervisor ? 'المشرف' : 'المدرس';
 
-        onLogExpense({
-            date: new Date().toISOString().split('T')[0],
-            category: category,
-            description: `راتب ${descRole}: ${employeeName} - شهر ${selectedMonth}`,
-            amount: finalSalary,
-        });
-        onUpdatePayrollAdjustments({
-            teacherId: employeeId,
-            month: selectedMonth,
-            isPaid: true
-        });
+        // If there are partial payments, we should probably warn or handle differently?
+        // Actually, the "Pay" button usually implies "Mark as Fully Paid" or "Log Expense".
+        // The user wants partial payments.
+        // We can keep the "Mark as Paid" flag for the final check, but maybe disable "Full Pay" button if using partials, 
+        // OR make "Full Pay" just add the remaining amount as a payment?
+        // For now, let's keep the legacy "Pay" button but maybe rename it to "تسجيل صرف كامل الراتب" 
+        // and allow it to log the *remaining* amount?
+
+        const remainingToPay = Math.max(0, finalSalary - totalPaidSalary);
+
+        if (remainingToPay <= 0) {
+            alert('تم صرف الراتب بالكامل بالفعل.');
+            return;
+        }
+
+        if (window.confirm(`سيتم صرف المبلغ المتبقي (${remainingToPay} ج.م). هل أنت متأكد؟`)) {
+            const category = isSupervisor ? ExpenseCategory.SUPERVISOR_SALARY : ExpenseCategory.TEACHER_SALARY;
+            const descRole = isSupervisor ? 'المشرف' : 'المدرس';
+
+            // Support legacy behavior for now OR switch to new system entirely?
+            // User asked for "Include ability to pay part of salary".
+            // So we should probably use the new system for consistency.
+            if (onAddSalaryPayment) {
+                onAddSalaryPayment({
+                    teacherId: employeeId,
+                    month: selectedMonth,
+                    amount: remainingToPay,
+                    date: new Date().toISOString().split('T')[0],
+                    addedBy: 'director',
+                    notes: `صرف باقي الراتب للمدة ${selectedMonth}`
+                });
+            } else {
+                // Fallback to legacy expense logging if onAddSalaryPayment not available (should happen only if not updated in App)
+                onLogExpense({
+                    date: new Date().toISOString().split('T')[0],
+                    category: category,
+                    description: `راتب ${descRole}: ${employeeName} - شهر ${selectedMonth} (نهائي)`,
+                    amount: remainingToPay,
+                });
+            }
+
+            // Mark as paid in adjustments to close the month visually if needed
+            // But with partial payments, "isPaid" boolean might be redundant or confusing?
+            // We can keep it to mean "Closed/Settled".
+            onUpdatePayrollAdjustments({
+                teacherId: employeeId,
+                month: selectedMonth,
+                isPaid: true
+            });
+        }
     };
 
     const handlePayAdditionalBonus = () => {
@@ -503,9 +611,9 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
             if (payrollData.collectedByDirector > 0) {
                 message += `   • المحصل بواسطة المدير: ${payrollData.collectedByDirector.toLocaleString()} ج.م\n`;
             }
-            if (payrollData.remainingBalance !== 0) {
-                const status = payrollData.remainingBalance > 0 ? '(عليك)' : '(لك)';
-                message += `   • المتبقي ${status}: ${Math.abs(payrollData.remainingBalance).toLocaleString()} ج.م\n`;
+            if (payrollData.deliveryDeficit !== 0) {
+                const status = payrollData.deliveryDeficit > 0 ? '(عليك)' : '(لك)';
+                message += `   • المتبقي ${status}: ${Math.abs(payrollData.deliveryDeficit).toLocaleString()} ج.م\n`;
             }
             message += `   • *نصيبك من الدخل:* ${payrollData.partnershipAmount.toFixed(2)} ج.م\n\n`;
         } else {
@@ -582,6 +690,15 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
         }
         const encodedMessage = encodeURIComponent(message);
         window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
+    };
+
+    const handlePrevMonth = () => {
+        const date = new Date(selectedMonth + '-01');
+        if (isNaN(date.getTime())) return;
+        date.setMonth(date.getMonth() - 1);
+        const yyyy = date.getFullYear();
+        const mm = String(date.getMonth() + 1).padStart(2, '0');
+        setSelectedMonth(`${yyyy}-${mm}`);
     };
 
     return (
@@ -663,12 +780,21 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                 {activeTab !== 'groups' && (
                     <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-center gap-4">
                         <label className="text-sm font-bold text-gray-700 whitespace-nowrap">عرض بيانات شهر:</label>
-                        <input
-                            type="month"
-                            value={selectedMonth}
-                            onChange={e => setSelectedMonth(e.target.value)}
-                            className="w-full sm:w-auto px-4 py-2 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-teal-100 outline-none transition-all font-bold text-gray-800"
-                        />
+                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                            <input
+                                type="month"
+                                value={selectedMonth}
+                                onChange={e => setSelectedMonth(e.target.value)}
+                                className="w-full sm:w-auto px-4 py-2 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-teal-100 outline-none transition-all font-bold text-gray-800"
+                            />
+                            <button
+                                onClick={handlePrevMonth}
+                                className="p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors"
+                                title="الشهر السابق"
+                            >
+                                <ArrowRightIcon className="w-5 h-5 transform rotate-180" />
+                            </button>
+                        </div>
                     </div>
                 )}
 
@@ -712,22 +838,41 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                         </div>
 
                         {/* Current Status Highlights */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4">
+                        <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                            {/* 1. المصروفات المتوقعة */}
+                            <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 text-center">
+                                <p className="text-xs font-bold text-purple-400 mb-1 uppercase tracking-wider">المصروفات المتوقعة</p>
+                                <p className="text-xl font-black text-purple-700">{payrollData.totalExpectedExpenses.toLocaleString()} ج.م</p>
+                            </div>
+
+                            {/* 2. ما حصله المدرس */}
                             <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 text-center">
                                 <p className="text-xs font-bold text-blue-400 mb-1 uppercase tracking-wider">ما حصله المدرس</p>
                                 <p className="text-xl font-black text-blue-700">{payrollData.collectedByTeacher.toLocaleString()} ج.م</p>
                             </div>
+
+                            {/* 3. ما حصله المدير */}
                             <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 text-center">
-                                <p className="text-xs font-bold text-indigo-400 mb-1 uppercase tracking-wider">مستلم بواسطة المدير</p>
+                                <p className="text-xs font-bold text-indigo-400 mb-1 uppercase tracking-wider">المحصل من المدير</p>
                                 <p className="text-xl font-black text-indigo-700">{payrollData.collectedByDirector.toLocaleString()} ج.م</p>
                             </div>
+
+                            {/* 4. ما سلمه المدرس للمدير */}
                             <div className="bg-teal-50 p-4 rounded-2xl border border-teal-100 text-center">
-                                <p className="text-xs font-bold text-teal-400 mb-1 uppercase tracking-wider">ما سلمه المدرس</p>
+                                <p className="text-xs font-bold text-teal-400 mb-1 uppercase tracking-wider">المسلم للمدير</p>
                                 <p className="text-xl font-black text-teal-700">{payrollData.totalHandedOver.toLocaleString()} ج.م</p>
                             </div>
-                            <div className={`${payrollData.remainingBalance > 0 ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'} p-4 rounded-2xl border text-center`}>
-                                <p className={`text-xs font-bold ${payrollData.remainingBalance > 0 ? 'text-red-400' : 'text-green-400'} mb-1 uppercase tracking-wider`}>المتبقي معه (عجـز)</p>
-                                <p className={`text-xl font-black ${payrollData.remainingBalance > 0 ? 'text-red-700' : 'text-green-700'}`}>{payrollData.remainingBalance.toLocaleString()} ج.م</p>
+
+                            {/* 5. عجز التسليم (معه - سلم) */}
+                            <div className={`p-4 rounded-2xl border text-center ${payrollData.deliveryDeficit > 0 ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
+                                <p className={`text-xs font-bold mb-1 uppercase tracking-wider ${payrollData.deliveryDeficit > 0 ? 'text-red-400' : 'text-green-400'}`}>عجز التسليم (معه)</p>
+                                <p className={`text-xl font-black ${payrollData.deliveryDeficit > 0 ? 'text-red-700' : 'text-green-700'}`}>{payrollData.deliveryDeficit.toLocaleString()} ج.م</p>
+                            </div>
+
+                            {/* 6. عجز المجموعة (المتوقع - المحصل) */}
+                            <div className={`p-4 rounded-2xl border text-center ${payrollData.groupDeficit > 0 ? 'bg-orange-50 border-orange-100' : 'bg-green-50 border-green-100'}`}>
+                                <p className={`text-xs font-bold mb-1 uppercase tracking-wider ${payrollData.groupDeficit > 0 ? 'text-orange-400' : 'text-green-400'}`}>عجز المجموعة (لم يحصل)</p>
+                                <p className={`text-xl font-black ${payrollData.groupDeficit > 0 ? 'text-orange-700' : 'text-green-700'}`}>{payrollData.groupDeficit.toLocaleString()} ج.م</p>
                             </div>
                         </div>
 
@@ -768,6 +913,19 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                                                             <TrashIcon className="w-4 h-4" />
                                                         </button>
                                                     )}
+                                                    {r.type === 'director_collection' && onDeleteDirectorCollection && (
+                                                        <button
+                                                            onClick={() => {
+                                                                if (window.confirm('هل أنت متأكد من حذف هذا السجل؟ سيتم إلغاء دفع الطالب.')) {
+                                                                    onDeleteDirectorCollection(r.id);
+                                                                }
+                                                            }}
+                                                            className="p-1.5 bg-red-50 text-red-500 rounded-lg hover:bg-red-100 transition-colors"
+                                                            title="حذف"
+                                                        >
+                                                            <TrashIcon className="w-4 h-4" />
+                                                        </button>
+                                                    )}
                                                 </div>
                                             </div>
                                             {r.notes && (
@@ -791,6 +949,7 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                                             <th className="px-6 py-3 text-sm font-bold text-gray-500 uppercase">المبلغ</th>
                                             <th className="px-6 py-3 text-sm font-bold text-gray-500 uppercase">ملاحظات</th>
                                             <th className="px-6 py-3 text-sm font-bold text-gray-500 uppercase">النوع</th>
+                                            <th className="px-6 py-3 text-sm font-bold text-gray-500 uppercase">إجراءات</th>
                                         </tr>
                                     </thead>
                                     <tbody className="bg-white divide-y divide-gray-100">
@@ -798,34 +957,47 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                                             allCollections.map(r => (
                                                 <tr key={r.id}>
                                                     <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600 font-bold">{new Date(r.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long' })}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-teal-600 font-extrabold">{r.amount.toLocaleString()} ج.م</td>
-                                                    <td className="px-6 py-4 text-sm text-gray-500">{r.notes || '-'}</td>
-                                                    <td className="px-6 py-4 whitespace-nowrap text-xs">
-                                                        <div className="flex items-center justify-center gap-2">
-                                                            {r.type === 'handed_over' ? (
-                                                                <span className="px-2 py-1 bg-teal-50 text-teal-600 rounded-full font-bold">تسليم يدوي</span>
-                                                            ) : (
-                                                                <span className="px-2 py-1 bg-indigo-50 text-indigo-600 rounded-full font-bold">مدير مباشر</span>
-                                                            )}
-                                                            {r.type === 'handed_over' && onDeleteTeacherCollection && (
-                                                                <button
-                                                                    onClick={() => {
-                                                                        if (window.confirm('هل أنت متأكد من رغبتك في حذف هذا التحصيل؟')) {
-                                                                            onDeleteTeacherCollection(r.id);
-                                                                        }
-                                                                    }}
-                                                                    className="p-1 text-red-400 hover:text-red-600 transition-colors"
-                                                                    title="حذف"
-                                                                >
-                                                                    <TrashIcon className="w-4 h-4" />
-                                                                </button>
-                                                            )}
-                                                        </div>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm font-bold text-gray-800">{r.amount.toLocaleString()} ج.م</td>
+                                                    <td className="px-6 py-4 whitespace-normal text-sm text-gray-500 max-w-xs">{r.notes || '-'}</td>
+                                                    <td className="px-6 py-4 whitespace-nowrap">
+                                                        {r.type === 'handed_over' ? (
+                                                            <span className="px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-teal-100 text-teal-800">تسليم يدوي</span>
+                                                        ) : (
+                                                            <span className="px-2 py-1 inline-flex text-xs leading-5 font-bold rounded-full bg-indigo-100 text-indigo-800">مدير مباشر</span>
+                                                        )}
+                                                    </td>
+                                                    <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-500">
+                                                        {r.type === 'handed_over' && onDeleteTeacherCollection && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (window.confirm('هل أنت متأكد من حذف هذا التحصيل؟')) {
+                                                                        onDeleteTeacherCollection(r.id);
+                                                                    }
+                                                                }}
+                                                                className="text-red-600 hover:text-red-900 mx-auto"
+                                                                title="حذف"
+                                                            >
+                                                                <TrashIcon className="w-5 h-5 mx-auto" />
+                                                            </button>
+                                                        )}
+                                                        {r.type === 'director_collection' && onDeleteDirectorCollection && (
+                                                            <button
+                                                                onClick={() => {
+                                                                    if (window.confirm('هل أنت متأكد من حذف هذا السجل؟ سيتم إلغاء دفع الطالب.')) {
+                                                                        onDeleteDirectorCollection(r.id);
+                                                                    }
+                                                                }}
+                                                                className="text-red-600 hover:text-red-900 mx-auto"
+                                                                title="حذف"
+                                                            >
+                                                                <TrashIcon className="w-5 h-5 mx-auto" />
+                                                            </button>
+                                                        )}
                                                     </td>
                                                 </tr>
                                             ))
                                         ) : (
-                                            <tr><td colSpan={4} className="px-6 py-10 text-center text-gray-400 italic">لا توجد عمليات مسجلة لهذا الشهر.</td></tr>
+                                            <tr><td colSpan={5} className="px-6 py-10 text-center text-gray-400 italic">لا توجد عمليات مسجلة لهذا الشهر.</td></tr>
                                         )}
                                     </tbody>
                                 </table>
@@ -989,11 +1161,21 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                                     <h3 className="text-2xl font-black text-gray-900 mb-2">حساب الراتب والمستحقات</h3>
                                     <p className="text-gray-500 font-bold">شهر {new Date(selectedMonth + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' })}</p>
                                 </div>
-                                <div className="bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100 flex items-center gap-2">
-                                    <span className="text-sm font-bold text-gray-500">حالة الصرف:</span>
-                                    <span className={`px-4 py-1.5 rounded-full text-xs font-black shadow-sm ${payrollData.isPaid ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-yellow-100 text-yellow-700 border border-yellow-200'}`}>
-                                        {payrollData.isPaid ? 'تم الصـرف ✅' : 'قيد الانتظار ⏳'}
-                                    </span>
+                                <div className="flex gap-2">
+                                    {payrollData.isPaid && (
+                                        <button
+                                            onClick={handleCancelPayment}
+                                            className="px-4 py-2 bg-red-50 text-red-600 rounded-2xl border border-red-100 text-xs font-black hover:bg-red-100 transition-colors"
+                                        >
+                                            إلغاء الصرف ↩
+                                        </button>
+                                    )}
+                                    <div className="bg-gray-50 px-4 py-2 rounded-2xl border border-gray-100 flex items-center gap-2">
+                                        <span className="text-sm font-bold text-gray-500">حالة الصرف:</span>
+                                        <span className={`px-4 py-1.5 rounded-full text-xs font-black shadow-sm ${payrollData.isPaid ? 'bg-green-100 text-green-700 border border-green-200' : 'bg-yellow-100 text-yellow-700 border border-yellow-200'}`}>
+                                            {payrollData.isPaid ? 'تم الصـرف ✅' : 'قيد الانتظار ⏳'}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
 
@@ -1017,23 +1199,87 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                                         </div>
                                         <span className="text-xl font-black text-red-700">-{(payrollData.absenceDeduction + (payrollData.manualBonusTotal < 0 ? Math.abs(payrollData.manualBonusTotal) : 0)).toLocaleString()} ج.م</span>
                                     </div>
+                                    <div className="flex justify-between items-center bg-purple-50/50 p-4 rounded-2xl border border-purple-100 transition-all hover:bg-white hover:shadow-sm">
+                                        <span className="font-bold text-purple-700">تم صرفه للمدرس:</span>
+                                        <span className="text-xl font-black text-purple-700">-{totalPaidSalary.toLocaleString()} ج.م</span>
+                                    </div>
                                 </div>
 
-                                <div className="bg-gradient-to-br from-teal-600 to-teal-700 p-8 rounded-[2.5rem] shadow-2xl shadow-teal-200 flex flex-col justify-center items-center text-white relative transition-transform hover:scale-[1.02]">
-                                    <div className="absolute top-4 right-4 text-white/20"><CurrencyDollarIcon className="w-16 h-16" /></div>
-                                    <p className="text-sm font-bold opacity-80 mb-2">صافي الراتب المستحق</p>
-                                    <p className="text-5xl font-black mb-1">{payrollData.finalSalary.toLocaleString()}</p>
-                                    <p className="text-xs font-bold opacity-80 uppercase tracking-widest">Egyptian Pound</p>
+                                <div className="flex flex-col gap-4">
+                                    <div className="bg-gray-100 p-6 rounded-[1.5rem] flex flex-col justify-center items-center text-center">
+                                        <p className="text-xs font-bold text-gray-500 mb-1">إجمالي الاستحقاق</p>
+                                        <p className="text-3xl font-black text-gray-800">{payrollData.finalSalary.toLocaleString()}</p>
+                                    </div>
+
+                                    <div className="flex-1 bg-gradient-to-br from-teal-600 to-teal-700 p-6 rounded-[2rem] shadow-2xl shadow-teal-200 flex flex-col justify-center items-center text-white relative transition-transform hover:scale-[1.02]">
+                                        <div className="absolute top-4 right-4 text-white/20"><CurrencyDollarIcon className="w-12 h-12" /></div>
+                                        <p className="text-sm font-bold opacity-80 mb-2">المتبقي للصرف</p>
+                                        <p className="text-5xl font-black mb-1">{(Math.max(0, payrollData.finalSalary - totalPaidSalary)).toLocaleString()}</p>
+                                        <p className="text-xs font-bold opacity-80 uppercase tracking-widest">Egyptian Pound</p>
+                                    </div>
                                 </div>
+                            </div>
+
+                            {/* Salary Payment Records Section */}
+                            <div className="mb-8">
+                                <div className="flex justify-between items-center mb-4">
+                                    <h4 className="font-bold text-gray-800 text-lg">سجل صرف الراتب</h4>
+                                    <button
+                                        onClick={handleAddSalaryPaymentWrapper}
+                                        className="px-4 py-2 bg-indigo-50 text-indigo-700 rounded-xl text-sm font-bold hover:bg-indigo-100"
+                                    >
+                                        + صرف جزء من الراتب
+                                    </button>
+                                </div>
+
+                                {salaryPayments && salaryPayments.filter(p => p.teacherId === employeeId && p.month === selectedMonth).length > 0 ? (
+                                    <div className="bg-white rounded-xl border border-gray-100 overflow-hidden">
+                                        <table className="min-w-full divide-y divide-gray-200 text-sm">
+                                            <thead className="bg-gray-50">
+                                                <tr>
+                                                    <th className="px-4 py-3 text-right font-bold text-gray-500">التاريخ</th>
+                                                    <th className="px-4 py-3 text-right font-bold text-gray-500">المبلغ</th>
+                                                    <th className="px-4 py-3 text-right font-bold text-gray-500">ملاحظات</th>
+                                                    <th className="px-4 py-3 text-center font-bold text-gray-500">حذف</th>
+                                                </tr>
+                                            </thead>
+                                            <tbody className="divide-y divide-gray-100">
+                                                {salaryPayments
+                                                    .filter(p => p.teacherId === employeeId && p.month === selectedMonth)
+                                                    .map(payment => (
+                                                        <tr key={payment.id} className="hover:bg-gray-50">
+                                                            <td className="px-4 py-3 text-gray-700 font-medium">{new Date(payment.date).toLocaleDateString('ar-EG')}</td>
+                                                            <td className="px-4 py-3 text-gray-900 font-bold">{payment.amount.toLocaleString()} ج.م</td>
+                                                            <td className="px-4 py-3 text-gray-500">{payment.notes || '-'}</td>
+                                                            <td className="px-4 py-3 text-center">
+                                                                <button
+                                                                    onClick={() => {
+                                                                        if (window.confirm('هل أنت متأكد من حذف هذا السجل؟')) {
+                                                                            onDeleteSalaryPayment?.(payment.id);
+                                                                        }
+                                                                    }}
+                                                                    className="text-red-500 hover:text-red-700 p-1 bg-red-50 rounded-lg"
+                                                                >
+                                                                    <TrashIcon className="w-4 h-4" />
+                                                                </button>
+                                                            </td>
+                                                        </tr>
+                                                    ))}
+                                            </tbody>
+                                        </table>
+                                    </div>
+                                ) : (
+                                    <p className="text-gray-400 text-sm italic text-center py-4 bg-gray-50 rounded-xl border border-dashed border-gray-200">لا توجد دفعات مسجلة لهذا الشهر.</p>
+                                )}
                             </div>
 
                             <div className="flex flex-col sm:flex-row gap-4">
                                 <button
                                     onClick={() => handlePayEmployee(payrollData.finalSalary)}
-                                    disabled={payrollData.isPaid || payrollData.finalSalary <= 0}
+                                    disabled={payrollData.isPaid || (Math.max(0, payrollData.finalSalary - totalPaidSalary) <= 0)}
                                     className="flex-1 py-4 bg-blue-600 text-white rounded-2xl shadow-xl shadow-blue-100 hover:bg-blue-700 transition-all font-black text-lg disabled:opacity-40 disabled:cursor-not-allowed group active:scale-95"
                                 >
-                                    {payrollData.isPaid ? 'تم تسجيل الصرف مسبقاً' : 'تأكيد وصرف الراتب الآن 💸'}
+                                    {Math.max(0, payrollData.finalSalary - totalPaidSalary) <= 0 ? (payrollData.isPaid ? 'تم تسجيل الصرف مسبقاً' : 'تم صرف كامل المستحقات ✅') : `صرف المتبقي (${Math.max(0, payrollData.finalSalary - totalPaidSalary)} ج.م) نهائياً 💸`}
                                 </button>
                                 <button
                                     onClick={handleSendWhatsAppReport}
@@ -1195,31 +1441,33 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                     </div>
                 )}
 
-                {activeTab === 'groups' && (
-                    <div className="max-w-4xl mx-auto">
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            {(isSupervisor ? (supervisor?.section || []) : assignedGroups.map(g => g.name)).map((item, idx) => (
-                                <div key={idx} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col items-center text-center transition-all hover:shadow-md hover:border-teal-200 group">
-                                    <div className="w-16 h-16 bg-teal-50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
-                                        <UsersIcon className="w-8 h-8 text-teal-600" />
+                {
+                    activeTab === 'groups' && (
+                        <div className="max-w-4xl mx-auto">
+                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                                {(isSupervisor ? (supervisor?.section || []) : assignedGroups.map(g => g.name)).map((item, idx) => (
+                                    <div key={idx} className="bg-white p-6 rounded-3xl border border-gray-100 shadow-sm flex flex-col items-center text-center transition-all hover:shadow-md hover:border-teal-200 group">
+                                        <div className="w-16 h-16 bg-teal-50 rounded-2xl flex items-center justify-center mb-4 group-hover:scale-110 transition-transform">
+                                            <UsersIcon className="w-8 h-8 text-teal-600" />
+                                        </div>
+                                        <h4 className="text-xl font-black text-gray-800">{item}</h4>
+                                        <p className="text-sm font-bold text-gray-400 mt-1">{isSupervisor ? 'قسم تحت الإشراف' : 'مجموعة تعليمية'}</p>
                                     </div>
-                                    <h4 className="text-xl font-black text-gray-800">{item}</h4>
-                                    <p className="text-sm font-bold text-gray-400 mt-1">{isSupervisor ? 'قسم تحت الإشراف' : 'مجموعة تعليمية'}</p>
-                                </div>
-                            ))}
-                            {((isSupervisor ? (supervisor?.section || []) : assignedGroups).length === 0) && (
-                                <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400">
-                                    <UsersIcon className="w-16 h-16 mb-4 opacity-20" />
-                                    <p className="italic">لا توجد {isSupervisor ? 'أقسام إشراف' : 'مجموعات'} مسجلة لهذا الموظف حالياً.</p>
-                                </div>
-                            )}
+                                ))}
+                                {((isSupervisor ? (supervisor?.section || []) : assignedGroups).length === 0) && (
+                                    <div className="col-span-full py-20 bg-white rounded-3xl border border-dashed border-gray-200 flex flex-col items-center justify-center text-gray-400">
+                                        <UsersIcon className="w-16 h-16 mb-4 opacity-20" />
+                                        <p className="italic">لا توجد {isSupervisor ? 'أقسام إشراف' : 'مجموعات'} مسجلة لهذا الموظف حالياً.</p>
+                                    </div>
+                                )}
+                            </div>
                         </div>
-                    </div>
-                )}
-            </main>
+                    )
+                }
+            </main >
 
             {/* Modals for Reason Input (Temporary as in original modal) */}
-            <BonusReasonModal
+            < BonusReasonModal
                 isOpen={isBonusModalOpen}
                 onClose={() => setIsBonusModalOpen(false)}
                 onConfirm={handleConfirmBonus}
@@ -1242,7 +1490,7 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                 currentStatus={attendanceForMonth.find(r => r.date === calendarSelectedDate)?.status}
                 onSetStatus={handleActionSelect}
             />
-        </div>
+        </div >
     );
 };
 
