@@ -169,43 +169,43 @@ const BadgeCertificatesSlider: React.FC<BadgeCertificatesSliderProps> = ({ secti
                 </div>
 
                 {/* --- BODY (Flex Grow) --- */}
-                <div className="flex-1 flex flex-col items-center justify-center relative z-10 w-full px-2 sm:px-8 -mt-6 sm:-mt-20 space-y-2 sm:space-y-6">
+                <div className="flex-1 flex flex-col items-center justify-center relative z-10 w-full px-2 sm:px-8 -mt-4 sm:-mt-16 space-y-0.5 sm:space-y-3">
                     {/* Title */}
-                    <h1 className={`font-bold text-amber-700 decoration-amber-300 decoration-double text-xl sm:text-6xl`}>
+                    <h1 className={`font-bold text-amber-700 decoration-amber-300 decoration-double text-base sm:text-4xl`}>
                         شهادة تقدير
                     </h1>
 
                     {/* Grant Text */}
-                    <p className={`font-medium text-gray-600 text-[10px] sm:text-2xl`}>
+                    <p className={`font-medium text-gray-600 text-[8px] sm:text-lg`}>
                         يمنح مركز الشاطبي هذه الشهادة إلى الطالب/ـة
                     </p>
 
                     {/* Name (Hero Text - Compact) */}
-                    <h2 className={`font-black w-full text-center px-2 border-b-2 sm:border-b-4 border-dashed border-amber-200/50 
-                        text-2xl sm:text-7xl`}
-                        style={{ color: '#854d0e', lineHeight: '1.4', paddingBottom: '8px' }}>
+                    <h2 className={`font-black w-full text-center px-1 border-b-2 sm:border-b-4 border-dashed border-amber-200/50 
+                        text-lg sm:text-5xl md:text-6xl`}
+                        style={{ color: '#854d0e', lineHeight: '1.2', paddingBottom: '2px' }}>
                         {student.name}
                     </h2>
 
                     {/* Reason Text (Compact) */}
-                    <div className={`text-gray-700 leading-tight font-medium max-w-4xl mx-auto text-[10px] sm:text-2xl`}>
+                    <div className={`text-gray-700 leading-tight font-medium max-w-4xl mx-auto text-[8px] sm:text-base`}>
                         <p>لجهده/ها المتميز وحصوله/ها على وسام <span className="text-amber-600 font-bold mx-1">"{latestBadge.title}"</span></p>
-                        <p className="mt-2 text-gray-500 hidden sm:block">والمشاركة الفعالة في أنشطة المركز، راجين من الله له دوام التوفيق والسداد.</p>
+                        <p className="mt-0.5 text-gray-500 hidden sm:block">والمشاركة الفعالة في أنشطة المركز، راجين من الله له دوام التوفيق والسداد.</p>
                     </div>
                 </div>
 
                 {/* --- FOOTER (Ensured Visibility) --- */}
-                <div className="w-full relative z-10 flex justify-between items-end pb-1 sm:pb-0 px-2 sm:px-4 mt-auto">
+                <div className="w-full relative z-10 flex justify-between items-end pb-2 sm:pb-8 px-3 sm:px-12 mt-2">
                     {/* Right: Date */}
                     <div className="text-right">
-                        <p className={`font-bold text-amber-800 text-[7px] sm:text-base`}>التاريخ</p>
-                        <p className={`font-mono text-gray-700 mt-0.5 text-[7px] sm:text-base`}>{latestBadge.dateEarned}</p>
+                        <p className={`font-bold text-amber-800 text-[8px] sm:text-lg`}>التاريخ</p>
+                        <p className={`font-mono text-gray-700 mt-0.5 text-[8px] sm:text-lg`}>{latestBadge.dateEarned}</p>
                     </div>
 
                     {/* Left: Signature */}
                     <div className="text-left">
-                        <p className={`font-bold text-amber-800 text-[7px] sm:text-base`}>مدير المركز</p>
-                        <div className={`font-bold text-blue-900 mt-0.5 text-[8px] sm:text-xl`}>
+                        <p className={`font-bold text-amber-800 text-[8px] sm:text-lg`}>مدير المركز</p>
+                        <div className={`font-bold text-blue-900 mt-0.5 text-[10px] sm:text-2xl`}>
                             د. محمد مصطفى شكر
                         </div>
                     </div>
