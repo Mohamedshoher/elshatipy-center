@@ -9,15 +9,38 @@ interface BadgeCertificatesSliderProps {
 
 const BadgeCertificatesSlider: React.FC<BadgeCertificatesSliderProps> = ({ section, students }) => {
     const certificateStudents = useMemo(() => {
-        const withBadges = students.filter(s => s.badges && s.badges.length > 0 && !s.isArchived);
-        withBadges.sort((a, b) => {
-            const dateA = a.badges && a.badges.length > 0 ? new Date(a.badges[a.badges.length - 1].dateEarned).getTime() : 0;
-            const dateB = b.badges && b.badges.length > 0 ? new Date(b.badges[b.badges.length - 1].dateEarned).getTime() : 0;
+        // 1. Filter students who have badges and are not archived
+        const eligibleStudents = students.filter(s => s.badges && s.badges.length > 0 && !s.isArchived);
+
+        // 2. Group students by groupId and find the one with the latest badge in each group
+        const latestPerGroup: Record<string, Student> = {};
+
+        eligibleStudents.forEach(student => {
+            const groupId = student.groupId || 'no-group';
+            const latestBadgeDate = new Date(student.badges![student.badges!.length - 1].dateEarned).getTime();
+
+            if (!latestPerGroup[groupId]) {
+                latestPerGroup[groupId] = student;
+            } else {
+                const existingLatestDate = new Date(latestPerGroup[groupId].badges![latestPerGroup[groupId].badges!.length - 1].dateEarned).getTime();
+                if (latestBadgeDate > existingLatestDate) {
+                    latestPerGroup[groupId] = student;
+                }
+            }
+        });
+
+        // 3. Convert back to array
+        const result = Object.values(latestPerGroup);
+
+        // 4. Sort the final list by date (most recent across all groups first)
+        result.sort((a, b) => {
+            const dateA = new Date(a.badges![a.badges!.length - 1].dateEarned).getTime();
+            const dateB = new Date(b.badges![b.badges!.length - 1].dateEarned).getTime();
             return dateB - dateA;
         });
-        const limit = section.sliderInterval || 10;
-        return withBadges.slice(0, limit);
-    }, [students, section.sliderInterval]);
+
+        return result;
+    }, [students]);
 
     const [currentIndex, setCurrentIndex] = useState(0);
     const [isHovered, setIsHovered] = useState(false);
@@ -143,37 +166,31 @@ const BadgeCertificatesSlider: React.FC<BadgeCertificatesSliderProps> = ({ secti
                         </span>
                     </div>
 
-                    {/* --- BADGE ICON (Lowered Position on Mobile) --- */}
-                    <div className="absolute left-1 top-0 bottom-0 w-1/3 flex items-center justify-center pointer-events-none z-0 overflow-hidden sm:-mt-16 mt-8">
-                        <span className="text-[60px] sm:text-[220px] opacity-100 transform rotate-[-5deg] drop-shadow-md text-amber-500">
-                            {latestBadge.icon}
-                        </span>
-                    </div>
                 </div>
 
                 {/* --- BODY (Flex Grow) --- */}
-                <div className="flex-1 flex flex-col items-center justify-center relative z-10 w-full px-2 sm:px-8 -mt-1 sm:-mt-6 space-y-1 sm:space-y-4">
+                <div className="flex-1 flex flex-col items-center justify-center relative z-10 w-full px-2 sm:px-8 -mt-6 sm:-mt-20 space-y-2 sm:space-y-6">
                     {/* Title */}
-                    <h1 className={`font-bold text-amber-700 decoration-amber-300 decoration-double -mt-1 sm:-mt-8 text-base sm:text-5xl`}>
+                    <h1 className={`font-bold text-amber-700 decoration-amber-300 decoration-double text-xl sm:text-6xl`}>
                         شهادة تقدير
                     </h1>
 
                     {/* Grant Text */}
-                    <p className={`font-medium text-gray-600 text-[8px] sm:text-xl`}>
+                    <p className={`font-medium text-gray-600 text-[10px] sm:text-2xl`}>
                         يمنح مركز الشاطبي هذه الشهادة إلى الطالب/ـة
                     </p>
 
                     {/* Name (Hero Text - Compact) */}
-                    <h2 className={`font-black w-full text-center truncate px-2 border-b-2 sm:border-b-4 border-dashed border-amber-200/50 
-                        text-base sm:text-5xl md:text-6xl`}
-                        style={{ color: '#854d0e', lineHeight: '1.2' }}>
+                    <h2 className={`font-black w-full text-center px-2 border-b-2 sm:border-b-4 border-dashed border-amber-200/50 
+                        text-2xl sm:text-7xl`}
+                        style={{ color: '#854d0e', lineHeight: '1.4', paddingBottom: '8px' }}>
                         {student.name}
                     </h2>
 
                     {/* Reason Text (Compact) */}
-                    <div className={`text-gray-700 leading-tight font-medium max-w-4xl mx-auto text-[8px] sm:text-lg`}>
+                    <div className={`text-gray-700 leading-tight font-medium max-w-4xl mx-auto text-[10px] sm:text-2xl`}>
                         <p>لجهده/ها المتميز وحصوله/ها على وسام <span className="text-amber-600 font-bold mx-1">"{latestBadge.title}"</span></p>
-                        <p className="mt-1 text-gray-500 hidden sm:block">والمشاركة الفعالة في أنشطة المركز، راجين من الله له دوام التوفيق والسداد.</p>
+                        <p className="mt-2 text-gray-500 hidden sm:block">والمشاركة الفعالة في أنشطة المركز، راجين من الله له دوام التوفيق والسداد.</p>
                     </div>
                 </div>
 
