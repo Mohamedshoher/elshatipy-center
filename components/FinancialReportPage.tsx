@@ -3,6 +3,7 @@ import type { Student, Group, UserRole } from '../types';
 import ChevronDownIcon from './icons/ChevronDownIcon';
 import UserIcon from './icons/UserIcon';
 import WhatsAppIcon from './icons/WhatsAppIcon';
+import ArrowRightIcon from './icons/ArrowRightIcon';
 import { getCairoDateString } from '../services/cairoTimeHelper';
 
 interface FinancialReportPageProps {
@@ -16,6 +17,14 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
   const [selectedMonth, setSelectedMonth] = useState(() => getCairoDateString().substring(0, 7));
   const [expandedPaid, setExpandedPaid] = useState<Set<string>>(new Set());
   const [expandedUnpaid, setExpandedUnpaid] = useState<Set<string>>(new Set());
+
+  const handlePrevMonth = () => {
+    const date = new Date(selectedMonth + '-01');
+    date.setMonth(date.getMonth() - 1);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    setSelectedMonth(`${yyyy}-${mm}`);
+  };
 
   const financialData = useMemo(() => {
     let totalCollected = 0;
@@ -87,7 +96,7 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
     onToggle: (groupId: string) => void;
     isUnpaidSection?: boolean;
     onSendWhatsApp?: (student: Student) => void;
-    currentUserRole?: 'director' | 'teacher' | 'supervisor';
+    currentUserRole?: UserRole;
   }> = ({ title, studentsByGroup, expandedSet, onToggle, isUnpaidSection, onSendWhatsApp, currentUserRole }) => (
     <div className="bg-white rounded-xl shadow-lg p-6">
       <h2 className="text-xl font-bold text-gray-800 mb-4">{title}</h2>
@@ -157,15 +166,22 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
         <div className="bg-white rounded-xl shadow-lg p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
             <h2 className="text-2xl font-bold text-gray-800">تقرير المصروفات الشهري</h2>
-            <div className="w-full sm:w-auto max-w-xs">
+            <div className="w-full sm:w-auto max-w-xs flex items-center gap-2">
               <label htmlFor="month-filter" className="sr-only">اختر الشهر</label>
               <input
                 type="month"
                 id="month-filter"
                 value={selectedMonth}
                 onChange={e => setSelectedMonth(e.target.value)}
-                className="w-full px-4 py-2 border rounded-lg bg-gray-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="flex-grow px-4 py-2 border rounded-lg bg-gray-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
+              <button
+                onClick={handlePrevMonth}
+                className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+                title="الشهر السابق"
+              >
+                <ArrowRightIcon className="w-5 h-5 transform rotate-180" />
+              </button>
             </div>
           </div>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">

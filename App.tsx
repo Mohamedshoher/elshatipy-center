@@ -1669,7 +1669,14 @@ const App: React.FC = () => {
         if (isTeacherFormOpen) { setIsTeacherFormOpen(false); setTeacherToEdit(null); setSupervisorToEdit(null); return true; }
         if (isGroupManagerOpen) { setIsGroupManagerOpen(false); return true; }
         if (detailsModalState) { setDetailsModalState(null); return true; }
-        if (teacherForDetails || supervisorForDetails) { setTeacherForDetails(null); setSupervisorForDetails(null); return true; }
+        if (teacherForDetails || supervisorForDetails) {
+            navigate('/teacher-manager');
+            setTimeout(() => {
+                setTeacherForDetails(null);
+                setSupervisorForDetails(null);
+            }, 0);
+            return true;
+        }
         if (isFormOpen) { setIsFormOpen(false); setStudentToEdit(null); return true; }
         if (isSidebarOpen) { setIsSidebarOpen(false); return true; }
         if (isSearchVisible) { setIsSearchVisible(false); setSearchTerm(''); return true; }

@@ -13,6 +13,7 @@ import WhatsAppIcon from './icons/WhatsAppIcon';
 import ArrowRightIcon from './icons/ArrowRightIcon';
 import UserIcon from './icons/UserIcon';
 import BriefcaseIcon from './icons/BriefcaseIcon';
+import ChevronDownIcon from './icons/ChevronDownIcon';
 import BonusReasonModal from './BonusReasonModal';
 import DeductionReasonModal from './DeductionReasonModal';
 import TeacherAttendanceCalendar from './TeacherAttendanceCalendar';
@@ -121,6 +122,7 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
     const [manualAmountType, setManualAmountType] = useState<'quarter' | 'half' | 'full' | 'custom'>('custom');
     const [calendarSelectedDate, setCalendarSelectedDate] = useState<string | null>(null);
     const [isActionModalOpen, setIsActionModalOpen] = useState(false);
+    const [isDeficitDetailsOpen, setIsDeficitDetailsOpen] = useState(false);
 
     const employee = teacher || supervisor;
     const isSupervisor = !!supervisor;
@@ -377,6 +379,37 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
             groupDeficit
         };
     }, [employeeId, employeeSalary, selectedMonth, teacherPayrollAdjustments, attendanceForMonth, financialSettings, teacherCollections, teacherManualBonuses, teacher, isSupervisor, groups, students]);
+
+    const deficitBreakdown = useMemo(() => {
+        if (!teacher || isSupervisor) return [];
+        const teacherGroupIds = new Set(groups.filter(g => g.teacherId === teacher.id).map(g => g.id));
+        const result: { studentName: string, expected: number, paid: number, diff: number, isFullDeficit: boolean }[] = [];
+        const monthPrefix = selectedMonth;
+
+        students.forEach(s => {
+            if (teacherGroupIds.has(s.groupId)) {
+                const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
+                const hasPaidCurrentMonth = !!monthFee;
+
+                if (!s.isArchived || hasPaidCurrentMonth) {
+                    const expected = s.monthlyFee || 0;
+                    if (expected > 0) {
+                        const paid = monthFee?.amountPaid || 0;
+                        if (paid < expected) {
+                            result.push({
+                                studentName: s.name,
+                                expected,
+                                paid,
+                                diff: expected - paid,
+                                isFullDeficit: paid === 0
+                            });
+                        }
+                    }
+                }
+            }
+        });
+        return result.sort((a, b) => b.diff - a.diff);
+    }, [teacher, groups, students, selectedMonth, isSupervisor]);
 
     const bonusRecordsWithReason = useMemo(() =>
         attendanceForMonth.filter(r => getBonusValue(r.status) > 0 && r.reason),
@@ -840,41 +873,133 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                         {/* Current Status Highlights */}
                         <div className="grid grid-cols-2 md:grid-cols-2 lg:grid-cols-3 gap-4">
                             {/* 1. المصروفات المتوقعة */}
-                            <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 text-center">
+                            <div className="bg-purple-50 p-4 rounded-2xl border border-purple-100 text-center flex flex-col justify-center">
                                 <p className="text-xs font-bold text-purple-400 mb-1 uppercase tracking-wider">المصروفات المتوقعة</p>
                                 <p className="text-xl font-black text-purple-700">{payrollData.totalExpectedExpenses.toLocaleString()} ج.م</p>
+                                {/* Added as per request: Group Expenses (Total Collected) */}
+                                <div className="mt-3 pt-3 border-t border-purple-200/50">
+                                    <p className="text-[10px] font-bold text-gray-400 mb-0.5">إجمالي إيراد المجموعة (مدرس + مدير)</p>
+                                    <p className="text-lg font-black text-gray-700">{payrollData.totalCollectedRevenue.toLocaleString()} ج.م</p>
+                                </div>
                             </div>
 
                             {/* 2. ما حصله المدرس */}
-                            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 text-center">
+                            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 text-center flex flex-col justify-center">
                                 <p className="text-xs font-bold text-blue-400 mb-1 uppercase tracking-wider">ما حصله المدرس</p>
                                 <p className="text-xl font-black text-blue-700">{payrollData.collectedByTeacher.toLocaleString()} ج.م</p>
                             </div>
 
                             {/* 3. ما حصله المدير */}
-                            <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 text-center">
+                            <div className="bg-indigo-50 p-4 rounded-2xl border border-indigo-100 text-center flex flex-col justify-center">
                                 <p className="text-xs font-bold text-indigo-400 mb-1 uppercase tracking-wider">المحصل من المدير</p>
                                 <p className="text-xl font-black text-indigo-700">{payrollData.collectedByDirector.toLocaleString()} ج.م</p>
                             </div>
 
                             {/* 4. ما سلمه المدرس للمدير */}
-                            <div className="bg-teal-50 p-4 rounded-2xl border border-teal-100 text-center">
+                            <div className="bg-teal-50 p-4 rounded-2xl border border-teal-100 text-center flex flex-col justify-center">
                                 <p className="text-xs font-bold text-teal-400 mb-1 uppercase tracking-wider">المسلم للمدير</p>
                                 <p className="text-xl font-black text-teal-700">{payrollData.totalHandedOver.toLocaleString()} ج.م</p>
                             </div>
 
                             {/* 5. عجز التسليم (معه - سلم) */}
-                            <div className={`p-4 rounded-2xl border text-center ${payrollData.deliveryDeficit > 0 ? 'bg-red-50 border-red-100' : 'bg-green-50 border-green-100'}`}>
+                            <div
+                                onClick={() => (payrollData.deliveryDeficit > 0 || payrollData.groupDeficit > 0) && setIsDeficitDetailsOpen(true)}
+                                className={`p-4 rounded-2xl border text-center flex flex-col justify-center cursor-pointer transition-all hover:scale-[1.02] ${payrollData.deliveryDeficit > 0 ? 'bg-red-50 border-red-100 shadow-sm' : 'bg-green-50 border-green-100'}`}
+                            >
                                 <p className={`text-xs font-bold mb-1 uppercase tracking-wider ${payrollData.deliveryDeficit > 0 ? 'text-red-400' : 'text-green-400'}`}>عجز التسليم (معه)</p>
                                 <p className={`text-xl font-black ${payrollData.deliveryDeficit > 0 ? 'text-red-700' : 'text-green-700'}`}>{payrollData.deliveryDeficit.toLocaleString()} ج.م</p>
+                                {payrollData.deliveryDeficit > 0 && <span className="text-[10px] text-red-400 mt-1 font-bold underline">عرض التفاصيل</span>}
                             </div>
 
                             {/* 6. عجز المجموعة (المتوقع - المحصل) */}
-                            <div className={`p-4 rounded-2xl border text-center ${payrollData.groupDeficit > 0 ? 'bg-orange-50 border-orange-100' : 'bg-green-50 border-green-100'}`}>
+                            <div
+                                onClick={() => (payrollData.deliveryDeficit > 0 || payrollData.groupDeficit > 0) && setIsDeficitDetailsOpen(true)}
+                                className={`p-4 rounded-2xl border text-center flex flex-col justify-center cursor-pointer transition-all hover:scale-[1.02] ${payrollData.groupDeficit > 0 ? 'bg-orange-50 border-orange-100 shadow-sm' : 'bg-green-50 border-green-100'}`}
+                            >
                                 <p className={`text-xs font-bold mb-1 uppercase tracking-wider ${payrollData.groupDeficit > 0 ? 'text-orange-400' : 'text-green-400'}`}>عجز المجموعة (لم يحصل)</p>
                                 <p className={`text-xl font-black ${payrollData.groupDeficit > 0 ? 'text-orange-700' : 'text-green-700'}`}>{payrollData.groupDeficit.toLocaleString()} ج.م</p>
+                                {payrollData.groupDeficit > 0 && <span className="text-[10px] text-orange-400 mt-1 font-bold underline">عرض التفاصيل</span>}
                             </div>
                         </div>
+
+                        {/* Deficit Reason Analysis (Collapsible) */}
+                        {(payrollData.deliveryDeficit > 0 || payrollData.groupDeficit > 0) && (
+                            <div className="space-y-4">
+                                <button
+                                    onClick={() => setIsDeficitDetailsOpen(!isDeficitDetailsOpen)}
+                                    className={`w-full flex items-center justify-between p-4 rounded-xl border transition-all ${isDeficitDetailsOpen ? 'bg-red-50 border-red-200 text-red-800' : 'bg-white border-gray-200 text-gray-600 hover:bg-gray-50'}`}
+                                >
+                                    <span className="font-bold flex items-center gap-2">
+                                        <span className="text-xl">⚠️</span>
+                                        <span>تفاصيل وأسباب العجز المالي</span>
+                                    </span>
+                                    <ChevronDownIcon className={`w-5 h-5 transition-transform ${isDeficitDetailsOpen ? 'rotate-180' : ''}`} />
+                                </button>
+
+                                {isDeficitDetailsOpen && (
+                                    <div className="bg-red-50 rounded-2xl border border-red-100 p-4 space-y-4 animate-in slide-in-from-top-2 duration-200">
+                                        {/* 1. Delivery Deficit Reason (On Teacher) */}
+                                        {payrollData.deliveryDeficit > 0 && (
+                                            <div className="bg-white p-4 rounded-xl border border-red-200 shadow-sm">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="p-2 bg-red-100 rounded-lg text-red-600 shrink-0">
+                                                        <BriefcaseIcon className="w-6 h-6" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-red-700 text-base mb-1">1. عجز تسليم (في عهدة المدرس)</p>
+                                                        <p className="text-sm text-gray-700 leading-relaxed">
+                                                            هناك مبلغ <span className="font-black text-red-600 bg-red-50 px-1 rounded mx-1">{payrollData.deliveryDeficit.toLocaleString()} ج.م</span>
+                                                            تم تحصيله بواسطة المدرس فعلياً، ولكن لم يتم تسليمه للإدارة بعد.
+                                                            (دين على المدرس).
+                                                        </p>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        )}
+
+                                        {/* 2. Group Deficit Reason (On Students) */}
+                                        {payrollData.groupDeficit > 0 && (
+                                            <div className="bg-white p-4 rounded-xl border border-orange-200 shadow-sm">
+                                                <div className="flex items-start gap-3 mb-4">
+                                                    <div className="p-2 bg-orange-100 rounded-lg text-orange-600 shrink-0">
+                                                        <UsersIcon className="w-6 h-6" />
+                                                    </div>
+                                                    <div>
+                                                        <p className="font-bold text-orange-700 text-base mb-1">2. عجز تحصيل من الطلاب (تقصير في الدفع)</p>
+                                                        <p className="text-sm text-gray-700">
+                                                            الطلاب التالية أسماؤهم لم يدفعوا المصاريف كاملة أو لم يدفعوا شيئاً:
+                                                        </p>
+                                                    </div>
+                                                </div>
+
+                                                <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                                                    {deficitBreakdown.map((item, idx) => (
+                                                        <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-orange-50 p-3 rounded-lg border border-orange-100 gap-2">
+                                                            <div className="flex items-center gap-2">
+                                                                <span className="w-6 h-6 rounded-full bg-orange-200 text-orange-800 flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</span>
+                                                                <span className="font-bold text-gray-800 text-sm">{item.studentName}</span>
+                                                            </div>
+
+                                                            <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pl-2 sm:pl-0 border-t sm:border-t-0 border-orange-200 pt-2 sm:pt-0 mt-1 sm:mt-0">
+                                                                {item.isFullDeficit ? (
+                                                                    <span className="px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-bold whitespace-nowrap">لم يدفع (عليه {item.expected})</span>
+                                                                ) : (
+                                                                    <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-md text-xs font-bold whitespace-nowrap">دفع {item.paid} (باقي {item.diff})</span>
+                                                                )}
+                                                                <span className="font-black text-red-600 dir-ltr whitespace-nowrap text-sm">-{item.diff} ج.م</span>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                    {deficitBreakdown.length === 0 && (
+                                                        <p className="text-sm text-gray-500 italic text-center py-4">لا توجد تفاصيل دقيقة متاحة (ربما بسبب عدم تعيين رسوم شهرية للطلاب).</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </div>
+                        )}
 
                         {/* Collection History Table */}
                         <div className="bg-white rounded-2xl border border-gray-100 shadow-sm overflow-hidden">

@@ -22,7 +22,7 @@ import { getGroupTypeFromName } from '../services/dataService';
 const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
   const { students, searchTerm, groups, currentUserRole, onViewDetails, typeFilter, onTypeFilterChange } = props;
 
-  const [visibleCount, setVisibleCount] = React.useState(20);
+  const [visibleCount, setVisibleCount] = React.useState(50);
 
   const filteredAndSortedStudents = useMemo(() => {
     let filtered = students
@@ -74,7 +74,7 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
   React.useEffect(() => {
     const handleScroll = () => {
       if (window.innerHeight + window.scrollY >= document.documentElement.scrollHeight - 500) {
-        setVisibleCount(prev => Math.min(prev + 20, filteredAndSortedStudents.length));
+        setVisibleCount(prev => Math.min(prev + 50, filteredAndSortedStudents.length));
       }
     };
     window.addEventListener('scroll', handleScroll);
@@ -83,7 +83,7 @@ const AllStudentsPage: React.FC<AllStudentsPageProps> = (props) => {
 
   // Reset visibleCount when filters change
   React.useEffect(() => {
-    setVisibleCount(20);
+    setVisibleCount(50);
   }, [searchTerm, typeFilter]);
 
   const displayedStudents = useMemo(() => {

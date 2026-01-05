@@ -24,6 +24,7 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
   const [selectedDailyDate, setSelectedDailyDate] = useState(() => getCairoDateString());
   const [absentDaysFilter, setAbsentDaysFilter] = useState(1);
   const [consecutiveFilter, setConsecutiveFilter] = useState(0);
+  const [absentGroupFilter, setAbsentGroupFilter] = useState('all');
 
   const setDateOffset = (offset: number) => {
     const date = getCairoNow();
@@ -60,7 +61,12 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
   }, [students, selectedDailyDate]);
 
   const monthlyReport = useMemo(() => {
-    const studentStats = students.map(student => {
+    let filteredStudents = students;
+    if (absentGroupFilter !== 'all') {
+      filteredStudents = students.filter(s => s.groupId === absentGroupFilter);
+    }
+
+    const studentStats = filteredStudents.map(student => {
       const attendanceInMonth = student.attendance.filter(a => a.date.startsWith(selectedMonth));
       const absentDays = attendanceInMonth.filter(a => a.status === AttendanceStatus.ABSENT).length;
 
@@ -100,7 +106,7 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
       .sort((a, b) => b.absentDays - a.absentDays);
 
     return { mostAbsent };
-  }, [students, selectedMonth, absentDaysFilter, consecutiveFilter, selectedDailyDate]);
+  }, [students, selectedMonth, absentDaysFilter, consecutiveFilter, selectedDailyDate, absentGroupFilter]);
 
   const handleStudentClick = (studentId: string) => {
     setIsAbsentModalOpen(false);
@@ -178,43 +184,47 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
           <div className="bg-white rounded-xl shadow-lg p-6">
             <div className="flex flex-col lg:flex-row justify-between items-start lg:items-center mb-6 gap-4">
               <h3 className="text-lg font-bold text-gray-800">الطلاب الأكثر غيابًا - {selectedMonthName}</h3>
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:flex items-center gap-3 bg-gray-50 p-3 rounded-xl border border-gray-100 w-full lg:w-auto">
-                <div className="flex items-center justify-between sm:justify-start gap-2 bg-white p-2 rounded-lg border border-gray-100 lg:border-none lg:bg-transparent lg:p-0">
-                  <label htmlFor="absent-filter" className="text-xs font-bold text-gray-500 whitespace-nowrap">إجمالي الغياب:</label>
-                  <div className="flex items-center gap-1">
-                    <input
-                      id="absent-filter"
-                      type="number"
-                      min="1"
-                      value={absentDaysFilter}
-                      onChange={(e) => setAbsentDaysFilter(Math.max(1, parseInt(e.target.value) || 1))}
-                      className="w-12 px-1 py-1 border-2 border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-center text-sm"
-                    />
-                    <span className="text-[10px] font-bold text-gray-400">يوم+</span>
-                  </div>
+
+              <div className="flex flex-nowrap items-center gap-2 w-full lg:w-auto bg-gray-50 p-2 rounded-xl border border-gray-100 overflow-x-auto">
+                <div className="flex items-center gap-2 flex-shrink-0">
+                  <input
+                    type="number"
+                    id="absent-filter"
+                    min="1"
+                    value={absentDaysFilter}
+                    onChange={(e) => setAbsentDaysFilter(Math.max(1, parseInt(e.target.value) || 1))}
+                    className="w-14 h-10 px-1 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-sm"
+                    placeholder="إجمالي"
+                    title="إجمالي أيام الغياب"
+                  />
+                  <input
+                    type="number"
+                    id="consecutive-filter"
+                    min="0"
+                    value={consecutiveFilter === 0 ? '' : consecutiveFilter}
+                    onChange={(e) => setConsecutiveFilter(Math.max(0, parseInt(e.target.value) || 0))}
+                    className="w-14 h-10 px-1 border border-gray-300 rounded-lg text-center focus:outline-none focus:ring-2 focus:ring-blue-500 [-moz-appearance:textfield] [&::-webkit-outer-spin-button]:appearance-none [&::-webkit-inner-spin-button]:appearance-none text-sm"
+                    placeholder="متصل"
+                    title="أيام الغياب المتصل"
+                  />
                 </div>
-                <div className="hidden lg:block w-px h-6 bg-gray-200"></div>
-                <div className="flex items-center justify-between sm:justify-start gap-2 bg-white p-2 rounded-lg border border-gray-100 lg:border-none lg:bg-transparent lg:p-0">
-                  <label htmlFor="consecutive-filter" className="text-xs font-bold text-gray-500 whitespace-nowrap">غياب متصل:</label>
-                  <div className="flex items-center gap-1">
-                    <input
-                      id="consecutive-filter"
-                      type="number"
-                      min="1"
-                      value={consecutiveFilter}
-                      onChange={(e) => setConsecutiveFilter(Math.max(0, parseInt(e.target.value) || 0))}
-                      className="w-12 px-1 py-1 border-2 border-gray-200 rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-blue-500 font-bold text-center text-sm"
-                      placeholder="0"
-                    />
-                    <span className="text-[10px] font-bold text-gray-400">يوم+</span>
-                  </div>
-                </div>
+
+                <select
+                  value={absentGroupFilter}
+                  onChange={(e) => setAbsentGroupFilter(e.target.value)}
+                  className="h-10 pl-2 pr-8 py-1 bg-white border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm flex-shrink-0 min-w-[120px]"
+                >
+                  <option value="all">كل المجموعات</option>
+                  {[...groups].sort((a, b) => a.name.localeCompare(b.name, 'ar')).map(g => (
+                    <option key={g.id} value={g.id}>{g.name}</option>
+                  ))}
+                </select>
               </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
               {monthlyReport.mostAbsent.map((student, index) => (
-                <div key={student.student.id} className="flex flex-col sm:flex-row sm:items-center justify-between bg-white border border-gray-100 p-4 rounded-xl shadow-sm hover:shadow-md transition-all gap-4">
+                <div key={student.student.id} className="flex flex-col xl:flex-row xl:items-center justify-between bg-white border border-gray-100 p-4 rounded-xl shadow-sm hover:shadow-md transition-all gap-4">
                   <div className="flex items-center min-w-0">
                     <span className="font-bold text-gray-300 w-5 text-center text-xs shrink-0">{index + 1}</span>
                     <div className="bg-blue-50 p-2 rounded-lg mx-3 shrink-0">
@@ -241,7 +251,7 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
                     </div>
                   </div>
 
-                  <div className="flex items-center justify-between sm:justify-end gap-3 pt-3 sm:pt-0 border-t sm:border-t-0 border-gray-50">
+                  <div className="flex items-center justify-between xl:justify-end gap-3 pt-3 xl:pt-0 border-t xl:border-t-0 border-gray-50">
                     <div className="flex items-center gap-1">
                       {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
                         <button onClick={() => handleWhatsAppWarning(student.student, student.absentDays)} className="text-green-500 hover:bg-green-50 p-2 rounded-lg transition-colors" title="إرسال تنبيه لولي الأمر">

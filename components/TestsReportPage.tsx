@@ -77,6 +77,8 @@ const ModalSection: React.FC<{
   );
 };
 
+import ArrowRightIcon from './icons/ArrowRightIcon';
+
 const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onViewStudent, onBack }) => {
   // Modal State
   const [activeModal, setActiveModal] = useState<'daily' | 'mostTested' | 'notTested' | 'comparison' | null>(null);
@@ -123,6 +125,14 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
     const date = getCairoNow();
     date.setDate(date.getDate() + offset);
     setSelectedDailyDate(date.toISOString().split('T')[0]);
+  };
+
+  const handlePrevMonth = () => {
+    const date = new Date(selectedMonth + '-01');
+    date.setMonth(date.getMonth() - 1);
+    const yyyy = date.getFullYear();
+    const mm = String(date.getMonth() + 1).padStart(2, '0');
+    setSelectedMonth(`${yyyy}-${mm}`);
   };
 
   const dailyReport = useMemo(() => {
@@ -178,7 +188,7 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
                The user asked for Backspace key, but having a visual button is also good UX. 
                But sticking to the request, let's just ensure the layout is clean.
            */}
-          <div className="w-full sm:w-auto max-w-xs sm:mr-auto">
+          <div className="w-full sm:w-auto max-w-xs sm:mr-auto flex items-center gap-2">
             <label htmlFor="month-filter" className="sr-only">اختر الشهر</label>
             <input
               type="month"
@@ -187,6 +197,13 @@ const TestsReportPage: React.FC<TestsReportPageProps> = ({ students, groups, onV
               onChange={e => setSelectedMonth(e.target.value)}
               className="w-full px-4 py-2 border rounded-lg bg-white shadow-sm focus:outline-none focus:ring-2 focus:ring-indigo-500"
             />
+            <button
+              onClick={handlePrevMonth}
+              className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
+              title="الشهر السابق"
+            >
+              <ArrowRightIcon className="w-5 h-5 transform rotate-180" />
+            </button>
           </div>
         </div>
 

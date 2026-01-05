@@ -21,7 +21,10 @@ import { getAnalytics, isSupported } from "firebase/analytics";
 const app = initializeApp(firebaseConfig);
 
 // تهيئة Firestore
-const db = getFirestore(app);
+// تهيئة Firestore مع التخزين المؤقت (Offline Persistence) لتحسين السرعة
+const db = initializeFirestore(app, {
+  localCache: persistentLocalCache({ tabManager: persistentMultipleTabManager() })
+});
 
 const messaging = typeof window !== 'undefined' ? getMessaging(app) : null;
 const storage = getStorage(app);
