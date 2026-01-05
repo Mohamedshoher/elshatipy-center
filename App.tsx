@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus, Donation, Parent, UserRole, Badge, SalaryPayment } from './types';
+import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus, Donation, Parent, UserRole, Badge, SalaryPayment, ParentVisit } from './types';
 import { ExpenseCategory, TeacherAttendanceStatus, DayOfWeek, TestType as TestTypeEnum, DirectorNotificationType } from './types';
 import { getCairoNow, getCairoDateString, getYesterdayDateString, getCairoTimeInMinutes, isCairoAfterMidnight, isCairoAfter12_05, getCairoDayOfWeek, isCairoWorkday } from './services/cairoTimeHelper';
 
@@ -107,6 +107,7 @@ const App: React.FC = () => {
 
     const activeTeachers = useMemo(() => teachers.filter(t => t.status === TeacherStatus.ACTIVE), [teachers]);
     const [parents, setParents] = useState<Parent[]>([]);
+    const [parentVisits, setParentVisits] = useState<ParentVisit[]>([]);
     const [notes, setNotes] = useState<Note[]>([]);
     const [notifications, setNotifications] = useState<Notification[]>([]);
     const [directorNotifications, setDirectorNotifications] = useState<DirectorNotification[]>([]);
@@ -148,6 +149,31 @@ const App: React.FC = () => {
         if (!currentUser) {
             setAppBadge(0);
             return;
+        }
+
+        // Record parent visit if the user is a parent
+        if (currentUser.role === 'parent') {
+            const recordVisit = async () => {
+                const today = getCairoDateString();
+                const visitId = `${(currentUser as any).id}_${today}`;
+                const visitRef = doc(db, 'parentVisits', visitId);
+                try {
+                    const visitSnap = await getDoc(visitRef);
+                    if (!visitSnap.exists()) {
+                        await setDoc(visitRef, {
+                            id: visitId,
+                            parentId: (currentUser as any).id,
+                            parentName: currentUser.name,
+                            date: today,
+                            timestamp: new Date()
+                        });
+                        console.log(`Recorded visit for parent: ${currentUser.name}`);
+                    }
+                } catch (error) {
+                    console.error("Error recording parent visit:", error);
+                }
+            };
+            recordVisit();
         }
         const myId = currentUser.role === 'director' ? 'director' : currentUser.id;
 
@@ -319,6 +345,7 @@ const App: React.FC = () => {
         // 2c. Other Collections (Role Scoped for Teachers)
         const essentialCollections = [
             { name: 'notes', setter: setNotes },
+            { name: 'parentVisits', setter: setParentVisits },
         ];
 
         essentialCollections.forEach(({ name, setter }) => {
@@ -2298,7 +2325,7 @@ const App: React.FC = () => {
                 <Route path="/notes" element={<DirectorNotesPage onBack={() => handleBackButton()} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />} />
                 <Route path="/archive" element={<ArchivePage students={students} groups={groups} searchTerm={searchTerm} currentUser={currentUser!} onOpenFeeModal={handleOpenFeeModal} onEditStudent={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchiveStudent={handleArchiveStudent} onOpenStudentDetails={handleOpenStudentDetails} onDeleteStudentPermanently={handleDeleteStudentPermanently} supervisorFilteredData={supervisorFilteredData} />} />
                 <Route path="/debtors" element={<DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />} />
-                <Route path="/general-view" element={<GeneralViewPage students={allStudents} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} />} />
+                <Route path="/general-view" element={<GeneralViewPage students={allStudents} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} parentVisits={parentVisits} />} />
                 <Route path="/reports" element={<DirectorReportsPage groups={groups} students={students} onBack={() => handleBackButton()} />} />
                 <Route path="/unpaid" element={<UnpaidStudentsPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} />} />
                 <Route path="/fee-collection" element={<FeeCollectionPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} teacherCollections={collections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />} />
@@ -2461,7 +2488,7 @@ const App: React.FC = () => {
                 <Route path="/notes" element={<DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />} />
                 <Route path="/archive" element={<ArchivePage students={students} groups={groups} searchTerm={searchTerm} currentUser={currentUser!} onOpenFeeModal={handleOpenFeeModal} onEditStudent={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchiveStudent={handleArchiveStudent} onOpenStudentDetails={handleOpenStudentDetails} onDeleteStudentPermanently={handleDeleteStudentPermanently} supervisorFilteredData={supervisorFilteredData} />} />
                 <Route path="/debtors" element={<DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />} />
-                <Route path="/general-view" element={<GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} />} />
+                <Route path="/general-view" element={<GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} parentVisits={parentVisits} />} />
                 <Route path="/reports" element={<DirectorReportsPage groups={groups} students={students} onBack={handleBackToMain} />} />
                 <Route path="/unpaid" element={<UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={students} />} />
                 <Route path="/fee-collection" element={<FeeCollectionPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={students} teacherCollections={teacherCollections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />} />

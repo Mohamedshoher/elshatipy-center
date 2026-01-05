@@ -1,6 +1,6 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import type { Note, Student, Group, Teacher, TeacherCollectionRecord, Expense, Donation } from '../types';
+import type { Note, Student, Group, Teacher, TeacherCollectionRecord, Expense, Donation, ParentVisit } from '../types';
 import { ExpenseCategory, roundToNearest5 } from '../types';
 import UserPlusIcon from './icons/UserPlusIcon';
 import ArchiveIcon from './icons/ArchiveIcon';
@@ -14,6 +14,8 @@ import PendingStudents from './PendingStudents';
 import FinanceIncomeModal from './FinanceIncomeModal';
 import FinanceExpenseModal from './FinanceExpenseModal';
 import FinanceCollectionsModal from './FinanceCollectionsModal';
+import UsersIcon from './icons/UsersIcon';
+import { getCairoDateString, getYesterdayDateString, parseCairoDateString, getArabicDayName } from '../services/cairoTimeHelper';
 
 interface GeneralViewPageProps {
     students: Student[];
@@ -32,6 +34,7 @@ interface GeneralViewPageProps {
     onApproveStudent: (studentId: string) => void;
     onRejectStudent: (studentId: string) => void;
     onEditStudent: (student: Student) => void;
+    parentVisits: ParentVisit[];
 }
 
 const FullScreenSection: React.FC<{
@@ -141,12 +144,12 @@ const GroupedStudentList: React.FC<{
 };
 
 
-const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, groups, teachers, teacherCollections, expenses, donations, onDeleteExpense, onLogExpense, onAddDonation, onDeleteDonation, onToggleAcknowledge, onViewStudent, onApproveStudent, onRejectStudent, onEditStudent }) => {
+const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, groups, teachers, teacherCollections, expenses, donations, onDeleteExpense, onLogExpense, onAddDonation, onDeleteDonation, onToggleAcknowledge, onViewStudent, onApproveStudent, onRejectStudent, onEditStudent, parentVisits }) => {
 
     const [expandedNewGroups, setExpandedNewGroups] = useState<Set<string>>(new Set());
     const [expandedArchivedGroups, setExpandedArchivedGroups] = useState<Set<string>>(new Set());
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
-    const [activeSection, setActiveSection] = useState<'finance' | 'new' | 'archived' | 'notes' | null>(null);
+    const [activeSection, setActiveSection] = useState<'finance' | 'new' | 'archived' | 'notes' | 'parentVisits' | null>(null);
 
     // Modal States
     const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
@@ -205,6 +208,27 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
             .slice(0, 5),
         [notes]);
+
+    // Parent Visits Calculations
+    const visitStats = useMemo(() => {
+        const today = getCairoDateString();
+        const yesterday = getYesterdayDateString();
+
+        const todayVisits = parentVisits.filter(v => v.date === today).length;
+        const yesterdayVisits = parentVisits.filter(v => v.date === yesterday).length;
+        const totalVisits = parentVisits.length;
+
+        const groupedByDate: Record<string, number> = {};
+        parentVisits.forEach(v => {
+            groupedByDate[v.date] = (groupedByDate[v.date] || 0) + 1;
+        });
+
+        const history = Object.entries(groupedByDate)
+            .map(([date, count]) => ({ date, count }))
+            .sort((a, b) => b.date.localeCompare(a.date));
+
+        return { todayVisits, yesterdayVisits, totalVisits, history };
+    }, [parentVisits]);
 
 
     // --- Financial Calculations ---
@@ -470,6 +494,78 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
             );
         }
 
+        if (activeSection === 'parentVisits') {
+            return (
+                <FullScreenSection
+                    onBack={() => setActiveSection(null)}
+                    title="تقرير زيارات أولياء الأمور"
+                    icon={<UsersIcon className="w-8 h-8 text-indigo-500" />}
+                >
+                    <div className="space-y-8">
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                            <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl text-center shadow-sm">
+                                <p className="text-indigo-800 font-bold mb-2">زيارات اليوم</p>
+                                <p className="text-4xl font-black text-indigo-600 tracking-tight">{visitStats.todayVisits}</p>
+                                <p className="text-xs text-indigo-400 mt-2 font-medium">بتوقيت القاهرة</p>
+                            </div>
+                            <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl text-center shadow-sm">
+                                <p className="text-blue-800 font-bold mb-2">زيارات أمس</p>
+                                <p className="text-4xl font-black text-blue-600 tracking-tight">{visitStats.yesterdayVisits}</p>
+                                <p className="text-xs text-blue-400 mt-2 font-medium">إجمالي اليوم السابق</p>
+                            </div>
+                            <div className="bg-gray-50 border border-gray-100 p-6 rounded-2xl text-center shadow-sm">
+                                <p className="text-gray-800 font-bold mb-2">إجمالي الزيارات</p>
+                                <p className="text-4xl font-black text-gray-600 tracking-tight">{visitStats.totalVisits}</p>
+                                <p className="text-xs text-gray-400 mt-2 font-medium">منذ بدء التفعيل</p>
+                            </div>
+                        </div>
+
+                        {/* History Table */}
+                        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                            <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+                                <h3 className="font-bold text-gray-800">سجل الزيارات اليومي</h3>
+                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full font-bold">آخر {visitStats.history.length} يوم</span>
+                            </div>
+                            <div className="overflow-x-auto">
+                                <table className="w-full text-right">
+                                    <thead className="bg-gray-50 text-gray-500 text-sm">
+                                        <tr>
+                                            <th className="px-6 py-4 font-bold text-right">التاريخ</th>
+                                            <th className="px-6 py-4 font-bold text-right">اليوم</th>
+                                            <th className="px-6 py-4 font-bold text-right">عدد الزوار المميزين</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="divide-y divide-gray-100">
+                                        {visitStats.history.map((h, idx) => {
+                                            const date = parseCairoDateString(h.date);
+                                            const dayName = getArabicDayName(date);
+                                            return (
+                                                <tr key={h.date} className={`hover:bg-gray-50 transition-colors ${idx === 0 ? 'bg-indigo-50/30' : ''}`}>
+                                                    <td className="px-6 py-4 font-medium text-gray-900 dir-ltr text-right">{h.date}</td>
+                                                    <td className="px-6 py-4 text-gray-600">{dayName}</td>
+                                                    <td className="px-6 py-4">
+                                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${idx === 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                            {h.count} زيارة
+                                                        </span>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                        {visitStats.history.length === 0 && (
+                                            <tr>
+                                                <td colSpan={3} className="px-6 py-10 text-center text-gray-400">لا توجد بيانات متاحة بعد.</td>
+                                            </tr>
+                                        )}
+                                    </tbody>
+                                </table>
+                            </div>
+                        </div>
+                    </div>
+                </FullScreenSection>
+            );
+        }
+
         // Dashboard View (Default)
         return (
             <div className="space-y-8">
@@ -514,6 +610,14 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
                         onClick={() => setActiveSection('notes')}
                         summary={unacknowledgedNotes.length > 0 ? `${unacknowledgedNotes.length} ملحوظة جديدة` : 'لا توجد ملحوظات'}
                         className="border-yellow-100 border-2"
+                    />
+
+                    <SectionTriggerCard
+                        title="زيارات أولياء الأمور"
+                        icon={<UsersIcon className="w-8 h-8 text-indigo-500" />}
+                        onClick={() => setActiveSection('parentVisits')}
+                        summary={`اليوم: ${visitStats.todayVisits} | أمس: ${visitStats.yesterdayVisits}`}
+                        className="border-indigo-100 border-2"
                     />
 
                 </div>

@@ -14,6 +14,7 @@ import WhatsAppIcon from './icons/WhatsAppIcon';
 import ArrowRightIcon from './icons/ArrowRightIcon';
 import CheckCircleIcon from './icons/CheckCircleIcon';
 import CheckIcon from './icons/CheckIcon';
+import PlanSection from './PlanSection';
 
 interface StudentDetailsPageProps {
     student: Student;
@@ -74,6 +75,7 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
 
     const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
     const [editingPlanData, setEditingPlanData] = useState<ProgressPlan>({});
+    const [selectedTestCategory, setSelectedTestCategory] = useState<TestType | null>(null);
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -470,93 +472,90 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
                 )}
 
                 {activeTab === 'progressPlan' && (
-                    <div className="max-w-3xl mx-auto">
-                        <div className="bg-white p-6 rounded-2xl border shadow-sm mb-8">
+                    <div className="max-w-4xl mx-auto space-y-8">
+                        {/* Centralized Input Form */}
+                        <div className="bg-white p-6 rounded-2xl border shadow-sm">
                             <h4 className="font-bold text-gray-800 mb-6 flex items-center gap-2">
                                 <ClockIcon className="w-6 h-6 text-blue-600" />
-                                إضافة خطة جديدة
+                                تسجيل هدف جديد في الخطة
                             </h4>
-                            <div className="space-y-6">
-                                {Object.values(TestTypeEnum).filter(v => v !== TestTypeEnum.READING).map(type => (
-                                    <div key={type}>
-                                        <label className="block text-sm font-bold text-gray-700 mb-2">{testTypeLabels[type]}</label>
-                                        <div className="flex gap-2">
-                                            <textarea
-                                                value={newPlan[type] || ''}
-                                                onChange={(e) => setNewPlan(p => ({ ...p, [type]: e.target.value }))}
-                                                rows={2}
-                                                className="w-full px-4 py-3 border rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all text-sm"
-                                                placeholder={`أدخل هدف ${testTypeLabels[type]}...`}
-                                            />
-                                            <button
-                                                onClick={() => {
-                                                    const authorName = currentUser?.role === 'director' ? 'المدير' : (currentUser?.name || 'مجهول');
-                                                    onSaveProgressPlan(student.id, { [type]: newPlan[type] }, authorName);
-                                                    setNewPlan(p => ({ ...p, [type]: '' }));
-                                                }}
-                                                className="p-3 bg-blue-600 text-white rounded-xl hover:bg-blue-700 flex-shrink-0 self-start shadow-md shadow-blue-100 transition-all active:scale-95"
-                                                title={`حفظ ${testTypeLabels[type]} فقط`}
-                                            >
-                                                <CheckIcon className="w-6 h-6" />
-                                            </button>
-                                        </div>
+                            <div className="space-y-4">
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 mb-2">محتوى الهدف</label>
+                                    <textarea
+                                        value={newNote}
+                                        onChange={(e) => setNewNote(e.target.value)}
+                                        rows={3}
+                                        className="w-full px-4 py-3 border rounded-xl bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all text-sm"
+                                        placeholder="اكتب هنا ما يجب على الطالب إنجازه..."
+                                    />
+                                </div>
+                                <div className="flex flex-col sm:flex-row gap-4 items-end">
+                                    <div className="flex-grow w-full">
+                                        <label className="block text-sm font-bold text-gray-700 mb-2">نوع الهدف</label>
+                                        <select
+                                            value={testType}
+                                            onChange={(e) => setTestType(e.target.value as TestType)}
+                                            className="w-full px-4 py-3 border rounded-xl bg-white focus:outline-none focus:ring-2 focus:ring-blue-200 transition-all text-sm font-bold"
+                                        >
+                                            <option value={TestTypeEnum.NEW}>الجديد (حفظ)</option>
+                                            <option value={TestTypeEnum.RECENT_PAST}>الماضي القريب</option>
+                                            <option value={TestTypeEnum.DISTANT_PAST}>الماضي البعيد</option>
+                                        </select>
                                     </div>
-                                ))}
-                            </div>
-                            <div className="mt-8 flex flex-col sm:flex-row gap-4 justify-between items-center border-t pt-6">
-                                {(currentUser?.role === 'director' || currentUser?.role === 'supervisor') && (
-                                    <button onClick={() => handleWhatsAppSharePlan(newPlan)} className="w-full sm:w-auto flex items-center justify-center gap-2 px-6 py-3 rounded-xl text-green-700 bg-green-50 hover:bg-green-100 transition-colors font-bold border border-green-200">
-                                        <WhatsAppIcon className="w-6 h-6" />
-                                        <span>مشاركة الخطة الحالية</span>
+                                    <button
+                                        onClick={() => {
+                                            if (!newNote.trim()) return;
+                                            const authorName = currentUser?.role === 'director' ? 'المدير' : (currentUser?.name || 'مجهول');
+                                            onSaveProgressPlan(student.id, { [testType]: newNote.trim() }, authorName);
+                                            setNewNote('');
+                                            alert('تم تسجيل الهدف بنجاح في السجل بنجاح');
+                                        }}
+                                        className="w-full sm:w-auto px-8 py-3.5 bg-blue-600 text-white rounded-xl hover:bg-blue-700 font-bold shadow-lg shadow-blue-100 transition-all active:scale-95"
+                                    >
+                                        تسجيل في السجل
                                     </button>
-                                )}
-                                <button
-                                    onClick={() => {
-                                        const authorName = currentUser?.role === 'director' ? 'المدير' : (currentUser?.name || 'مجهول');
-                                        onSaveProgressPlan(student.id, newPlan, authorName);
-                                        setNewPlan({ [TestTypeEnum.NEW]: '', [TestTypeEnum.RECENT_PAST]: '', [TestTypeEnum.DISTANT_PAST]: '' });
-                                        alert('تمت إضافة الخطة بنجاح!');
-                                    }}
-                                    className="w-full sm:w-auto px-10 py-3 rounded-xl text-white bg-blue-600 hover:bg-blue-700 transition-all font-bold shadow-lg shadow-blue-100 active:scale-95"
-                                >
-                                    حفظ الكل للسجل
-                                </button>
+                                </div>
                             </div>
                         </div>
 
-                        <h4 className="font-bold text-gray-800 mb-4 px-2">سجل الخطط السابقة</h4>
-                        <div className="space-y-4">
-                            {student.progressPlanHistory && student.progressPlanHistory.length > 0 ? (
-                                [...student.progressPlanHistory].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(record => (
-                                    <div key={record.id} className={`p-5 rounded-2xl border transition-all ${record.isCompleted ? 'bg-green-50/50 border-green-100' : 'bg-white border-gray-100 shadow-sm'}`}>
-                                        <div className="flex justify-between items-start">
-                                            <div className={`flex-grow ${record.isCompleted ? 'text-gray-500 line-through' : 'text-gray-800'}`}>
-                                                <div className="flex items-center gap-2 mb-3">
-                                                    <span className="text-xs font-bold text-gray-400 bg-gray-100 px-2 py-1 rounded-md">{new Date(record.date).toLocaleDateString('ar-EG')}</span>
-                                                    <span className="text-xs font-bold text-blue-600 bg-blue-50 px-2 py-1 rounded-md">بواسطة: {record.authorName}</span>
-                                                </div>
-                                                <div className="mt-2 text-sm space-y-2">
-                                                    {record.plan[TestTypeEnum.NEW] && <p className="bg-white/50 p-2 rounded-lg border border-gray-50"><span className="font-bold text-blue-700 mr-1">الجديد:</span> {record.plan[TestTypeEnum.NEW]}</p>}
-                                                    {record.plan[TestTypeEnum.RECENT_PAST] && <p className="bg-white/50 p-2 rounded-lg border border-gray-50"><span className="font-bold text-indigo-700 mr-1">القريب:</span> {record.plan[TestTypeEnum.RECENT_PAST]}</p>}
-                                                    {record.plan[TestTypeEnum.DISTANT_PAST] && <p className="bg-white/50 p-2 rounded-lg border border-gray-50"><span className="font-bold text-purple-700 mr-1">البعيد:</span> {record.plan[TestTypeEnum.DISTANT_PAST]}</p>}
-                                                </div>
-                                            </div>
-                                            <div className="flex flex-col items-center gap-3 flex-shrink-0 mr-4">
-                                                <button onClick={() => onTogglePlanCompletion(student.id, record.id)} title={record.isCompleted ? 'إلغاء الإكمال' : 'وضع علامة كمكتمل'} className="active:scale-90 transition-transform">
-                                                    <CheckCircleIcon className={`w-8 h-8 ${record.isCompleted ? 'text-green-500' : 'text-gray-300 hover:text-green-400'}`} />
-                                                </button>
-                                                {(currentUser?.role === 'director' || currentUser?.role === 'supervisor') && (
-                                                    <button onClick={() => onDeletePlanRecord(student.id, record.id)} title="حذف الخطة" className="p-2 hover:bg-red-50 rounded-lg transition-colors group">
-                                                        <TrashIcon className="w-5 h-5 text-gray-400 group-hover:text-red-500" />
-                                                    </button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))
-                            ) : (
-                                <p className="text-center text-gray-500 py-12 bg-white rounded-2xl border border-dashed">لا يوجد سجل للخطط السابقة.</p>
-                            )}
+                        {/* Classified Lists Below */}
+                        <div className="grid grid-cols-1 gap-8">
+                            <PlanSection
+                                title={testTypeLabels[TestTypeEnum.NEW]}
+                                type={TestTypeEnum.NEW}
+                                student={student}
+                                currentUser={currentUser}
+                                onUpdate={onUpdatePlanRecord}
+                                onDelete={onDeletePlanRecord}
+                                onToggleCompletion={onTogglePlanCompletion}
+                                colorClass="blue"
+                                icon={<CheckCircleIcon className="w-6 h-6" />}
+                            />
+
+                            <PlanSection
+                                title={testTypeLabels[TestTypeEnum.RECENT_PAST]}
+                                type={TestTypeEnum.RECENT_PAST}
+                                student={student}
+                                currentUser={currentUser}
+                                onUpdate={onUpdatePlanRecord}
+                                onDelete={onDeletePlanRecord}
+                                onToggleCompletion={onTogglePlanCompletion}
+                                colorClass="indigo"
+                                icon={<ClockIcon className="w-6 h-6" />}
+                            />
+
+                            <PlanSection
+                                title={testTypeLabels[TestTypeEnum.DISTANT_PAST]}
+                                type={TestTypeEnum.DISTANT_PAST}
+                                student={student}
+                                currentUser={currentUser}
+                                onUpdate={onUpdatePlanRecord}
+                                onDelete={onDeletePlanRecord}
+                                onToggleCompletion={onTogglePlanCompletion}
+                                colorClass="purple"
+                                icon={<ClipboardListIcon className="w-6 h-6" />}
+                            />
                         </div>
                     </div>
                 )}
@@ -685,44 +684,122 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
                         </section>
 
                         <section>
-                            <div className="flex flex-col sm:flex-row justify-between items-center mb-6 gap-4">
-                                <h4 className="font-bold text-gray-800">سجل الاختبارات</h4>
-                                <div className="flex flex-wrap justify-center items-center gap-2">
-                                    <select value={testMonthFilter} onChange={e => setTestMonthFilter(e.target.value)} className="text-xs px-3 py-2 border rounded-xl bg-white outline-none shadow-sm">
-                                        <option value="all">كل الشهور</option>
-                                        {testMonths.map(m => <option key={m} value={m}>{new Date(m + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' })}</option>)}
-                                    </select>
-                                    <select value={testTypeFilter} onChange={e => setTestTypeFilter(e.target.value as 'all' | TestType)} className="text-xs px-3 py-2 border rounded-xl bg-white outline-none shadow-sm">
-                                        <option value="all">كل الأنواع</option>
-                                        {Object.entries(testTypeLabels).map(([key, label]) => <option key={key} value={key}>{label}</option>)}
-                                    </select>
-                                    <select value={testSortOrder} onChange={e => setTestSortOrder(e.target.value as 'asc' | 'desc')} className="text-xs px-3 py-2 border rounded-xl bg-white outline-none shadow-sm">
-                                        <option value="desc">الأحدث أولاً</option>
-                                        <option value="asc">الأقدم أولاً</option>
-                                    </select>
+                            <div className="flex justify-between items-center mb-6">
+                                <h4 className="font-bold text-gray-800">سجل الاختبارات المصنف</h4>
+                            </div>
+
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-6">
+                                {[TestTypeEnum.NEW, TestTypeEnum.RECENT_PAST, TestTypeEnum.DISTANT_PAST].map((type) => {
+                                    const count = student.tests.filter(t => t.type === type).length;
+                                    const colors = {
+                                        [TestTypeEnum.NEW]: 'from-blue-500 to-blue-600 shadow-blue-100',
+                                        [TestTypeEnum.RECENT_PAST]: 'from-indigo-500 to-indigo-600 shadow-indigo-100',
+                                        [TestTypeEnum.DISTANT_PAST]: 'from-purple-500 to-purple-600 shadow-purple-100',
+                                        [TestTypeEnum.READING]: 'from-gray-500 to-gray-600 shadow-gray-100',
+                                    };
+
+                                    return (
+                                        <button
+                                            key={type}
+                                            onClick={() => setSelectedTestCategory(type)}
+                                            className={`relative overflow-hidden p-6 rounded-3xl bg-gradient-to-br ${colors[type]} text-white text-right transition-all hover:scale-105 active:scale-95 shadow-xl group`}
+                                        >
+                                            <div className="absolute -right-4 -bottom-4 w-24 h-24 bg-white/10 rounded-full blur-2xl group-hover:bg-white/20 transition-all" />
+                                            <div className="relative z-10 flex justify-between items-start">
+                                                <div>
+                                                    <h5 className="text-white/80 text-sm font-bold mb-1">{testTypeLabels[type]}</h5>
+                                                    <div className="text-3xl font-black">{count}</div>
+                                                    <div className="text-xs text-white/60 mt-2 font-bold flex items-center gap-1">
+                                                        <span>عرض التفاصيل</span>
+                                                        <ArrowRightIcon className="w-3 h-3 rotate-180" />
+                                                    </div>
+                                                </div>
+                                                <ClipboardListIcon className="w-8 h-8 opacity-20" />
+                                            </div>
+                                        </button>
+                                    );
+                                })}
+                            </div>
+
+                            {/* Optional: Reading section if it has data */}
+                            {student.tests.some(t => t.type === TestTypeEnum.READING) && (
+                                <div className="mt-6">
+                                    <button
+                                        onClick={() => setSelectedTestCategory(TestTypeEnum.READING)}
+                                        className="w-full p-4 bg-white border rounded-2xl flex justify-between items-center hover:bg-gray-50 transition-all"
+                                    >
+                                        <span className="font-bold text-gray-700">سجل القراءة</span>
+                                        <span className="bg-gray-100 text-gray-600 px-3 py-1 rounded-full text-sm font-bold">
+                                            {student.tests.filter(t => t.type === TestTypeEnum.READING).length} اختبار
+                                        </span>
+                                    </button>
+                                </div>
+                            )}
+                        </section>
+
+                        {/* Test Details Popup Modal */}
+                        {selectedTestCategory && (
+                            <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
+                                <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
+                                    <div className={`p-6 flex justify-between items-center text-white bg-gradient-to-r ${selectedTestCategory === TestTypeEnum.NEW ? 'from-blue-600 to-blue-700' :
+                                            selectedTestCategory === TestTypeEnum.RECENT_PAST ? 'from-indigo-600 to-indigo-700' :
+                                                selectedTestCategory === TestTypeEnum.DISTANT_PAST ? 'from-purple-600 to-purple-700' :
+                                                    'from-gray-600 to-gray-700'
+                                        }`}>
+                                        <div className="flex items-center gap-3">
+                                            <ClipboardListIcon className="w-6 h-6" />
+                                            <h3 className="text-xl font-black">سجل اختبارات ({testTypeLabels[selectedTestCategory]})</h3>
+                                        </div>
+                                        <button
+                                            onClick={() => setSelectedTestCategory(null)}
+                                            className="p-2 hover:bg-white/20 rounded-xl transition-colors"
+                                        >
+                                            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                                            </svg>
+                                        </button>
+                                    </div>
+
+                                    <div className="flex-grow overflow-y-auto p-6 space-y-4">
+                                        {student.tests
+                                            .filter(t => t.type === selectedTestCategory)
+                                            .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime())
+                                            .map(test => (
+                                                <div key={test.id} className="flex justify-between items-center bg-gray-50 p-5 rounded-2xl border border-gray-100 group hover:border-blue-200 hover:bg-white transition-all">
+                                                    <div>
+                                                        <p className="font-bold text-gray-800 text-lg">{test.suraName}</p>
+                                                        <p className="text-xs font-bold text-blue-500 mt-1">{new Date(test.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
+                                                    </div>
+                                                    <div className="flex items-center gap-4">
+                                                        <span className={`px-4 py-1.5 text-sm font-bold rounded-full ${testGradeInfo[test.grade].className}`}>{testGradeInfo[test.grade].label}</span>
+                                                        <button
+                                                            onClick={() => handleDeleteTestClick(student.id, test.id)}
+                                                            className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
+                                                            title="حذف الاختبار"
+                                                        >
+                                                            <TrashIcon className="w-5 h-5" />
+                                                        </button>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        {student.tests.filter(t => t.type === selectedTestCategory).length === 0 && (
+                                            <div className="text-center py-20 text-gray-400 italic font-bold">
+                                                لا توجد اختبارات مسجلة في هذا القسم بعد.
+                                            </div>
+                                        )}
+                                    </div>
+
+                                    <div className="p-4 bg-gray-50 border-t flex justify-end">
+                                        <button
+                                            onClick={() => setSelectedTestCategory(null)}
+                                            className="px-8 py-2.5 font-bold bg-gray-200 text-gray-700 rounded-xl hover:bg-gray-300 transition-all active:scale-95"
+                                        >
+                                            إغلاق
+                                        </button>
+                                    </div>
                                 </div>
                             </div>
-                            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                                {filteredAndSortedTests.length > 0 ? filteredAndSortedTests.map(test => (
-                                    <div key={test.id} className="flex justify-between items-center bg-white p-5 rounded-2xl shadow-sm border border-gray-100 group">
-                                        <div>
-                                            <p className="font-bold text-gray-800 text-lg">{test.suraName} <span className="text-sm font-normal text-gray-400">({testTypeLabels[test.type]})</span></p>
-                                            <p className="text-xs font-bold text-blue-500 mt-1">{new Date(test.date).toLocaleDateString('ar-EG', { day: 'numeric', month: 'long', year: 'numeric' })}</p>
-                                        </div>
-                                        <div className="flex items-center gap-4">
-                                            <span className={`px-4 py-1.5 text-sm font-bold rounded-full ${testGradeInfo[test.grade].className}`}>{testGradeInfo[test.grade].label}</span>
-                                            <button
-                                                onClick={() => handleDeleteTestClick(student.id, test.id)}
-                                                className="p-2 text-gray-300 hover:text-red-500 hover:bg-red-50 rounded-lg transition-all"
-                                                title="حذف الاختبار"
-                                            >
-                                                <TrashIcon className="w-5 h-5" />
-                                            </button>
-                                        </div>
-                                    </div>
-                                )) : <div className="col-span-full py-20 bg-white rounded-2xl border border-dashed text-center text-gray-500">لا توجد اختبارات مسجلة تطابق التصفية.</div>}
-                            </div>
-                        </section>
+                        )}
                     </div>
                 )}
 

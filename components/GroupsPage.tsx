@@ -108,7 +108,11 @@ const GroupsPage: React.FC<GroupsPageProps> = (props) => {
                     <div>
                       <h2 className="text-lg sm:text-xl font-bold text-gray-800 flex items-center truncate">
                         <span className="truncate">{group.name}</span>
-                        <span className="text-base font-normal bg-blue-100 text-blue-700 rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0">{studentCount}</span>
+                        <span className={`text-base font-normal rounded-full w-8 h-8 flex items-center justify-center mr-3 flex-shrink-0 ${studentCount < 30 ? 'bg-red-100 text-red-700' :
+                            studentCount < 35 ? 'bg-blue-100 text-blue-700' :
+                              studentCount < 40 ? 'bg-green-100 text-green-700' :
+                                'bg-purple-100 text-purple-700'
+                          }`}>{studentCount}</span>
                       </h2>
                       {teacher && <p className="text-sm text-gray-500 font-semibold mt-1">{`المدرس: ${teacher.name}`}</p>}
                     </div>

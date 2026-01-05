@@ -198,6 +198,14 @@ export interface Parent {
   studentIds: string[]; // قائمة بأرقام الطلاب المرتبطين بهذا الرقم
 }
 
+export interface ParentVisit {
+  id: string;
+  parentId: string;
+  parentName: string;
+  date: string; // YYYY-MM-DD
+  timestamp: any; // Firestore Timestamp for sorting
+}
+
 export type CurrentUser =
   | { role: 'director' }
   | { role: 'teacher'; id: string; name: string; }

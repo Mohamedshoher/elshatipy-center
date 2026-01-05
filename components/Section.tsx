@@ -229,12 +229,46 @@ const Section: React.FC<SectionProps> = ({ section, students = [] }) => {
               </p>
             )}
             {section.youtubeShortsUrls && section.youtubeShortsUrls.length > 0 && (
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-6">
-                {section.youtubeShortsUrls.filter(url => url.trim() !== '').map((url, idx) => (
-                  <div key={idx} className="aspect-[9/16] rounded-2xl overflow-hidden shadow-xl ring-1 ring-black/5 transform hover:scale-[1.03] transition-all duration-300">
-                    <YouTubeLite url={url} title={`${section.title} - ${idx + 1}`} isShorts />
-                  </div>
-                ))}
+              <div className="relative group/slider">
+                {/* Scroll Buttons */}
+                <button
+                  onClick={() => {
+                    document.getElementById(`shorts-slider-${section.id}`)?.scrollBy({ left: 320, behavior: 'smooth' });
+                  }}
+                  className="absolute right-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/90 backdrop-blur text-blue-600 rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover/slider:opacity-100 transition-opacity duration-300 hover:bg-white hover:scale-110 translate-x-1/2"
+                  aria-label="Next"
+                >
+                  <svg className="w-6 h-6 rotate-180" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+                <button
+                  onClick={() => {
+                    document.getElementById(`shorts-slider-${section.id}`)?.scrollBy({ left: -320, behavior: 'smooth' });
+                  }}
+                  className="absolute left-0 top-1/2 -translate-y-1/2 z-10 w-12 h-12 bg-white/90 backdrop-blur text-blue-600 rounded-full shadow-lg flex items-center justify-center opacity-0 group-hover/slider:opacity-100 transition-opacity duration-300 hover:bg-white hover:scale-110 -translate-x-1/2"
+                  aria-label="Previous"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 19l-7-7 7-7" />
+                  </svg>
+                </button>
+
+                {/* Slider Container */}
+                <div
+                  id={`shorts-slider-${section.id}`}
+                  className="flex gap-6 overflow-x-auto pb-8 snap-x snap-mandatory px-4 scrollbar-hide scroll-smooth"
+                  style={{ scrollbarWidth: 'none', msOverflowStyle: 'none' }}
+                >
+                  {section.youtubeShortsUrls.filter(url => url.trim() !== '').map((url, idx) => (
+                    <div
+                      key={idx}
+                      className="flex-shrink-0 w-[280px] sm:w-[320px] aspect-[9/16] rounded-2xl overflow-hidden shadow-xl ring-1 ring-black/5 transform hover:scale-[1.02] transition-all duration-300 snap-center bg-black"
+                    >
+                      <YouTubeLite url={url} title={`${section.title} - ${idx + 1}`} isShorts />
+                    </div>
+                  ))}
+                </div>
               </div>
             )}
           </div>
