@@ -8,6 +8,7 @@ import WhatsAppIcon from './icons/WhatsAppIcon';
 import { getCairoDateString, getCairoNow } from '../services/cairoTimeHelper';
 import ClipboardListIcon from './icons/ClipboardListIcon';
 import ArchiveIcon from './icons/ArchiveIcon';
+import PhoneIcon from './icons/PhoneIcon';
 
 interface AttendanceReportPageProps {
   students: Student[];
@@ -254,9 +255,19 @@ const AttendanceReportPage: React.FC<AttendanceReportPageProps> = ({ students, g
                   <div className="flex items-center justify-between xl:justify-end gap-3 pt-3 xl:pt-0 border-t xl:border-t-0 border-gray-50">
                     <div className="flex items-center gap-1">
                       {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
-                        <button onClick={() => handleWhatsAppWarning(student.student, student.absentDays)} className="text-green-500 hover:bg-green-50 p-2 rounded-lg transition-colors" title="إرسال تنبيه لولي الأمر">
-                          <WhatsAppIcon className="w-5 h-5" />
-                        </button>
+                        <>
+                          <a
+                            href={`tel:${student.student.phone}`}
+                            onClick={(e) => e.stopPropagation()}
+                            className="p-2 text-gray-400 hover:text-blue-600 hover:bg-blue-50 rounded-lg transition-colors"
+                            title={`اتصال بـ ${student.student.name}`}
+                          >
+                            <PhoneIcon className="w-5 h-5" />
+                          </a>
+                          <button onClick={() => handleWhatsAppWarning(student.student, student.absentDays)} className="text-green-500 hover:bg-green-50 p-2 rounded-lg transition-colors" title="إرسال تنبيه لولي الأمر">
+                            <WhatsAppIcon className="w-5 h-5" />
+                          </button>
+                        </>
                       )}
                       <button
                         onClick={(e) => { e.stopPropagation(); onViewDetails(student.student, 'attendanceLog'); }}

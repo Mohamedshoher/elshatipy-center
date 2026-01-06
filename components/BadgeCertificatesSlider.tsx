@@ -10,19 +10,29 @@ interface BadgeCertificatesSliderProps {
 const BadgeCertificatesSlider: React.FC<BadgeCertificatesSliderProps> = ({ section, students }) => {
     const certificateStudents = useMemo(() => {
         // 1. Filter students who have badges and are not archived
-        const eligibleStudents = students.filter(s => s.badges && s.badges.length > 0 && !s.isArchived);
+        if (!students || !Array.isArray(students)) return [];
+
+        const eligibleStudents = students.filter(s => s && s.badges && s.badges.length > 0 && !s.isArchived);
 
         // 2. Group students by groupId and find the one with the latest badge in each group
         const latestPerGroup: Record<string, Student> = {};
 
         eligibleStudents.forEach(student => {
             const groupId = student.groupId || 'no-group';
-            const latestBadgeDate = new Date(student.badges![student.badges!.length - 1].dateEarned).getTime();
+            const badges = student.badges || [];
+            if (badges.length === 0) return;
+
+            const latestBadgeDate = new Date(badges[badges.length - 1].dateEarned).getTime();
 
             if (!latestPerGroup[groupId]) {
                 latestPerGroup[groupId] = student;
             } else {
-                const existingLatestDate = new Date(latestPerGroup[groupId].badges![latestPerGroup[groupId].badges!.length - 1].dateEarned).getTime();
+                const currentGroupBadges = latestPerGroup[groupId].badges || [];
+                if (currentGroupBadges.length === 0) {
+                    latestPerGroup[groupId] = student;
+                    return;
+                }
+                const existingLatestDate = new Date(currentGroupBadges[currentGroupBadges.length - 1].dateEarned).getTime();
                 if (latestBadgeDate > existingLatestDate) {
                     latestPerGroup[groupId] = student;
                 }
@@ -34,8 +44,10 @@ const BadgeCertificatesSlider: React.FC<BadgeCertificatesSliderProps> = ({ secti
 
         // 4. Sort the final list by date (most recent across all groups first)
         result.sort((a, b) => {
-            const dateA = new Date(a.badges![a.badges!.length - 1].dateEarned).getTime();
-            const dateB = new Date(b.badges![b.badges!.length - 1].dateEarned).getTime();
+            const badgesA = a.badges || [];
+            const badgesB = b.badges || [];
+            const dateA = badgesA.length > 0 ? new Date(badgesA[badgesA.length - 1].dateEarned).getTime() : 0;
+            const dateB = badgesB.length > 0 ? new Date(badgesB[badgesB.length - 1].dateEarned).getTime() : 0;
             return dateB - dateA;
         });
 
@@ -123,7 +135,8 @@ const BadgeCertificatesSlider: React.FC<BadgeCertificatesSliderProps> = ({ secti
 
     // --- Certificate Component ---
     const CertificateDesign = ({ student }: { student: Student }) => {
-        const latestBadge = student.badges ? student.badges[student.badges.length - 1] : null;
+        const badges = student?.badges || [];
+        const latestBadge = badges.length > 0 ? badges[badges.length - 1] : null;
         if (!latestBadge) return null;
 
         // Mobile Optimized Sizes

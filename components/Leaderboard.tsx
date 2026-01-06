@@ -81,8 +81,8 @@ const Leaderboard: React.FC<LeaderboardProps> = ({ students }) => {
                                         {student.name}
                                     </h3>
                                     <div className="flex gap-2 mt-1">
-                                        {student.badges.slice(0, 3).map(badge => (
-                                            <span key={badge.id} title={badge.title} className="text-lg animate-bounce" style={{ animationDelay: `${Math.random()}s` }}>
+                                        {(student.badges || []).slice(0, 3).map((badge, bIdx) => (
+                                            <span key={badge.id || bIdx} title={badge.title} className="text-lg animate-bounce" style={{ animationDelay: `${Math.random()}s` }}>
                                                 {badge.icon}
                                             </span>
                                         ))}

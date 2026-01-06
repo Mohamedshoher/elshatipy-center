@@ -5,7 +5,7 @@ importScripts('https://www.gstatic.com/firebasejs/10.12.2/firebase-messaging-com
 
 // هام: يجب أن تتطابق هذه الإعدادات مع إعدادات مشروعك في firebase.ts
 const firebaseConfig = {
-    apiKey: "AIzaSyDU7Iw6HPkcLABpHpZHi54wzzMgGKAPSX0",
+    apiKey: "AIzaSyDU7Iw6HPkclABpHpZHi54wzzMgGKaPSX0",
     authDomain: "app2-d293c.firebaseapp.com",
     projectId: "app2-d293c",
     storageBucket: "app2-d293c.firebasestorage.app",

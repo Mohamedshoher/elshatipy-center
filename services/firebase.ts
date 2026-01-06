@@ -5,7 +5,7 @@ import { getStorage, ref, uploadBytes, getDownloadURL, deleteObject } from "fire
 // هام: يرجى استبدال القيم التالية بإعدادات مشروع Firebase الخاص بك
 // يمكنك الحصول عليها من إعدادات المشروع في لوحة تحكم Firebase
 const firebaseConfig = {
-  apiKey: "AIzaSyDU7Iw6HPkcLABpHpZHi54wzzMgGKAPSX0",
+  apiKey: "AIzaSyDU7Iw6HPkclABpHpZHi54wzzMgGKaPSX0",
   authDomain: "app2-d293c.firebaseapp.com",
   projectId: "app2-d293c",
   storageBucket: "app2-d293c.firebasestorage.app",
