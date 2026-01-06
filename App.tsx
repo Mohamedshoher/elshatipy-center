@@ -1,5 +1,5 @@
 import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
-import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus, Donation, Parent, UserRole, Badge, SalaryPayment, ParentVisit } from './types';
+import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus, Donation, Parent, UserRole, Badge, SalaryPayment, ParentVisit, LeaveRequest } from './types';
 import { ExpenseCategory, TeacherAttendanceStatus, DayOfWeek, TestType as TestTypeEnum, DirectorNotificationType } from './types';
 import { getCairoNow, getCairoDateString, getYesterdayDateString, getCairoTimeInMinutes, isCairoAfterMidnight, isCairoAfter12_05, getCairoDayOfWeek, isCairoWorkday } from './services/cairoTimeHelper';
 
@@ -55,7 +55,7 @@ import ArrowRightIcon from './components/icons/ArrowRightIcon';
 import ArchiveIcon from './components/icons/ArchiveIcon';
 import UserPlusIcon from './components/icons/UserPlusIcon';
 import { useLocalStorage } from './hooks/useLocalStorage';
-import { createParentAccountIfNeeded } from './services/parentHelpers';
+import { createParentAccountIfNeeded, removeStudentFromParent } from './services/parentHelpers';
 import { db } from './services/firebase';
 import { applyDeductions } from './services/deductionService';
 import { generateAllParents } from './services/parentGenerationService';
@@ -124,6 +124,7 @@ const App: React.FC = () => {
     const [teacherManualBonuses, setTeacherManualBonuses] = useState<TeacherManualBonus[]>([]);
     const [salaryPayments, setSalaryPayments] = useState<SalaryPayment[]>([]);
     const [donations, setDonations] = useState<Donation[]>([]);
+    const [leaveRequests, setLeaveRequests] = useState<LeaveRequest[]>([]);
 
 
     const [financialSettings, setFinancialSettings] = useState<FinancialSettings>({ workingDaysPerMonth: 22, absenceDeductionPercentage: 100 });
@@ -139,6 +140,16 @@ const App: React.FC = () => {
 
     // --- Local UI State & Session ---
     const [currentUser, setCurrentUser] = useLocalStorage<CurrentUser | null>('shatibi-center-currentUser', null);
+
+    const handleUpdateLeaveStatus = async (requestId: string, status: 'approved' | 'rejected') => {
+        try {
+            await updateDoc(doc(db, 'leaveRequests', requestId), { status });
+            // alert('تم تحديث حالة الطلب بنجاح');
+        } catch (error) {
+            console.error('Error updating leave status:', error);
+            alert('حدث خطأ أثناء تحديث حالة الطلب');
+        }
+    };
 
     // --- Parent UI States ---
 
@@ -346,6 +357,7 @@ const App: React.FC = () => {
         const essentialCollections = [
             { name: 'notes', setter: setNotes },
             { name: 'parentVisits', setter: setParentVisits },
+            { name: 'leaveRequests', setter: setLeaveRequests },
         ];
 
         essentialCollections.forEach(({ name, setter }) => {
@@ -729,14 +741,20 @@ const App: React.FC = () => {
 
         try {
             if (studentId) {
+                // التحقق من تغيير رقم الهاتف لإزالته من ولي الأمر القديم
+                const oldStudent = students.find(s => s.id === studentId);
+                if (oldStudent && oldStudent.phone !== studentData.phone) {
+                    if (oldStudent.phone) {
+                        await removeStudentFromParent(oldStudent.phone, studentId, parents);
+                    }
+                }
+
                 // When editing, preserve existing approval status
                 await updateDoc(doc(db, 'students', studentId), studentData);
                 // Alert removed as per user request
             } else {
-                // When adding a new student
+                // ... (adding new student - same as before)
                 const isTeacher = currentUser?.role === 'teacher';
-
-                // Prepare the base student data
                 const baseStudentData = {
                     ...studentData,
                     attendance: [],
@@ -748,7 +766,6 @@ const App: React.FC = () => {
                     isPending: isTeacher,
                 };
 
-                // Only add addedBy if it's a teacher and ID exists
                 let addedByValue: string | undefined;
                 if (isTeacher && currentUser?.id) {
                     addedByValue = currentUser.id;
@@ -756,20 +773,13 @@ const App: React.FC = () => {
                     addedByValue = 'director';
                 }
 
-                const newStudentData: any = {
-                    ...baseStudentData,
-                };
+                const newStudentData: any = { ...baseStudentData };
+                if (addedByValue) newStudentData.addedBy = addedByValue;
 
-                if (addedByValue) {
-                    newStudentData.addedBy = addedByValue;
-                }
-
-                // Sanitize object to remove any undefined values (including nested)
                 const sanitizeObject = (obj: any): any => {
                     if (obj === null || obj === undefined) return null;
                     if (Array.isArray(obj)) return obj;
                     if (typeof obj !== 'object') return obj;
-
                     const sanitized: any = {};
                     Object.keys(obj).forEach(key => {
                         const value = obj[key];
@@ -783,16 +793,12 @@ const App: React.FC = () => {
                 };
 
                 const sanitizedData = sanitizeObject(newStudentData);
-
-                console.log('Attempting to save student:', sanitizedData);
                 const docRef = await addDoc(collection(db, 'students'), sanitizedData);
 
-                // إنشاء حساب ولي أمر تلقائياً إذا كان رقم الهاتف صالحاً
                 if (studentData.phone) {
                     await createParentAccountIfNeeded(studentData.phone, studentData.name, docRef.id, parents);
                 }
 
-                // Show appropriate message based on user role
                 if (isTeacher) {
                     alert('تم إضافة الطالب بنجاح! سيتم مراجعته من قبل المشرف أو المدير.');
                 } else {
@@ -801,21 +807,14 @@ const App: React.FC = () => {
             }
         } catch (error: any) {
             console.error("Error saving student: ", error);
-            console.error("Error code:", error?.code);
-            console.error("Error message:", error?.message);
-            const errorMessage = error?.code === 'permission-denied'
-                ? 'ليس لديك صلاحية لحفظ بيانات الطالب. يرجى التواصل مع المدير.'
-                : error?.message
-                    ? `حدث خطأ: ${error.message} `
-                    : 'حدث خطأ أثناء حفظ بيانات الطالب.';
-            alert(errorMessage);
+            alert('حدث خطأ أثناء حفظ بيانات الطالب.');
         }
 
-        // تحديث حساب ولي الأمر عند التعديل
+        // يتم استدعاء إنشاء الحساب بالفعل في حالة الطالب الجديد بالأعلى باستخدام docRef.id
+        // هنا نقوم بالتحديث فقط في حالة الـ Edit
         if (studentId && studentData.phone) {
             await createParentAccountIfNeeded(studentData.phone, studentData.name, studentId, parents);
         }
-
         setStudentToEdit(null);
     };
 
@@ -1146,6 +1145,11 @@ const App: React.FC = () => {
 
         if (window.confirm(`هل أنت متأكد من رغبتك في حذف الطالب "${student.name}" بشكل نهائي؟ لا يمكن التراجع عن هذا الإجراء.`)) {
             try {
+                // إزالة الطالب من حساب ولي الأمر قبل حذفه
+                if (student.phone) {
+                    await removeStudentFromParent(student.phone, studentId, parents);
+                }
+
                 await deleteDoc(doc(db, 'students', studentId));
                 const notesQuery = query(collection(db, "notes"), where("studentId", "==", studentId));
                 const notesSnapshot = await getDocs(notesQuery);
@@ -2325,7 +2329,7 @@ const App: React.FC = () => {
                 <Route path="/notes" element={<DirectorNotesPage onBack={() => handleBackButton()} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />} />
                 <Route path="/archive" element={<ArchivePage students={students} groups={groups} searchTerm={searchTerm} currentUser={currentUser!} onOpenFeeModal={handleOpenFeeModal} onEditStudent={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchiveStudent={handleArchiveStudent} onOpenStudentDetails={handleOpenStudentDetails} onDeleteStudentPermanently={handleDeleteStudentPermanently} supervisorFilteredData={supervisorFilteredData} />} />
                 <Route path="/debtors" element={<DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />} />
-                <Route path="/general-view" element={<GeneralViewPage students={allStudents} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} parentVisits={parentVisits} />} />
+                <Route path="/general-view" element={<GeneralViewPage students={allStudents} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} parentVisits={parentVisits} leaveRequests={leaveRequests} onUpdateLeaveStatus={handleUpdateLeaveStatus} />} />
                 <Route path="/reports" element={<DirectorReportsPage groups={groups} students={students} onBack={() => handleBackButton()} />} />
                 <Route path="/unpaid" element={<UnpaidStudentsPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} />} />
                 <Route path="/fee-collection" element={<FeeCollectionPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} teacherCollections={collections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />} />
@@ -2488,7 +2492,7 @@ const App: React.FC = () => {
                 <Route path="/notes" element={<DirectorNotesPage onBack={handleBackToMain} notes={notes} students={students} groups={groups} teachers={teachers} onToggleAcknowledge={handleToggleNoteAcknowledge} onOpenStudentDetails={handleOpenStudentDetails} />} />
                 <Route path="/archive" element={<ArchivePage students={students} groups={groups} searchTerm={searchTerm} currentUser={currentUser!} onOpenFeeModal={handleOpenFeeModal} onEditStudent={handleEditStudent} onToggleAttendance={handleToggleAttendance} onArchiveStudent={handleArchiveStudent} onOpenStudentDetails={handleOpenStudentDetails} onDeleteStudentPermanently={handleDeleteStudentPermanently} supervisorFilteredData={supervisorFilteredData} />} />
                 <Route path="/debtors" element={<DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />} />
-                <Route path="/general-view" element={<GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} parentVisits={parentVisits} />} />
+                <Route path="/general-view" element={<GeneralViewPage students={students} notes={notes} groups={groups} teachers={teachers} teacherCollections={teacherCollections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} parentVisits={parentVisits} leaveRequests={leaveRequests} onUpdateLeaveStatus={handleUpdateLeaveStatus} />} />
                 <Route path="/reports" element={<DirectorReportsPage groups={groups} students={students} onBack={handleBackToMain} />} />
                 <Route path="/unpaid" element={<UnpaidStudentsPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={students} />} />
                 <Route path="/fee-collection" element={<FeeCollectionPage onBack={handleBackToMain} teachers={teachers} groups={groups} students={students} teacherCollections={teacherCollections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />} />

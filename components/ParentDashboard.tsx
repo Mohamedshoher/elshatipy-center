@@ -1,14 +1,58 @@
-import React from 'react';
+import React, { useState } from 'react';
 import type { Student, Group } from '../types';
 import UserIcon from './icons/UserIcon';
+import { db } from '../services/firebase';
+import { collection, addDoc } from 'firebase/firestore';
+import XIcon from './icons/XIcon';
+import CalendarCheckIcon from './icons/CalendarCheckIcon';
 
 interface ParentDashboardProps {
     students: Student[];
     groups: Group[];
     onViewStudent: (student: Student) => void;
+    parentPhone: string;
+    parentName: string;
 }
 
-const ParentDashboard: React.FC<ParentDashboardProps> = ({ students, groups, onViewStudent }) => {
+const ParentDashboard: React.FC<ParentDashboardProps> = ({ students, groups, onViewStudent, parentPhone, parentName }) => {
+    const [isLeaveModalOpen, setIsLeaveModalOpen] = useState(false);
+    const [selectedStudentForLeave, setSelectedStudentForLeave] = useState<Student | null>(null);
+    const [leaveDays, setLeaveDays] = useState(1);
+    const [leaveReason, setLeaveReason] = useState('');
+    const [isSubmitting, setIsSubmitting] = useState(false);
+
+    const handleOpenLeaveModal = (e: React.MouseEvent, student: Student) => {
+        e.stopPropagation();
+        setSelectedStudentForLeave(student);
+        setIsLeaveModalOpen(true);
+    };
+
+    const handleSubmitLeave = async () => {
+        if (!selectedStudentForLeave || !leaveReason) return;
+        setIsSubmitting(true);
+        try {
+            await addDoc(collection(db, 'leaveRequests'), {
+                studentId: selectedStudentForLeave.id,
+                studentName: selectedStudentForLeave.name,
+                parentId: parentPhone,
+                parentPhone: parentPhone,
+                parentName: parentName,
+                days: leaveDays,
+                reason: leaveReason,
+                date: new Date().toISOString(),
+                status: 'pending'
+            });
+            alert('تم إرسال طلب الإجازة بنجاح');
+            setIsLeaveModalOpen(false);
+            setLeaveReason('');
+            setLeaveDays(1);
+        } catch (error) {
+            console.error('Error submitting leave request:', error);
+            alert('حدث خطأ أثناء إرسال الطلب');
+        } finally {
+            setIsSubmitting(false);
+        }
+    };
     // حساب إحصائيات لكل طالب
     const getStudentStats = (student: Student) => {
         const today = new Date().toISOString().split('T')[0];
@@ -100,11 +144,24 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ students, groups, onV
                                             </div>
                                         </div>
 
-                                        <div className="mt-8 flex items-center justify-center text-teal-600 font-black text-sm group-hover:gap-3 transition-all">
-                                            <span>عرض التفاصيل والتقارير</span>
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 mr-1" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
-                                            </svg>
+                                        <div className="mt-8 flex items-center justify-between border-t border-gray-50 pt-4 px-2">
+                                            <button
+                                                onClick={() => onViewStudent(student)}
+                                                className="flex items-center gap-2 text-teal-600 font-black text-sm hover:gap-3 transition-all"
+                                            >
+                                                <span>عرض التفاصيل</span>
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M15 19l-7-7 7-7" />
+                                                </svg>
+                                            </button>
+
+                                            <button
+                                                onClick={(e) => handleOpenLeaveModal(e, student)}
+                                                className="flex items-center gap-2 text-amber-600 bg-amber-50 px-3 py-1.5 rounded-xl font-bold text-xs hover:bg-amber-100 transition-all border border-amber-100/50"
+                                            >
+                                                <CalendarCheckIcon className="w-4 h-4" />
+                                                <span>طلب إجازة</span>
+                                            </button>
                                         </div>
                                     </div>
                                 </div>
@@ -113,6 +170,64 @@ const ParentDashboard: React.FC<ParentDashboardProps> = ({ students, groups, onV
                     </div>
                 )}
             </div>
+
+            {/* Leave Request Modal */}
+            {isLeaveModalOpen && selectedStudentForLeave && (
+                <div className="fixed inset-0 z-[110] flex items-center justify-center p-4">
+                    <div className="absolute inset-0 bg-black/40 backdrop-blur-sm" onClick={() => setIsLeaveModalOpen(false)}></div>
+                    <div className="relative bg-white rounded-[2.5rem] w-full max-w-md overflow-hidden shadow-2xl animate-in zoom-in-95 duration-300">
+                        <div className="p-8">
+                            <div className="flex items-center justify-between mb-6">
+                                <h3 className="text-2xl font-black text-gray-800">طلب إجازة</h3>
+                                <button onClick={() => setIsLeaveModalOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors text-gray-400">
+                                    <XIcon className="w-6 h-6" />
+                                </button>
+                            </div>
+
+                            <p className="text-gray-500 font-bold mb-6">
+                                تقديم طلب إجازة لـ: <span className="text-teal-600">{selectedStudentForLeave.name}</span>
+                            </p>
+
+                            <div className="space-y-6">
+                                <div>
+                                    <label className="block text-sm font-black text-gray-700 mb-2">عدد أيام الإجازة</label>
+                                    <div className="flex items-center gap-4">
+                                        <button
+                                            onClick={() => setLeaveDays(Math.max(1, leaveDays - 1))}
+                                            className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl font-black text-gray-600 hover:bg-gray-200"
+                                        >-</button>
+                                        <div className="flex-1 bg-gray-50 h-12 rounded-2xl flex items-center justify-center text-xl font-black text-gray-800 border border-gray-100">
+                                            {leaveDays} {leaveDays === 1 ? 'يوم' : leaveDays === 2 ? 'يومين' : 'أيام'}
+                                        </div>
+                                        <button
+                                            onClick={() => setLeaveDays(leaveDays + 1)}
+                                            className="w-12 h-12 rounded-2xl bg-gray-100 flex items-center justify-center text-2xl font-black text-gray-600 hover:bg-gray-200"
+                                        >+</button>
+                                    </div>
+                                </div>
+
+                                <div>
+                                    <label className="block text-sm font-black text-gray-700 mb-2">سبب الإجازة</label>
+                                    <textarea
+                                        value={leaveReason}
+                                        onChange={(e) => setLeaveReason(e.target.value)}
+                                        className="w-full bg-gray-50 rounded-2xl p-4 border border-gray-100 focus:ring-2 focus:ring-teal-500 focus:outline-none font-bold text-gray-700 min-h-[120px]"
+                                        placeholder="اكتب سبب الإجازة هنا..."
+                                    ></textarea>
+                                </div>
+
+                                <button
+                                    onClick={handleSubmitLeave}
+                                    disabled={isSubmitting || !leaveReason.trim()}
+                                    className="w-full bg-teal-500 hover:bg-teal-600 disabled:opacity-50 text-white font-black py-4 rounded-2xl shadow-lg shadow-teal-500/20 transition-all flex items-center justify-center gap-2"
+                                >
+                                    {isSubmitting ? 'جاري الإرسال...' : 'إرسال الطلب'}
+                                </button>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

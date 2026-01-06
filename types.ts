@@ -462,3 +462,17 @@ export interface LandingPageContent {
   updatedAt: string;             // آخر تحديث
   updatedBy: string;             // معرّف المدير الذي عدّل
 }
+
+export interface LeaveRequest {
+  id: string;
+  studentId: string;
+  studentName: string;
+  parentId: string;
+  parentPhone: string;
+  parentName: string;
+  days: number;
+  reason: string;
+  date: string; // ISO String
+  status: 'pending' | 'approved' | 'rejected';
+}
+

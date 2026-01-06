@@ -1,8 +1,9 @@
 
 import React, { useMemo, useState, useEffect } from 'react';
-import type { Note, Student, Group, Teacher, TeacherCollectionRecord, Expense, Donation, ParentVisit } from '../types';
+import type { Note, Student, Group, Teacher, TeacherCollectionRecord, Expense, Donation, ParentVisit, LeaveRequest } from '../types';
 import { ExpenseCategory, roundToNearest5 } from '../types';
 import UserPlusIcon from './icons/UserPlusIcon';
+import UserIcon from './icons/UserIcon';
 import ArchiveIcon from './icons/ArchiveIcon';
 import ClipboardListIcon from './icons/ClipboardListIcon';
 import CurrencyDollarIcon from './icons/CurrencyDollarIcon';
@@ -15,6 +16,7 @@ import FinanceIncomeModal from './FinanceIncomeModal';
 import FinanceExpenseModal from './FinanceExpenseModal';
 import FinanceCollectionsModal from './FinanceCollectionsModal';
 import UsersIcon from './icons/UsersIcon';
+import CalendarCheckIcon from './icons/CalendarCheckIcon';
 import { getCairoDateString, getYesterdayDateString, parseCairoDateString, getArabicDayName } from '../services/cairoTimeHelper';
 
 interface GeneralViewPageProps {
@@ -35,6 +37,8 @@ interface GeneralViewPageProps {
     onRejectStudent: (studentId: string) => void;
     onEditStudent: (student: Student) => void;
     parentVisits: ParentVisit[];
+    leaveRequests: LeaveRequest[];
+    onUpdateLeaveStatus: (requestId: string, status: 'approved' | 'rejected') => void;
 }
 
 const FullScreenSection: React.FC<{
@@ -144,12 +148,12 @@ const GroupedStudentList: React.FC<{
 };
 
 
-const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, groups, teachers, teacherCollections, expenses, donations, onDeleteExpense, onLogExpense, onAddDonation, onDeleteDonation, onToggleAcknowledge, onViewStudent, onApproveStudent, onRejectStudent, onEditStudent, parentVisits }) => {
+const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, groups, teachers, teacherCollections, expenses, donations, onDeleteExpense, onLogExpense, onAddDonation, onDeleteDonation, onToggleAcknowledge, onViewStudent, onApproveStudent, onRejectStudent, onEditStudent, parentVisits, leaveRequests, onUpdateLeaveStatus }) => {
 
     const [expandedNewGroups, setExpandedNewGroups] = useState<Set<string>>(new Set());
     const [expandedArchivedGroups, setExpandedArchivedGroups] = useState<Set<string>>(new Set());
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
-    const [activeSection, setActiveSection] = useState<'finance' | 'new' | 'archived' | 'notes' | 'parentVisits' | null>(null);
+    const [activeSection, setActiveSection] = useState<'finance' | 'new' | 'archived' | 'notes' | 'parentVisits' | 'leaveRequests' | null>(null);
 
     // Modal States
     const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
@@ -566,6 +570,94 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
             );
         }
 
+        if (activeSection === 'leaveRequests') {
+            const pendingRequests = leaveRequests.filter(r => r.status === 'pending');
+            const pastRequests = leaveRequests.filter(r => r.status !== 'pending');
+
+            return (
+                <FullScreenSection
+                    onBack={() => setActiveSection(null)}
+                    title="طلبات الإجازات"
+                    icon={<CalendarCheckIcon className="w-8 h-8 text-amber-500" />}
+                >
+                    <div className="space-y-4">
+                        {pendingRequests.length > 0 ? pendingRequests.map(request => (
+                            <div key={request.id} className="bg-white rounded-2xl border border-amber-100 shadow-sm p-6 hover:shadow-md transition-shadow">
+                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                    <div className="flex-1 text-right" dir="rtl">
+                                        <div className="flex items-center gap-3 mb-2">
+                                            <h3 className="text-lg font-black text-gray-800">{request.studentName}</h3>
+                                            <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-black">
+                                                {request.days} {request.days === 1 ? 'يوم' : request.days === 2 ? 'يومين' : 'أيام'}
+                                            </span>
+                                        </div>
+                                        <p className="text-gray-600 font-bold mb-3 bg-gray-50 p-3 rounded-xl border border-gray-100 italic">
+                                            "{request.reason}"
+                                        </p>
+                                        <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-gray-400">
+                                            <div className="flex items-center gap-1">
+                                                <UserIcon className="w-3.5 h-3.5" />
+                                                <span>ولي الأمر: {request.parentName}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <WhatsAppIcon className="w-3.5 h-3.5" />
+                                                <span className="dir-ltr">{request.parentPhone}</span>
+                                            </div>
+                                            <div className="flex items-center gap-1">
+                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                                </svg>
+                                                <span>بتاريخ: {new Date(request.date).toLocaleDateString('ar-EG')}</span>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                                        <button
+                                            onClick={() => onUpdateLeaveStatus(request.id, 'rejected')}
+                                            className="px-6 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-black text-sm"
+                                        >
+                                            رفض
+                                        </button>
+                                        <button
+                                            onClick={() => onUpdateLeaveStatus(request.id, 'approved')}
+                                            className="px-6 py-2.5 rounded-xl bg-teal-500 text-white hover:bg-teal-600 shadow-lg shadow-teal-500/20 transition-all font-black text-sm"
+                                        >
+                                            موافقة
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+                        )) : (
+                            <div className="text-center py-20 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-100">
+                                <CalendarCheckIcon className="w-20 h-20 text-gray-200 mx-auto mb-4" />
+                                <p className="text-gray-500 text-xl font-bold">لا توجد طلبات إجازة معلقة حالياً</p>
+                            </div>
+                        )}
+
+                        {pastRequests.length > 0 && (
+                            <div className="mt-12">
+                                <h4 className="text-sm font-black text-gray-400 mb-4 px-2 tracking-widest uppercase text-right">الطلبات السابقة</h4>
+                                <div className="space-y-3 opacity-60">
+                                    {pastRequests.slice(0, 10).map(request => (
+                                        <div key={request.id} className="bg-gray-50/50 rounded-xl p-4 flex items-center justify-between border border-gray-100 text-right" dir="rtl">
+                                            <div>
+                                                <p className="font-bold text-gray-700 text-sm">{request.studentName}</p>
+                                                <p className="text-[10px] text-gray-400 font-bold">{request.days} أيام - {request.status === 'approved' ? 'مقبول' : 'مرفوض'}</p>
+                                            </div>
+                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${request.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                                {request.status === 'approved' ? '✓ تم القبول' : '✗ تم الرفض'}
+                                            </span>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                </FullScreenSection>
+            );
+        }
+
         // Dashboard View (Default)
         return (
             <div className="space-y-8">
@@ -618,6 +710,14 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
                         onClick={() => setActiveSection('parentVisits')}
                         summary={`اليوم: ${visitStats.todayVisits} | أمس: ${visitStats.yesterdayVisits}`}
                         className="border-indigo-100 border-2"
+                    />
+
+                    <SectionTriggerCard
+                        title="طلبات الإجازات"
+                        icon={<CalendarCheckIcon className="w-8 h-8 text-amber-500" />}
+                        onClick={() => setActiveSection('leaveRequests')}
+                        summary={leaveRequests.filter(r => r.status === 'pending').length > 0 ? `${leaveRequests.filter(r => r.status === 'pending').length} طلب جديد` : 'لا توجد طلبات معلقة'}
+                        className="border-amber-100 border-2"
                     />
 
                 </div>

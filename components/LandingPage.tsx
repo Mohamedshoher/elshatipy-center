@@ -136,8 +136,8 @@ const LandingPage: React.FC<LandingPageProps> = ({ onBackToParent, students = []
               />
             )}
 
-            {/* Overlay with gradient */}
-            <div className="absolute inset-0 bg-gradient-to-br from-blue-900/70 via-indigo-900/60 to-purple-900/70"></div>
+            {/* Overlay - Removed strong blue gradient to show natural image colors */}
+            <div className="absolute inset-0 bg-black/20"></div>
 
             {/* Decorative elements */}
             <div className="absolute top-0 left-0 w-full h-full overflow-hidden pointer-events-none">

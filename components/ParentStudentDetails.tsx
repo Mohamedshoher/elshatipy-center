@@ -24,6 +24,11 @@ type TabType = 'tests' | 'fees' | 'attendance' | 'progress';
 const ParentStudentDetails: React.FC<ParentStudentDetailsProps> = ({ student, group, teacher, onClose, onOpenChat, unreadMessagesCount }) => {
     const navigate = useNavigate();
     const [activeTab, setActiveTab] = useState<TabType>('tests');
+    const [expandedGroups, setExpandedGroups] = useState<Record<string, boolean>>({ 'new': true });
+
+    const toggleGroup = (groupId: string) => {
+        setExpandedGroups(prev => ({ ...prev, [groupId]: !prev[groupId] }));
+    };
 
     // Test Type Translation
     const getTestTypeLabel = (type: TestType): string => {
@@ -55,48 +60,118 @@ const ParentStudentDetails: React.FC<ParentStudentDetailsProps> = ({ student, gr
 
     // Render Tests Tab
     const renderTestsTab = () => {
-        const sortedTests = [...(student.tests || [])].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+        const tests = student.tests || [];
+        const sortedTests = [...tests].sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+
+        const now = new Date();
+        const getDaysDiff = (dateStr: string) => {
+            const diffTime = Math.abs(now.getTime() - new Date(dateStr).getTime());
+            return Math.ceil(diffTime / (1000 * 60 * 60 * 24));
+        };
+
+        const groups = {
+            new: { title: 'جديد', tests: tests.filter(t => getDaysDiff(t.date) <= 7), color: 'text-indigo-600 bg-indigo-50 border-indigo-200' },
+            recent: { title: 'ماضي قريب', tests: tests.filter(t => getDaysDiff(t.date) > 7 && getDaysDiff(t.date) <= 30), color: 'text-blue-600 bg-blue-50 border-blue-200' },
+            distant: { title: 'ماضي بعيد', tests: tests.filter(t => getDaysDiff(t.date) > 30), color: 'text-gray-600 bg-gray-50 border-gray-200' }
+        };
+
+        const chartData = [...tests]
+            .sort((a, b) => new Date(a.date).getTime() - new Date(b.date).getTime())
+            .slice(-10)
+            .map(t => {
+                let score = 0;
+                if (t.grade === TestGrade.EXCELLENT) score = 100;
+                else if (t.grade === TestGrade.VERY_GOOD) score = 80;
+                else if (t.grade === TestGrade.GOOD) score = 60;
+                else if (t.grade === TestGrade.REPEAT) score = 30;
+                return { name: t.suraName, score };
+            });
 
         return (
-            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500">
-                <div className="flex items-center justify-between">
+            <div className="space-y-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-10">
+                <div className="flex items-center justify-between mb-2">
                     <h3 className="text-xl font-black text-gray-800">سجل الاختبارات</h3>
-                    <span className="bg-gray-200 text-gray-600 px-3 py-1 rounded-full text-xs font-bold uppercase">{(student.tests || []).length} اختبار</span>
+                    <div className="flex gap-2">
+                        <span className="bg-gray-100 text-gray-500 px-3 py-1 rounded-full text-[10px] font-black">{tests.length} إجمالي</span>
+                    </div>
                 </div>
 
-                {sortedTests.length === 0 ? (
+                {tests.length === 0 ? (
                     <div className="text-center py-20 bg-white/40 backdrop-blur-sm rounded-[2rem] border-2 border-dashed border-gray-200">
                         <p className="text-gray-500 font-bold">لا توجد اختبارات مسجلة حتى الآن</p>
                     </div>
                 ) : (
-                    <div className="grid grid-cols-1 gap-4">
-                        {sortedTests.map(test => {
-                            const gradeInfo = getTestGradeLabel(test.grade);
-                            return (
-                                <div key={test.id} className="bg-white rounded-[1.5rem] p-5 shadow-sm border border-gray-100 hover:shadow-md transition-all duration-300">
-                                    <div className="flex items-start justify-between mb-4">
-                                        <div>
-                                            <h4 className="text-lg font-black text-gray-800 mb-1">{test.suraName}</h4>
-                                            <div className="flex items-center gap-2">
-                                                <span className="w-1.5 h-1.5 bg-blue-500 rounded-full"></span>
-                                                <span className="text-xs font-bold text-gray-500 uppercase tracking-widest">{getTestTypeLabel(test.type)}</span>
+                    <div className="space-y-4">
+                        {(Object.entries(groups) as [string, typeof groups.new][]).map(([id, group]) => (
+                            group.tests.length > 0 && (
+                                <div key={id} className="overflow-hidden">
+                                    <button
+                                        onClick={() => toggleGroup(id)}
+                                        className={`w-full flex items-center justify-between p-4 rounded-2xl border transition-all ${group.color} ${expandedGroups[id] ? 'rounded-b-none' : 'shadow-sm'}`}
+                                    >
+                                        <div className="flex items-center gap-3">
+                                            <span className="font-black text-sm">{group.title}</span>
+                                            <span className="text-[10px] font-black bg-white/60 px-2 py-0.5 rounded-full">{group.tests.length} اختبار</span>
+                                        </div>
+                                        <svg xmlns="http://www.w3.org/2000/svg" className={`w-5 h-5 transition-transform duration-300 ${expandedGroups[id] ? 'rotate-180' : ''}`} fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M19 9l-7 7-7-7" />
+                                        </svg>
+                                    </button>
+
+                                    {expandedGroups[id] && (
+                                        <div className="bg-white/40 border-x border-b border-gray-100 rounded-b-2xl p-3 space-y-3 animate-in slide-in-from-top-2 duration-300">
+                                            {group.tests.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime()).map(test => {
+                                                const gradeInfo = getTestGradeLabel(test.grade);
+                                                return (
+                                                    <div key={test.id} className="bg-white rounded-xl p-4 shadow-sm border border-gray-50 hover:shadow-md transition-all">
+                                                        <div className="flex items-center justify-between gap-4">
+                                                            <div className="min-w-0">
+                                                                <h4 className="text-base font-black text-gray-800 truncate">{test.suraName}</h4>
+                                                                <p className="text-[10px] font-bold text-gray-400 mt-1">{formatDate(test.date)}</p>
+                                                            </div>
+                                                            <span className={`px-3 py-1 rounded-lg text-[10px] font-black shrink-0 shadow-sm ${gradeInfo.color}`}>
+                                                                {gradeInfo.label}
+                                                            </span>
+                                                        </div>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+                                </div>
+                            )
+                        ))}
+
+                        {/* Performance Chart */}
+                        {chartData.length > 1 && (
+                            <div className="mt-10 bg-white rounded-[2rem] p-6 border border-gray-100 shadow-sm">
+                                <h4 className="text-sm font-black text-gray-800 mb-6 flex items-center gap-2">
+                                    <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5 text-teal-600" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M7 12l3-3 3 3 4-4M8 21l4-4 4 4M3 4h18M4 4h16v12a1 1 0 01-1 1H5a1 1 0 01-1-1V4z" />
+                                    </svg>
+                                    <span>مستوى الطالب في آخر 10 اختبارات</span>
+                                </h4>
+
+                                <div className="h-40 flex items-end justify-between gap-1 px-2 border-b border-gray-100 pb-1">
+                                    {chartData.map((d, i) => (
+                                        <div key={i} className="flex-1 flex flex-col items-center group relative">
+                                            <div
+                                                className="w-full max-w-[12px] rounded-t-full bg-gradient-to-t from-teal-500 to-teal-300 transition-all duration-700 ease-out hover:from-teal-600 hover:to-teal-400"
+                                                style={{ height: `${d.score}%` }}
+                                            >
+                                                <div className="absolute bottom-full mb-2 left-1/2 -translate-x-1/2 bg-gray-800 text-white text-[8px] px-2 py-1 rounded opacity-0 group-hover:opacity-100 transition-opacity whitespace-nowrap z-50">
+                                                    {d.name}: {d.score}%
+                                                </div>
                                             </div>
                                         </div>
-                                        <span className={`px-4 py-1.5 rounded-full text-xs font-black uppercase shadow-sm ${gradeInfo.color}`}>
-                                            {gradeInfo.label}
-                                        </span>
-                                    </div>
-                                    <div className="pt-4 border-t border-gray-50 flex items-center justify-between">
-                                        <div className="flex items-center gap-2 text-gray-400">
-                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-4 h-4" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                            </svg>
-                                            <span className="text-xs font-bold">{formatDate(test.date)}</span>
-                                        </div>
-                                    </div>
+                                    ))}
                                 </div>
-                            );
-                        })}
+                                <div className="flex justify-between mt-2 text-[8px] font-bold text-gray-400">
+                                    <span>الأقدم</span>
+                                    <span>الأحدث</span>
+                                </div>
+                            </div>
+                        )}
                     </div>
                 )}
             </div>

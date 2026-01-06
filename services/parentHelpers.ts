@@ -3,11 +3,30 @@ import { db } from '../services/firebase';
 import type { Parent } from '../types';
 
 /**
+ * تطبيع رقم الهاتف ليتناسب مع نظام حسابات أولياء الأمور
+ */
+export const normalizePhoneForParent = (phone: string): string | null => {
+    let processedPhone = phone.replace(/\D/g, '');
+
+    if (processedPhone.startsWith('0020')) {
+        processedPhone = processedPhone.slice(2);
+    }
+
+    if (processedPhone.startsWith('20') && processedPhone.length === 12) {
+        processedPhone = '0' + processedPhone;
+    } else if (processedPhone.length === 11 && (processedPhone.startsWith('010') || processedPhone.startsWith('011') || processedPhone.startsWith('012') || processedPhone.startsWith('015'))) {
+        processedPhone = '02' + processedPhone;
+    }
+
+    if (!processedPhone.startsWith('02') || processedPhone.length !== 13) {
+        return null;
+    }
+
+    return processedPhone;
+};
+
+/**
  * إنشاء أو تحديث حساب ولي أمر تلقائياً عند حفظ/تعديل طالب
- * @param studentPhone رقم هاتف الطالب (يجب أن يكون 16 رقم يبدأ بـ 02)
- * @param studentName اسم الطالب
- * @param studentId معرّف الطالب
- * @param existingParents قائمة أولياء الأمور الحالية
  */
 export const createParentAccountIfNeeded = async (
     studentPhone: string,
@@ -15,34 +34,16 @@ export const createParentAccountIfNeeded = async (
     studentId: string,
     existingParents: Parent[]
 ): Promise<void> => {
-    // تطبيع رقم الهاتف (تحويل الأرقام إلى 13 رقم ببادئة 02)
-    let processedPhone = studentPhone.replace(/\D/g, '');
-
-    // التعامل مع البادئة الدولية 20 أو 0020 أو +20
-    if (processedPhone.startsWith('0020')) {
-        processedPhone = processedPhone.slice(2); // تصبح تبدأ بـ 20
-    }
-
-    if (processedPhone.startsWith('20') && processedPhone.length === 12) {
-        processedPhone = '0' + processedPhone; // تصبح تبدأ بـ 020
-    } else if (processedPhone.length === 11 && (processedPhone.startsWith('010') || processedPhone.startsWith('011') || processedPhone.startsWith('012') || processedPhone.startsWith('015'))) {
-        processedPhone = '02' + processedPhone;
-    }
-
-    // التحقق من صحة رقم الهاتف النهائي (13 رقم يبدأ بـ 02)
-    if (!processedPhone.startsWith('02') || processedPhone.length !== 13) {
-        console.log('رقم الهاتف غير صالح لإنشاء حساب ولي أمر:', processedPhone);
+    const studentPhoneToUse = normalizePhoneForParent(studentPhone);
+    if (!studentPhoneToUse) {
+        console.log('رقم الهاتف غير صالح لإنشاء حساب ولي أمر:', studentPhone);
         return;
     }
 
-    const studentPhoneToUse = processedPhone;
-
     try {
-        // التحقق من وجود حساب ولي أمر بهذا الرقم
         const existingParent = existingParents.find(p => p.phone === studentPhoneToUse);
 
         if (existingParent) {
-            // تحديث قائمة الطلاب إذا لم يكن الطالب موجوداً
             if (!existingParent.studentIds.includes(studentId)) {
                 await updateDoc(doc(db, 'parents', existingParent.id), {
                     studentIds: arrayUnion(studentId)
@@ -50,8 +51,7 @@ export const createParentAccountIfNeeded = async (
                 console.log(`✅ تم إضافة الطالب ${studentName} لحساب ولي الأمر الموجود`);
             }
         } else {
-            // إنشاء حساب جديد
-            const password = studentPhoneToUse.slice(-6); // آخر 6 أرقام
+            const password = studentPhoneToUse.slice(-6);
             await addDoc(collection(db, 'parents'), {
                 phone: studentPhoneToUse,
                 name: `ولي أمر ${studentName}`,
@@ -59,10 +59,33 @@ export const createParentAccountIfNeeded = async (
                 studentIds: [studentId]
             });
             console.log(`✅ تم إنشاء حساب جديد لولي أمر ${studentName}`);
-            console.log(`📱 رقم الهاتف: ${studentPhoneToUse}`);
-            console.log(`🔑 كلمة المرور: ${password}`);
         }
     } catch (error) {
         console.error('❌ خطأ في إنشاء/تحديث حساب ولي الأمر:', error);
+    }
+};
+
+/**
+ * إزالة طالب من حساب ولي أمر (عند تغيير رقم الهاتف أو الحذف)
+ */
+export const removeStudentFromParent = async (
+    oldPhone: string,
+    studentId: string,
+    existingParents: Parent[]
+): Promise<void> => {
+    const phoneToSearch = normalizePhoneForParent(oldPhone);
+    if (!phoneToSearch) return;
+
+    try {
+        const parent = existingParents.find(p => p.phone === phoneToSearch);
+        if (parent && parent.studentIds.includes(studentId)) {
+            const updatedStudentIds = parent.studentIds.filter(id => id !== studentId);
+            await updateDoc(doc(db, 'parents', parent.id), {
+                studentIds: updatedStudentIds
+            });
+            console.log(`✅ تم إزالة الطالب من حساب ولي الأمر القديم (${phoneToSearch})`);
+        }
+    } catch (error) {
+        console.error('❌ خطأ في إزالة الطالب من حساب ولي الأمر:', error);
     }
 };

@@ -58,6 +58,8 @@ const ParentView: React.FC<ParentViewProps> = ({
             students={parentStudents}
             groups={groups}
             onViewStudent={setSelectedParentStudent}
+            parentPhone={currentUser.phone}
+            parentName={currentUser.name}
         />
     );
 };
