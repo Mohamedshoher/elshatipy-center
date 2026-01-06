@@ -4,7 +4,7 @@ import ChevronDownIcon from './icons/ChevronDownIcon';
 import UserIcon from './icons/UserIcon';
 import WhatsAppIcon from './icons/WhatsAppIcon';
 import ArrowRightIcon from './icons/ArrowRightIcon';
-import { getCairoDateString } from '../services/cairoTimeHelper';
+import { getCairoDateString, parseCairoDateString, getCairoNow } from '../services/cairoTimeHelper';
 
 interface FinancialReportPageProps {
   students: Student[]; // Should be pre-filtered for the current user
@@ -32,6 +32,12 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
     const paidStudentsByGroup: Record<string, Student[]> = {};
     const unpaidStudentsByGroup: Record<string, Student[]> = {};
 
+    const now = getCairoNow();
+    const [year, monthNum] = selectedMonth.split('-').map(Number);
+    const lastDayDate = new Date(year, monthNum, 0); // Last day of selected month
+    const checkDate = now < lastDayDate ? now : lastDayDate;
+    checkDate.setHours(0, 0, 0, 0);
+
     students.forEach(student => {
       // Skip archived students
       if (student.isArchived) return;
@@ -41,11 +47,27 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
         return;
       }
 
-      totalDue += student.monthlyFee;
       const feeRecord = student.fees.find(f => f.month === selectedMonth);
+      const isPaid = !!feeRecord?.paid;
 
-      if (feeRecord?.paid) {
-        totalCollected += feeRecord.amountPaid || student.monthlyFee;
+      // New rule: For unpaid students, joining date must be at least 15 days ago
+      if (!isPaid) {
+        const joiningDate = parseCairoDateString(student.joiningDate);
+        joiningDate.setHours(0, 0, 0, 0);
+
+        const diffTime = checkDate.getTime() - joiningDate.getTime();
+        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+        if (diffDays < 15) {
+          // Skip this student in the unpaid section if they haven't been here for 15 days
+          return;
+        }
+      }
+
+      totalDue += student.monthlyFee;
+
+      if (isPaid) {
+        totalCollected += feeRecord?.amountPaid || student.monthlyFee;
         if (!paidStudentsByGroup[student.groupId]) {
           paidStudentsByGroup[student.groupId] = [];
         }

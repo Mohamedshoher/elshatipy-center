@@ -742,9 +742,9 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
                             <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/60 backdrop-blur-sm animate-in fade-in duration-200">
                                 <div className="bg-white w-full max-w-2xl rounded-3xl shadow-2xl overflow-hidden flex flex-col max-h-[90vh] animate-in zoom-in-95 duration-200">
                                     <div className={`p-6 flex justify-between items-center text-white bg-gradient-to-r ${selectedTestCategory === TestTypeEnum.NEW ? 'from-blue-600 to-blue-700' :
-                                            selectedTestCategory === TestTypeEnum.RECENT_PAST ? 'from-indigo-600 to-indigo-700' :
-                                                selectedTestCategory === TestTypeEnum.DISTANT_PAST ? 'from-purple-600 to-purple-700' :
-                                                    'from-gray-600 to-gray-700'
+                                        selectedTestCategory === TestTypeEnum.RECENT_PAST ? 'from-indigo-600 to-indigo-700' :
+                                            selectedTestCategory === TestTypeEnum.DISTANT_PAST ? 'from-purple-600 to-purple-700' :
+                                                'from-gray-600 to-gray-700'
                                         }`}>
                                         <div className="flex items-center gap-3">
                                             <ClipboardListIcon className="w-6 h-6" />

@@ -1,9 +1,8 @@
 import React, { useState, useMemo } from 'react';
+import { parseCairoDateString, getCairoNow } from '../services/cairoTimeHelper';
 import type { Group, Student, Teacher } from '../types';
 import UserIcon from './icons/UserIcon';
 import CreditCardOffIcon from './icons/CreditCardOffIcon';
-
-
 interface UnpaidStudentsPageProps {
     groups: Group[];
     students: Student[];
@@ -38,6 +37,12 @@ const UnpaidStudentsPage: React.FC<UnpaidStudentsPageProps> = ({ groups, student
     }, [students]);
 
     const unpaidStudents = useMemo(() => {
+        const now = getCairoNow();
+        const [year, monthNum] = selectedMonth.split('-').map(Number);
+        const lastDayDate = new Date(year, monthNum, 0); // Last day of selected month
+        const checkDate = now < lastDayDate ? now : lastDayDate;
+        checkDate.setHours(0, 0, 0, 0);
+
         return students.filter(student => {
             const isFeeDue = selectedMonth >= student.joiningDate.substring(0, 7);
             if (!isFeeDue) return false;
@@ -49,6 +54,16 @@ const UnpaidStudentsPage: React.FC<UnpaidStudentsPageProps> = ({ groups, student
 
             // Only show if student attended 10+ sessions
             if (attendanceInMonth < 10) return false;
+
+            // New 15-day rule from joining date
+            const joiningDate = parseCairoDateString(student.joiningDate);
+            joiningDate.setHours(0, 0, 0, 0);
+            const diffTime = checkDate.getTime() - joiningDate.getTime();
+            const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+            if (diffDays < 15) {
+                return false;
+            }
 
             const feeRecord = student.fees.find(f => f.month === selectedMonth);
             return !feeRecord || !feeRecord.paid;
