@@ -62,6 +62,19 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
           // Skip this student in the unpaid section if they haven't been here for 15 days
           return;
         }
+
+        // New rule: Student must attend 10+ sessions OR be in an 'Iqraa' group
+        const attendanceInMonth = student.attendance.filter(record => {
+          return record.date.startsWith(selectedMonth) && record.status === 'present';
+        }).length;
+
+        const group = groups.find(g => g.id === student.groupId);
+        const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
+
+        if (!isIqraaGroup && attendanceInMonth < 10) {
+          // Skip if they didn't attend enough days (unless it's an Iqraa group)
+          return;
+        }
       }
 
       totalDue += student.monthlyFee;
