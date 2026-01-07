@@ -6,6 +6,7 @@ import type { Expense } from '../types';
 import { ExpenseCategory } from '../types';
 import XIcon from './icons/XIcon';
 import TrashIcon from './icons/TrashIcon';
+import Portal from './Portal';
 
 interface FinanceExpenseModalProps {
   isOpen: boolean;
@@ -145,149 +146,151 @@ const FinanceExpenseModal: React.FC<FinanceExpenseModalProps> = ({ isOpen, onClo
   const monthName = new Date(month + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' });
 
   return (
-    <div className="fixed inset-0 bg-black bg-opacity-60 z-50 flex justify-center items-center p-4">
-      <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-[95vw] h-[90vh] flex flex-col overflow-hidden">
-        <div className="flex-shrink-0 flex justify-between items-center mb-4 border-b pb-3">
-          <h2 className="text-2xl font-bold text-gray-700">تفاصيل المصروفات لشهر {monthName}</h2>
-          <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
-            <XIcon className="w-6 h-6" />
-          </button>
-        </div>
-        <div className="flex-grow overflow-y-auto pr-2 grid grid-cols-1 md:grid-cols-2 gap-6">
-          {/* Salaries Section */}
-          <div>
-            <h3 className="font-bold text-lg text-gray-800 mb-2">الرواتب والمكافآت ({expenseDetails.totalSalaries.toLocaleString()} EGP)</h3>
-            <div className="space-y-2">
-              {expenseDetails.salaries.length > 0 ? expenseDetails.salaries.map(s => (
-                <div key={s.id} className="flex justify-between items-center bg-gray-50 p-2 rounded group">
-                  <span className="text-sm text-gray-700">{s.description}</span>
-                  <div className="flex items-center gap-2">
-                    <span className="font-semibold text-red-600">{s.amount.toLocaleString()} EGP</span>
-                    <button
-                      onClick={() => {
-                        if (window.confirm('هل أنت متأكد من حذف هذا الراتب؟')) {
-                          onDeleteExpense(s.id);
-                        }
-                      }}
-                      className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                      title="حذف"
-                    >
-                      <TrashIcon className="w-4 h-4" />
-                    </button>
-                  </div>
-                </div>
-              )) : <p className="text-sm text-gray-400">لا توجد رواتب مسجلة.</p>}
-            </div>
+    <Portal>
+      <div className="fixed inset-0 bg-black bg-opacity-60 z-[80] flex justify-center items-center p-4">
+        <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-[95vw] h-[90vh] flex flex-col overflow-hidden">
+          <div className="flex-shrink-0 flex justify-between items-center mb-4 border-b pb-3">
+            <h2 className="text-2xl font-bold text-gray-700">تفاصيل المصروفات لشهر {monthName}</h2>
+            <button onClick={onClose} className="text-gray-400 hover:text-gray-600">
+              <XIcon className="w-6 h-6" />
+            </button>
           </div>
-          {/* General Expenses Section */}
-          <div>
-            <div className="flex justify-between items-center mb-2">
-              <h3 className="font-bold text-lg text-gray-800">المصروفات العامة ({expenseDetails.totalGeneral.toLocaleString()} EGP)</h3>
-              <button
-                onClick={() => setIsAddFormOpen(!isAddFormOpen)}
-                className="p-1 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
-                title="إضافة مصروف جديد"
-              >
-                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
-                  <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
-                </svg>
-              </button>
+          <div className="flex-grow overflow-y-auto pr-2 grid grid-cols-1 md:grid-cols-2 gap-6">
+            {/* Salaries Section */}
+            <div>
+              <h3 className="font-bold text-lg text-gray-800 mb-2">الرواتب والمكافآت ({expenseDetails.totalSalaries.toLocaleString()} EGP)</h3>
+              <div className="space-y-2">
+                {expenseDetails.salaries.length > 0 ? expenseDetails.salaries.map(s => (
+                  <div key={s.id} className="flex justify-between items-center bg-gray-50 p-2 rounded group">
+                    <span className="text-sm text-gray-700">{s.description}</span>
+                    <div className="flex items-center gap-2">
+                      <span className="font-semibold text-red-600">{s.amount.toLocaleString()} EGP</span>
+                      <button
+                        onClick={() => {
+                          if (window.confirm('هل أنت متأكد من حذف هذا الراتب؟')) {
+                            onDeleteExpense(s.id);
+                          }
+                        }}
+                        className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                        title="حذف"
+                      >
+                        <TrashIcon className="w-4 h-4" />
+                      </button>
+                    </div>
+                  </div>
+                )) : <p className="text-sm text-gray-400">لا توجد رواتب مسجلة.</p>}
+              </div>
             </div>
+            {/* General Expenses Section */}
+            <div>
+              <div className="flex justify-between items-center mb-2">
+                <h3 className="font-bold text-lg text-gray-800">المصروفات العامة ({expenseDetails.totalGeneral.toLocaleString()} EGP)</h3>
+                <button
+                  onClick={() => setIsAddFormOpen(!isAddFormOpen)}
+                  className="p-1 bg-green-100 text-green-600 rounded-full hover:bg-green-200 transition-colors"
+                  title="إضافة مصروف جديد"
+                >
+                  <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                    <path fillRule="evenodd" d="M10 3a1 1 0 011 1v5h5a1 1 0 110 2h-5v5a1 1 0 11-2 0v-5H4a1 1 0 110-2h5V4a1 1 0 011-1z" clipRule="evenodd" />
+                  </svg>
+                </button>
+              </div>
 
-            {isAddFormOpen && (
-              <div className="bg-green-50 p-3 rounded-lg mb-4 border border-green-100 animate-fadeIn">
-                <h4 className="text-sm font-bold text-green-800 mb-2">تسجيل مصروف جديد ({month})</h4>
-                <div className="space-y-2">
-                  <div className="grid grid-cols-2 gap-2">
+              {isAddFormOpen && (
+                <div className="bg-green-50 p-3 rounded-lg mb-4 border border-green-100 animate-fadeIn">
+                  <h4 className="text-sm font-bold text-green-800 mb-2">تسجيل مصروف جديد ({month})</h4>
+                  <div className="space-y-2">
+                    <div className="grid grid-cols-2 gap-2">
+                      <input
+                        type="number"
+                        placeholder="المبلغ"
+                        value={newAmount}
+                        onChange={e => setNewAmount(e.target.value)}
+                        className="w-full text-sm p-1.5 border rounded focus:ring-1 focus:ring-green-500"
+                      />
+                      <select
+                        value={newCategory}
+                        onChange={e => setNewCategory(e.target.value as ExpenseCategory)}
+                        className="w-full text-sm p-1.5 border rounded focus:ring-1 focus:ring-green-500"
+                      >
+                        <option value={ExpenseCategory.OTHER}>مصاريف أخرى</option>
+                        <option value={ExpenseCategory.RENT}>إيجار</option>
+                        <option value={ExpenseCategory.UTILITIES}>مرافق</option>
+                        <option value={ExpenseCategory.DEVELOPMENT}>تطوير</option>
+                      </select>
+                    </div>
                     <input
-                      type="number"
-                      placeholder="المبلغ"
-                      value={newAmount}
-                      onChange={e => setNewAmount(e.target.value)}
+                      type="text"
+                      placeholder="لمن هذا المصروف؟ (اسم المستفيد)"
+                      value={newForWhom}
+                      onChange={e => setNewForWhom(e.target.value)}
                       className="w-full text-sm p-1.5 border rounded focus:ring-1 focus:ring-green-500"
                     />
-                    <select
-                      value={newCategory}
-                      onChange={e => setNewCategory(e.target.value as ExpenseCategory)}
+                    <input
+                      type="text"
+                      placeholder="سبب المصروف"
+                      value={newReason}
+                      onChange={e => setNewReason(e.target.value)}
                       className="w-full text-sm p-1.5 border rounded focus:ring-1 focus:ring-green-500"
-                    >
-                      <option value={ExpenseCategory.OTHER}>مصاريف أخرى</option>
-                      <option value={ExpenseCategory.RENT}>إيجار</option>
-                      <option value={ExpenseCategory.UTILITIES}>مرافق</option>
-                      <option value={ExpenseCategory.DEVELOPMENT}>تطوير</option>
-                    </select>
-                  </div>
-                  <input
-                    type="text"
-                    placeholder="لمن هذا المصروف؟ (اسم المستفيد)"
-                    value={newForWhom}
-                    onChange={e => setNewForWhom(e.target.value)}
-                    className="w-full text-sm p-1.5 border rounded focus:ring-1 focus:ring-green-500"
-                  />
-                  <input
-                    type="text"
-                    placeholder="سبب المصروف"
-                    value={newReason}
-                    onChange={e => setNewReason(e.target.value)}
-                    className="w-full text-sm p-1.5 border rounded focus:ring-1 focus:ring-green-500"
-                  />
-                  <div className="flex gap-2 pt-1">
-                    <button
-                      type="button"
-                      onClick={handleAddExpense}
-                      disabled={!newAmount || !newForWhom || !newReason}
-                      className="flex-1 bg-green-600 text-white text-xs font-bold py-1.5 rounded hover:bg-green-700 disabled:opacity-50"
-                    >
-                      حفظ
-                    </button>
-                    <button
-                      type="button"
-                      onClick={() => setIsAddFormOpen(false)}
-                      className="px-3 bg-gray-200 text-gray-700 text-xs font-bold py-1.5 rounded hover:bg-gray-300"
-                    >
-                      إلغاء
-                    </button>
+                    />
+                    <div className="flex gap-2 pt-1">
+                      <button
+                        type="button"
+                        onClick={handleAddExpense}
+                        disabled={!newAmount || !newForWhom || !newReason}
+                        className="flex-1 bg-green-600 text-white text-xs font-bold py-1.5 rounded hover:bg-green-700 disabled:opacity-50"
+                      >
+                        حفظ
+                      </button>
+                      <button
+                        type="button"
+                        onClick={() => setIsAddFormOpen(false)}
+                        className="px-3 bg-gray-200 text-gray-700 text-xs font-bold py-1.5 rounded hover:bg-gray-300"
+                      >
+                        إلغاء
+                      </button>
+                    </div>
                   </div>
                 </div>
-              </div>
-            )}
+              )}
 
-            <div className="space-y-2">
-              {expenseDetails.generalExpenses.length > 0 ? expenseDetails.generalExpenses.map(([category, data]) => (
-                <div key={category} className="bg-gray-50 p-2 rounded">
-                  <div className="flex justify-between items-center font-semibold mb-1">
-                    <span className="text-gray-700">{expenseCategoryLabels[category as ExpenseCategory]}</span>
-                    <span className="text-red-600">{data?.total.toLocaleString()} EGP</span>
+              <div className="space-y-2">
+                {expenseDetails.generalExpenses.length > 0 ? expenseDetails.generalExpenses.map(([category, data]) => (
+                  <div key={category} className="bg-gray-50 p-2 rounded">
+                    <div className="flex justify-between items-center font-semibold mb-1">
+                      <span className="text-gray-700">{expenseCategoryLabels[category as ExpenseCategory]}</span>
+                      <span className="text-red-600">{data?.total.toLocaleString()} EGP</span>
+                    </div>
+                    <ul className="text-xs text-gray-500 space-y-1">
+                      {data?.items.map(item => (
+                        <li key={item.id} className="flex justify-between items-center group pl-2">
+                          <span>- {item.description} ({item.amount.toLocaleString()})</span>
+                          <button
+                            onClick={() => {
+                              if (window.confirm('هل أنت متأكد من حذف هذا المصروف؟')) {
+                                onDeleteExpense(item.id);
+                              }
+                            }}
+                            className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
+                            title="حذف"
+                          >
+                            <TrashIcon className="w-3 h-3" />
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
                   </div>
-                  <ul className="text-xs text-gray-500 space-y-1">
-                    {data?.items.map(item => (
-                      <li key={item.id} className="flex justify-between items-center group pl-2">
-                        <span>- {item.description} ({item.amount.toLocaleString()})</span>
-                        <button
-                          onClick={() => {
-                            if (window.confirm('هل أنت متأكد من حذف هذا المصروف؟')) {
-                              onDeleteExpense(item.id);
-                            }
-                          }}
-                          className="text-red-400 hover:text-red-600 opacity-0 group-hover:opacity-100 transition-opacity"
-                          title="حذف"
-                        >
-                          <TrashIcon className="w-3 h-3" />
-                        </button>
-                      </li>
-                    ))}
-                  </ul>
-                </div>
-              )) : <p className="text-sm text-gray-400">لا توجد مصروفات عامة مسجلة.</p>}
+                )) : <p className="text-sm text-gray-400">لا توجد مصروفات عامة مسجلة.</p>}
+              </div>
             </div>
           </div>
-        </div>
-        <div className="flex-shrink-0 mt-4 pt-4 border-t flex justify-between items-center">
-          <h3 className="text-lg font-bold text-gray-800">الإجمالي:</h3>
-          <span className="text-2xl font-bold text-red-700">{expenseDetails.grandTotal.toLocaleString()} EGP</span>
+          <div className="flex-shrink-0 mt-4 pt-4 border-t flex justify-between items-center">
+            <h3 className="text-lg font-bold text-gray-800">الإجمالي:</h3>
+            <span className="text-2xl font-bold text-red-700">{expenseDetails.grandTotal.toLocaleString()} EGP</span>
+          </div>
         </div>
       </div>
-    </div>
+    </Portal>
   );
 };
 

@@ -2649,7 +2649,13 @@ const App: React.FC = () => {
                     <TestsReportPage students={teacherStudents.students} groups={visibleGroups} onViewStudent={handleViewStudent} onBack={() => handleBackButton()} />
                 } />
                 <Route path="/financial_report" element={
-                    <FinancialReportPage students={teacherStudents.allStudents} groups={visibleGroups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />
+                    <FinancialReportPage
+                        students={teacherStudents.allStudents}
+                        groups={visibleGroups}
+                        onViewStudent={handleViewStudent}
+                        currentUserRole={currentUser?.role}
+                        currentUserId={currentUser?.role === 'teacher' ? currentUser.id : undefined}
+                    />
                 } />
 
                 {/* Sub-views as Route wrappers or catch-all */}
@@ -2862,7 +2868,7 @@ const App: React.FC = () => {
             </div>
 
             {studentToArchive && (
-                <div className="fixed inset-0 bg-black bg-opacity-50 z-50 flex justify-center items-center p-4">
+                <div className="fixed inset-0 bg-black bg-opacity-50 z-[60] flex justify-center items-center p-4">
                     <div className="bg-white rounded-lg shadow-2xl p-6 sm:p-8 w-full max-w-md">
                         <h2 className="text-2xl font-bold mb-4 text-gray-700">رسالة تأكيد للأرشفة</h2>
                         <p className="text-gray-600 mb-6">هل أنت متأكد من رغبتك في نقل الطالب "{studentToArchive.name}" إلى الأرشيف؟</p>

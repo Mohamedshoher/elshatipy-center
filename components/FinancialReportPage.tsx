@@ -7,16 +7,32 @@ import ArrowRightIcon from './icons/ArrowRightIcon';
 import { getCairoDateString, parseCairoDateString, getCairoNow } from '../services/cairoTimeHelper';
 
 interface FinancialReportPageProps {
-  students: Student[]; // Should be pre-filtered for the current user
-  groups: Group[];   // Should be pre-filtered for the current user
+  students: Student[];
+  groups: Group[];
   onViewStudent: (studentId: string) => void;
   currentUserRole?: UserRole;
+  currentUserId?: string; // Teacher ID when role is teacher
 }
 
-const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, groups, onViewStudent, currentUserRole }) => {
+interface StudentWithFee extends Student {
+  feeRecord: any;
+  amountPaid: number;
+  receiptNumber: string;
+  isTransferred?: boolean; // Student moved to another group
+}
+
+const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, groups, onViewStudent, currentUserRole, currentUserId }) => {
   const [selectedMonth, setSelectedMonth] = useState(() => getCairoDateString().substring(0, 7));
-  const [expandedPaid, setExpandedPaid] = useState<Set<string>>(new Set());
-  const [expandedUnpaid, setExpandedUnpaid] = useState<Set<string>>(new Set());
+  const [isPaidExpanded, setIsPaidExpanded] = useState(false);
+  const [isUnpaidExpanded, setIsUnpaidExpanded] = useState(false);
+
+  // Get teacher's current groups if viewing as teacher
+  const teacherGroupIds = useMemo(() => {
+    if (currentUserRole === 'teacher' && currentUserId) {
+      return new Set(groups.filter(g => g.teacherId === currentUserId).map(g => g.id));
+    }
+    return null;
+  }, [currentUserRole, currentUserId, groups]);
 
   const handlePrevMonth = () => {
     const date = new Date(selectedMonth + '-01');
@@ -29,17 +45,16 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
   const financialData = useMemo(() => {
     let totalCollected = 0;
     let totalDue = 0;
-    const paidStudentsByGroup: Record<string, Student[]> = {};
-    const unpaidStudentsByGroup: Record<string, Student[]> = {};
+    const paidStudents: StudentWithFee[] = [];
+    const unpaidStudents: Student[] = [];
 
     const now = getCairoNow();
     const [year, monthNum] = selectedMonth.split('-').map(Number);
-    const lastDayDate = new Date(year, monthNum, 0); // Last day of selected month
+    const lastDayDate = new Date(year, monthNum, 0);
     const checkDate = now < lastDayDate ? now : lastDayDate;
     checkDate.setHours(0, 0, 0, 0);
 
     students.forEach(student => {
-      // Only consider students who have joined on or before the selected month
       if (student.joiningDate.substring(0, 7) > selectedMonth) {
         return;
       }
@@ -47,25 +62,31 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
       const feeRecord = student.fees.find(f => f.month === selectedMonth);
       const isPaid = !!feeRecord?.paid;
 
-      // If student paid, include them in total collected (even if archived)
       if (isPaid) {
-        totalCollected += feeRecord?.amountPaid || student.monthlyFee;
-        if (!paidStudentsByGroup[student.groupId]) {
-          paidStudentsByGroup[student.groupId] = [];
-        }
-        paidStudentsByGroup[student.groupId].push(student);
+        const amountPaid = feeRecord?.amountPaid || student.monthlyFee;
+        totalCollected += amountPaid;
 
-        // Add to totalDue as well since they should have paid
+        // Check if student is transferred (not in teacher's current groups but paid with them)
+        const isTransferred = teacherGroupIds
+          ? !student.isArchived && !teacherGroupIds.has(student.groupId)
+          : false;
+
+        paidStudents.push({
+          ...student,
+          feeRecord,
+          amountPaid,
+          receiptNumber: feeRecord?.receiptNumber || '',
+          isTransferred
+        });
+
         if (!student.isArchived) {
           totalDue += student.monthlyFee;
         }
-        return; // Continue to next student
+        return;
       }
 
-      // For unpaid students, skip archived ones
       if (student.isArchived) return;
 
-      // New rule: For unpaid students, joining date must be at least 15 days ago
       const joiningDate = parseCairoDateString(student.joiningDate);
       joiningDate.setHours(0, 0, 0, 0);
 
@@ -73,11 +94,9 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
       const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
 
       if (diffDays < 15) {
-        // Skip this student in the unpaid section if they haven't been here for 15 days
         return;
       }
 
-      // New rule: Student must attend 5+ sessions OR be in an 'Iqraa' group
       const attendanceInMonth = student.attendance.filter(record => {
         return record.date.startsWith(selectedMonth) && record.status === 'present';
       }).length;
@@ -86,21 +105,26 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
       const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
 
       if (!isIqraaGroup && attendanceInMonth < 5) {
-        // Skip if they didn't attend enough days (unless it's an Iqraa group)
         return;
       }
 
-      // This student is unpaid and meets all criteria
       totalDue += student.monthlyFee;
-      if (!unpaidStudentsByGroup[student.groupId]) {
-        unpaidStudentsByGroup[student.groupId] = [];
-      }
-      unpaidStudentsByGroup[student.groupId].push(student);
+      unpaidStudents.push(student);
     });
+
+    // Sort paid students by receipt number
+    paidStudents.sort((a, b) => {
+      const receiptA = a.receiptNumber || '';
+      const receiptB = b.receiptNumber || '';
+      return receiptA.localeCompare(receiptB, 'ar', { numeric: true });
+    });
+
+    // Sort unpaid students by name
+    unpaidStudents.sort((a, b) => a.name.localeCompare(b.name, 'ar'));
 
     const totalRemaining = totalDue - totalCollected;
 
-    return { totalCollected, totalRemaining, paidStudentsByGroup, unpaidStudentsByGroup };
+    return { totalCollected, totalRemaining, paidStudents, unpaidStudents };
   }, [students, selectedMonth, groups]);
 
   const handleIndividualWhatsAppReminder = (student: Student) => {
@@ -116,94 +140,10 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
     window.open(`https://wa.me/${phone}?text=${encodedMessage}`, '_blank');
   };
 
-  const toggleExpansion = (groupId: string, type: 'paid' | 'unpaid') => {
-    const setter = type === 'paid' ? setExpandedPaid : setExpandedUnpaid;
-    setter(prev => {
-      const newSet = new Set(prev);
-      if (newSet.has(groupId)) {
-        newSet.delete(groupId);
-      } else {
-        newSet.add(groupId);
-      }
-      return newSet;
-    });
-  };
-
-  const GroupSection: React.FC<{
-    title: string;
-    studentsByGroup: Record<string, Student[]>;
-    expandedSet: Set<string>;
-    onToggle: (groupId: string) => void;
-    isUnpaidSection?: boolean;
-    onSendWhatsApp?: (student: Student) => void;
-    currentUserRole?: UserRole;
-  }> = ({ title, studentsByGroup, expandedSet, onToggle, isUnpaidSection, onSendWhatsApp, currentUserRole }) => (
-    <div className="bg-white rounded-xl shadow-lg p-6">
-      <h2 className="text-xl font-bold text-gray-800 mb-4">{title}</h2>
-      <div className="space-y-3">
-        {groups
-          .filter(group => studentsByGroup[group.id] && studentsByGroup[group.id].length > 0)
-          .sort((a, b) => a.name.localeCompare(b.name, 'ar'))
-          .map(group => {
-            const studentsInGroup = studentsByGroup[group.id] || [];
-            const isExpanded = expandedSet.has(group.id);
-            return (
-              <div key={group.id} className="bg-gray-50 rounded-lg border">
-                <div
-                  className="p-3 flex justify-between items-center cursor-pointer hover:bg-gray-100"
-                  onClick={() => onToggle(group.id)}
-                >
-                  <h3 className="font-semibold text-gray-700">{group.name}</h3>
-                  <div className="flex items-center gap-2">
-                    <span className="font-bold bg-blue-100 text-blue-700 px-2 py-1 rounded-full text-sm">
-                      {studentsInGroup.length}
-                    </span>
-                    <ChevronDownIcon className={`w-5 h-5 text-gray-500 transition-transform duration-300 ${isExpanded ? 'rotate-180' : ''}`} />
-                  </div>
-                </div>
-                {isExpanded && (
-                  <div className="border-t border-gray-200 p-3">
-                    <ul className="space-y-2">
-                      {studentsInGroup
-                        .sort((a, b) => a.name.localeCompare(b.name, 'ar'))
-                        .map(student => (
-                          <li key={student.id} className="flex items-center justify-between bg-white p-2 rounded-md hover:bg-blue-50 transition-colors">
-                            <button
-                              onClick={() => onViewStudent(student.id)}
-                              className="flex-grow text-right flex items-center gap-2"
-                            >
-                              <UserIcon className="w-5 h-5 text-gray-400" />
-                              <span>{student.name}</span>
-                              {student.isArchived && <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">مؤرشف</span>}
-                            </button>
-                            {isUnpaidSection && onSendWhatsApp && (currentUserRole === 'director' || currentUserRole === 'supervisor') && (
-                              <button
-                                onClick={(e) => {
-                                  e.stopPropagation();
-                                  onSendWhatsApp(student);
-                                }}
-                                className="p-1 text-green-500 hover:bg-green-100 rounded-full transition-colors flex-shrink-0"
-                                title={`إرسال تذكير واتساب لولي أمر ${student.name}`}
-                              >
-                                <WhatsAppIcon className="w-5 h-5" />
-                              </button>
-                            )}
-                          </li>
-                        ))}
-                    </ul>
-                  </div>
-                )}
-              </div>
-            );
-          })}
-      </div>
-    </div>
-  );
-
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
-      <div className="space-y-8">
-        {/* Summary and Month Selector */}
+      <div className="space-y-6">
+        {/* Month Selector */}
         <div className="bg-white rounded-xl shadow-lg p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
             <h2 className="text-2xl font-bold text-gray-800">تقرير المصروفات الشهري</h2>
@@ -225,40 +165,270 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
               </button>
             </div>
           </div>
+
+          {/* Summary Cards */}
           <div className="grid grid-cols-1 md:grid-cols-2 gap-4 text-center">
-            <div className="bg-green-100 p-4 rounded-lg">
-              <p className="text-lg text-green-800 font-semibold">الإجمالي المحصّل</p>
-              <p className="text-3xl font-bold text-green-600 mt-2">
-                {financialData.totalCollected.toLocaleString()} EGP
+            {/* Total Collected Card - Clickable */}
+            <button
+              onClick={() => setIsPaidExpanded(!isPaidExpanded)}
+              className={`p-6 rounded-lg transition-all hover:shadow-md ${isPaidExpanded ? 'bg-green-200 ring-2 ring-green-500' : 'bg-green-100'
+                }`}
+            >
+              <p className="text-lg text-green-800 font-semibold mb-1">الإجمالي المحصّل</p>
+              <p className="text-4xl font-black text-green-600">
+                {financialData.totalCollected.toLocaleString()}
               </p>
-            </div>
-            <div className="bg-red-100 p-4 rounded-lg">
-              <p className="text-lg text-red-800 font-semibold">الإجمالي المتبقي</p>
-              <p className="text-3xl font-bold text-red-600 mt-2">
-                {financialData.totalRemaining.toLocaleString()} EGP
+              <p className="text-xs text-green-700 mt-2">ج.م</p>
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <span className="text-xs text-green-700 font-bold">
+                  {financialData.paidStudents.length} طالب
+                </span>
+                <ChevronDownIcon className={`w-4 h-4 text-green-700 transition-transform ${isPaidExpanded ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
+
+            {/* Total Remaining Card - Clickable */}
+            <button
+              onClick={() => setIsUnpaidExpanded(!isUnpaidExpanded)}
+              className={`p-6 rounded-lg transition-all hover:shadow-md ${isUnpaidExpanded ? 'bg-red-200 ring-2 ring-red-500' : 'bg-red-100'
+                }`}
+            >
+              <p className="text-lg text-red-800 font-semibold mb-1">الإجمالي المتبقي</p>
+              <p className="text-4xl font-black text-red-600">
+                {financialData.totalRemaining.toLocaleString()}
               </p>
-            </div>
+              <p className="text-xs text-red-700 mt-2">ج.م</p>
+              <div className="flex items-center justify-center gap-2 mt-3">
+                <span className="text-xs text-red-700 font-bold">
+                  {financialData.unpaidStudents.length} طالب
+                </span>
+                <ChevronDownIcon className={`w-4 h-4 text-red-700 transition-transform ${isUnpaidExpanded ? 'rotate-180' : ''}`} />
+              </div>
+            </button>
           </div>
         </div>
 
-        {/* Paid Students Section */}
-        <GroupSection
-          title="الطلاب الذين دفعوا"
-          studentsByGroup={financialData.paidStudentsByGroup}
-          expandedSet={expandedPaid}
-          onToggle={(groupId) => toggleExpansion(groupId, 'paid')}
-        />
+        {/* Paid Students Details */}
+        {isPaidExpanded && (
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden animate-in slide-in-from-top-4 duration-300">
+            <div className="p-4 border-b bg-green-50/50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-800">الطلاب الذين دفعوا ({financialData.paidStudents.length})</h3>
+              <span className="text-sm text-gray-600">مرتب حسب رقم الوصل</span>
+            </div>
 
-        {/* Unpaid Students Section */}
-        <GroupSection
-          title="الطلاب الذين لم يدفعوا"
-          studentsByGroup={financialData.unpaidStudentsByGroup}
-          expandedSet={expandedUnpaid}
-          onToggle={(groupId) => toggleExpansion(groupId, 'unpaid')}
-          isUnpaidSection={true}
-          onSendWhatsApp={handleIndividualWhatsAppReminder}
-          currentUserRole={currentUserRole}
-        />
+            {/* Mobile View */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {financialData.paidStudents.length > 0 ? (
+                financialData.paidStudents.map(student => {
+                  const group = groups.find(g => g.id === student.groupId);
+                  return (
+                    <div key={student.id} className="p-4 hover:bg-green-50 transition-colors">
+                      <div className="flex justify-between items-start mb-2">
+                        <button
+                          onClick={() => onViewStudent(student.id)}
+                          className="flex-grow text-right"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <UserIcon className="w-5 h-5 text-gray-400" />
+                            <span className="font-bold text-gray-800">{student.name}</span>
+                            {student.isArchived && <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">مؤرشف</span>}
+                            {student.isTransferred && <span className="px-2 py-0.5 bg-orange-100 text-orange-600 rounded text-[10px] font-bold">منقول</span>}
+                          </div>
+                          <p className="text-xs text-gray-500">{group?.name || 'مجموعة غير معروفة'}</p>
+                        </button>
+                        <div className="text-left flex flex-col items-end gap-1">
+                          <p className="text-lg font-black text-green-600">{student.amountPaid.toLocaleString()} ج.م</p>
+                          {student.receiptNumber && (
+                            <span className="px-2 py-0.5 bg-blue-100 text-blue-700 rounded text-[10px] font-bold">
+                              #{student.receiptNumber}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="px-6 py-10 text-center text-gray-400 italic">لا يوجد طلاب دفعوا هذا الشهر.</div>
+              )}
+            </div>
+
+            {/* Desktop View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-center text-sm font-bold text-gray-500 uppercase">رقم الوصل</th>
+                    <th className="px-6 py-3 text-right text-sm font-bold text-gray-500 uppercase">اسم الطالب</th>
+                    <th className="px-6 py-3 text-right text-sm font-bold text-gray-500 uppercase">المجموعة</th>
+                    <th className="px-6 py-3 text-center text-sm font-bold text-gray-500 uppercase">المبلغ</th>
+                    <th className="px-6 py-3 text-center text-sm font-bold text-gray-500 uppercase">الحالة</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {financialData.paidStudents.length > 0 ? (
+                    financialData.paidStudents.map(student => {
+                      const group = groups.find(g => g.id === student.groupId);
+                      return (
+                        <tr key={student.id} className="hover:bg-green-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            {student.receiptNumber ? (
+                              <span className="px-3 py-1 bg-blue-100 text-blue-700 rounded-full text-sm font-bold">
+                                #{student.receiptNumber}
+                              </span>
+                            ) : (
+                              <span className="text-gray-400 text-sm">-</span>
+                            )}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={() => onViewStudent(student.id)}
+                              className="flex items-center gap-2 hover:text-blue-600 transition-colors"
+                            >
+                              <UserIcon className="w-5 h-5 text-gray-400" />
+                              <span className="font-bold text-gray-800">{student.name}</span>
+                              {student.isArchived && <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">مؤرشف</span>}
+                              {student.isTransferred && <span className="px-2 py-0.5 bg-orange-100 text-orange-600 rounded text-[10px] font-bold">منقول</span>}
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {group?.name || 'مجموعة غير معروفة'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span className="text-lg font-black text-green-600">{student.amountPaid.toLocaleString()} ج.م</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span className="px-3 py-1 bg-green-100 text-green-700 rounded-full text-xs font-bold">
+                              تم الدفع ✓
+                            </span>
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={5} className="px-6 py-10 text-center text-gray-400 italic">
+                        لا يوجد طلاب دفعوا هذا الشهر.
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
+
+        {/* Unpaid Students Details */}
+        {isUnpaidExpanded && (
+          <div className="bg-white rounded-xl shadow-lg overflow-hidden animate-in slide-in-from-top-4 duration-300">
+            <div className="p-4 border-b bg-red-50/50 flex justify-between items-center">
+              <h3 className="text-lg font-bold text-gray-800">الطلاب الذين لم يدفعوا ({financialData.unpaidStudents.length})</h3>
+              <span className="text-sm text-gray-600">مرتب أبجدياً</span>
+            </div>
+
+            {/* Mobile View */}
+            <div className="md:hidden divide-y divide-gray-100">
+              {financialData.unpaidStudents.length > 0 ? (
+                financialData.unpaidStudents.map(student => {
+                  const group = groups.find(g => g.id === student.groupId);
+                  return (
+                    <div key={student.id} className="p-4 hover:bg-red-50 transition-colors">
+                      <div className="flex justify-between items-start">
+                        <button
+                          onClick={() => onViewStudent(student.id)}
+                          className="flex-grow text-right"
+                        >
+                          <div className="flex items-center gap-2 mb-1">
+                            <UserIcon className="w-5 h-5 text-gray-400" />
+                            <span className="font-bold text-gray-800">{student.name}</span>
+                          </div>
+                          <p className="text-xs text-gray-500">{group?.name || 'مجموعة غير معروفة'}</p>
+                        </button>
+                        <div className="flex items-center gap-2">
+                          <p className="text-lg font-black text-red-600">{student.monthlyFee.toLocaleString()} ج.م</p>
+                          {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
+                            <button
+                              onClick={(e) => {
+                                e.stopPropagation();
+                                handleIndividualWhatsAppReminder(student);
+                              }}
+                              className="p-2 text-green-500 hover:bg-green-100 rounded-full transition-colors"
+                              title={`إرسال تذكير واتساب لولي أمر ${student.name}`}
+                            >
+                              <WhatsAppIcon className="w-5 h-5" />
+                            </button>
+                          )}
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })
+              ) : (
+                <div className="px-6 py-10 text-center text-gray-400 italic">جميع الطلاب دفعوا! 🎉</div>
+              )}
+            </div>
+
+            {/* Desktop View */}
+            <div className="hidden md:block overflow-x-auto">
+              <table className="min-w-full divide-y divide-gray-200">
+                <thead className="bg-gray-50">
+                  <tr>
+                    <th className="px-6 py-3 text-right text-sm font-bold text-gray-500 uppercase">اسم الطالب</th>
+                    <th className="px-6 py-3 text-right text-sm font-bold text-gray-500 uppercase">المجموعة</th>
+                    <th className="px-6 py-3 text-center text-sm font-bold text-gray-500 uppercase">المبلغ المستحق</th>
+                    <th className="px-6 py-3 text-center text-sm font-bold text-gray-500 uppercase">إجراءات</th>
+                  </tr>
+                </thead>
+                <tbody className="bg-white divide-y divide-gray-100">
+                  {financialData.unpaidStudents.length > 0 ? (
+                    financialData.unpaidStudents.map(student => {
+                      const group = groups.find(g => g.id === student.groupId);
+                      return (
+                        <tr key={student.id} className="hover:bg-red-50 transition-colors">
+                          <td className="px-6 py-4 whitespace-nowrap">
+                            <button
+                              onClick={() => onViewStudent(student.id)}
+                              className="flex items-center gap-2 hover:text-blue-600 transition-colors"
+                            >
+                              <UserIcon className="w-5 h-5 text-gray-400" />
+                              <span className="font-bold text-gray-800">{student.name}</span>
+                            </button>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
+                            {group?.name || 'مجموعة غير معروفة'}
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            <span className="text-lg font-black text-red-600">{student.monthlyFee.toLocaleString()} ج.م</span>
+                          </td>
+                          <td className="px-6 py-4 whitespace-nowrap text-center">
+                            {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
+                              <button
+                                onClick={(e) => {
+                                  e.stopPropagation();
+                                  handleIndividualWhatsAppReminder(student);
+                                }}
+                                className="p-2 text-green-500 hover:bg-green-100 rounded-full transition-colors inline-flex"
+                                title={`إرسال تذكير واتساب لولي أمر ${student.name}`}
+                              >
+                                <WhatsAppIcon className="w-5 h-5" />
+                              </button>
+                            )}
+                          </td>
+                        </tr>
+                      );
+                    })
+                  ) : (
+                    <tr>
+                      <td colSpan={4} className="px-6 py-10 text-center text-gray-400 italic">
+                        جميع الطلاب دفعوا! 🎉
+                      </td>
+                    </tr>
+                  )}
+                </tbody>
+              </table>
+            </div>
+          </div>
+        )}
       </div>
     </main>
   );

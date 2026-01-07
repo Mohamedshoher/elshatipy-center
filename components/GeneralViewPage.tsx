@@ -18,6 +18,7 @@ import FinanceCollectionsModal from './FinanceCollectionsModal';
 import UsersIcon from './icons/UsersIcon';
 import CalendarCheckIcon from './icons/CalendarCheckIcon';
 import { getCairoDateString, getYesterdayDateString, parseCairoDateString, getArabicDayName } from '../services/cairoTimeHelper';
+import Portal from './Portal';
 
 interface GeneralViewPageProps {
     students: Student[];
@@ -48,26 +49,32 @@ const FullScreenSection: React.FC<{
     children: React.ReactNode;
 }> = ({ onBack, title, icon, children }) => {
     return (
-        <div className="bg-white rounded-2xl shadow-md border border-gray-100 p-6 animate-in slide-in-from-bottom-4 duration-300 min-h-[500px]">
-            <div className="flex items-center gap-4 mb-6 border-b pb-4">
-                <button
-                    onClick={onBack}
-                    className="p-2 hover:bg-gray-100 rounded-full transition-colors group border border-gray-200"
-                    title="عودة"
-                >
-                    <svg className="w-6 h-6 text-gray-600 group-hover:text-gray-900 rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
-                    </svg>
-                </button>
-                <div className="p-3 bg-gray-50 rounded-full">
-                    {icon}
+        <Portal>
+            <div className="fixed inset-0 bg-black bg-opacity-60 z-[70] flex justify-center items-center p-4">
+                <div className="bg-white rounded-3xl shadow-2xl w-full max-w-[95vw] h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
+                    <div className="flex-shrink-0 flex justify-between items-center p-4 sm:p-6 border-b bg-gray-50/50">
+                        <div className="flex items-center gap-3">
+                            <div className="p-2 bg-white rounded-xl shadow-sm border border-gray-100">
+                                {icon}
+                            </div>
+                            <h2 className="text-2xl font-black text-gray-800">{title}</h2>
+                        </div>
+                        <button
+                            onClick={onBack}
+                            className="p-2 hover:bg-red-50 hover:text-red-600 rounded-full transition-colors group"
+                            title="إغلاق"
+                        >
+                            <svg xmlns="http://www.w3.org/2000/svg" className="w-8 h-8 text-gray-400 group-hover:text-red-500 transition-colors" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M6 18L18 6M6 6l12 12" />
+                            </svg>
+                        </button>
+                    </div>
+                    <div className="flex-grow overflow-y-auto p-4 sm:p-6 bg-gray-50/30 text-right" dir="rtl">
+                        {children}
+                    </div>
                 </div>
-                <h2 className="text-2xl font-bold text-gray-800">{title}</h2>
             </div>
-            <div>
-                {children}
-            </div>
-        </div>
+        </Portal>
     );
 };
 
@@ -154,6 +161,18 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
     const [expandedArchivedGroups, setExpandedArchivedGroups] = useState<Set<string>>(new Set());
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
     const [activeSection, setActiveSection] = useState<'finance' | 'new' | 'archived' | 'notes' | 'parentVisits' | 'leaveRequests' | null>(null);
+
+    const handlePrevMonth = () => {
+        const date = new Date(selectedMonth + '-01');
+        date.setMonth(date.getMonth() - 1);
+        setSelectedMonth(date.toISOString().slice(0, 7));
+    };
+
+    const handleNextMonth = () => {
+        const date = new Date(selectedMonth + '-01');
+        date.setMonth(date.getMonth() + 1);
+        setSelectedMonth(date.toISOString().slice(0, 7));
+    };
 
     // Modal States
     const [isIncomeModalOpen, setIsIncomeModalOpen] = useState(false);
@@ -327,336 +346,349 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
     };
 
     const renderContent = () => {
-        if (activeSection === 'finance') {
-            return (
-                <FullScreenSection
-                    onBack={() => setActiveSection(null)}
-                    title="الملخص المالي للشهر المحدد"
-                    icon={<CurrencyDollarIcon className="w-8 h-8 text-green-500" />}
-                >
-                    <div className="mb-6 bg-white p-4 rounded-lg border shadow-sm">
-                        <div className="flex items-center gap-4 justify-between">
-                            <label htmlFor="month-filter" className="font-semibold text-gray-700">اختر الشهر للعرض:</label>
+        const pendingRequests = leaveRequests.filter(r => r.status === 'pending');
+        const pastRequests = leaveRequests.filter(r => r.status !== 'pending');
+        const financeModal = activeSection === 'finance' && (
+            <FullScreenSection
+                onBack={() => setActiveSection(null)}
+                title="الملخص المالي للشهر المحدد"
+                icon={<CurrencyDollarIcon className="w-8 h-8 text-green-500" />}
+            >
+                <div className="mb-6 bg-white p-4 rounded-lg border shadow-sm">
+                    <div className="flex items-center gap-4 justify-between">
+                        <label htmlFor="month-filter" className="font-semibold text-gray-700">اختر الشهر للعرض:</label>
+                        <div className="flex items-center gap-2">
+                            <button
+                                onClick={handleNextMonth}
+                                className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-gray-600"
+                                title="الشهر القادم"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M12.707 5.293a1 1 0 010 1.414L9.414 10l3.293 3.293a1 1 0 01-1.414 1.414l-4-4a1 1 0 010-1.414l4-4a1 1 0 011.414 0z" clipRule="evenodd" />
+                                </svg>
+                            </button>
                             <input
                                 type="month"
                                 id="month-filter"
                                 value={selectedMonth}
                                 onChange={e => setSelectedMonth(e.target.value)}
-                                className="px-4 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 text-left dir-ltr"
+                                className="px-4 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-green-500 text-left dir-ltr font-bold text-gray-700"
                             />
+                            <button
+                                onClick={handlePrevMonth}
+                                className="p-2 bg-gray-100 rounded-lg hover:bg-gray-200 transition-colors text-gray-600"
+                                title="الشهر السابق"
+                            >
+                                <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" viewBox="0 0 20 20" fill="currentColor">
+                                    <path fillRule="evenodd" d="M7.293 14.707a1 1 0 010-1.414L10.586 10 7.293 6.707a1 1 0 011.414-1.414l4 4a1 1 0 010 1.414l-4 4a1 1 0 01-1.414 0z" clipRule="evenodd" />
+                                </svg>
+                            </button>
                         </div>
                     </div>
+                </div>
 
-                    <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-                        <button
-                            onClick={() => setIsIncomeModalOpen(true)}
-                            className="bg-green-50 border border-green-200 p-6 rounded-xl text-center transition-all duration-300 hover:shadow-lg hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-400 group"
-                        >
-                            <p className="text-xl text-green-800 font-bold mb-3">إجمالي الدخل</p>
-                            <p className="text-4xl font-extrabold text-green-600 dir-ltr group-hover:scale-110 transition-transform">
-                                EGP {roundToNearest5(financialOverview.income).toLocaleString()}
-                            </p>
-                            <p className="text-sm text-green-700 mt-3 font-medium">مصروفات الطلاب المسددة</p>
-                        </button>
+                <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+                    <button
+                        onClick={() => setIsIncomeModalOpen(true)}
+                        className="bg-green-50 border border-green-200 p-6 rounded-xl text-center transition-all duration-300 hover:shadow-lg hover:bg-green-100 focus:outline-none focus:ring-2 focus:ring-green-400 group"
+                    >
+                        <p className="text-xl text-green-800 font-bold mb-3">إجمالي الدخل</p>
+                        <p className="text-4xl font-extrabold text-green-600 dir-ltr group-hover:scale-110 transition-transform">
+                            EGP {roundToNearest5(financialOverview.income).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-green-700 mt-3 font-medium">مصروفات الطلاب المسددة</p>
+                    </button>
 
-                        <button
-                            onClick={() => setIsExpenseModalOpen(true)}
-                            className="bg-red-50 border border-red-200 p-6 rounded-xl text-center transition-all duration-300 hover:shadow-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-400 group"
-                        >
-                            <p className="text-xl text-red-800 font-bold mb-3">إجمالي المصروفات</p>
-                            <p className="text-4xl font-extrabold text-red-600 dir-ltr group-hover:scale-110 transition-transform">
-                                EGP {roundToNearest5(financialOverview.totalExpenses).toLocaleString()}
-                            </p>
-                            <p className="text-sm text-red-700 mt-3 font-medium">الرواتب والمصاريف العامة</p>
-                        </button>
+                    <button
+                        onClick={() => setIsExpenseModalOpen(true)}
+                        className="bg-red-50 border border-red-200 p-6 rounded-xl text-center transition-all duration-300 hover:shadow-lg hover:bg-red-100 focus:outline-none focus:ring-2 focus:ring-red-400 group"
+                    >
+                        <p className="text-xl text-red-800 font-bold mb-3">إجمالي المصروفات</p>
+                        <p className="text-4xl font-extrabold text-red-600 dir-ltr group-hover:scale-110 transition-transform">
+                            EGP {roundToNearest5(financialOverview.totalExpenses).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-red-700 mt-3 font-medium">الرواتب والمصاريف العامة</p>
+                    </button>
 
-                        <button
-                            onClick={() => setIsCollectionsModalOpen(true)}
-                            className="bg-cyan-50 border border-cyan-200 p-6 rounded-xl text-center transition-all duration-300 hover:shadow-lg hover:bg-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-400 group"
-                        >
-                            <p className="text-xl text-cyan-800 font-bold mb-3">المبلغ المستلم</p>
-                            <p className="text-4xl font-extrabold text-cyan-600 dir-ltr group-hover:scale-110 transition-transform">
-                                EGP {roundToNearest5(teacherCollectionsSummary.totalReceived).toLocaleString()}
-                            </p>
-                            <p className="text-sm text-cyan-700 mt-3 font-medium">من تحصيلات المدرسين</p>
-                        </button>
+                    <button
+                        onClick={() => setIsCollectionsModalOpen(true)}
+                        className="bg-cyan-50 border border-cyan-200 p-6 rounded-xl text-center transition-all duration-300 hover:shadow-lg hover:bg-cyan-100 focus:outline-none focus:ring-2 focus:ring-cyan-400 group"
+                    >
+                        <p className="text-xl text-cyan-800 font-bold mb-3">المبلغ المستلم</p>
+                        <p className="text-4xl font-extrabold text-cyan-600 dir-ltr group-hover:scale-110 transition-transform">
+                            EGP {roundToNearest5(teacherCollectionsSummary.totalReceived).toLocaleString()}
+                        </p>
+                        <p className="text-sm text-cyan-700 mt-3 font-medium">من تحصيلات المدرسين</p>
+                    </button>
 
-                        <div className={`p-6 rounded-xl text-center border shadow-sm ${financialOverview.net >= 0 ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200'}`}>
-                            <p className={`text-xl font-bold mb-3 ${financialOverview.net >= 0 ? 'text-orange-800' : 'text-red-800'}`}>
-                                صافي الربح / الخسارة
-                            </p>
-                            <p className={`text-4xl font-extrabold dir-ltr ${financialOverview.net >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
-                                {roundToNearest5(financialOverview.net).toLocaleString()} EGP
-                            </p>
-                            <p className={`text-sm mt-3 font-medium ${financialOverview.net >= 0 ? 'text-orange-700' : 'text-red-700'}`}>
-                                المبلغ المستلم - المصروفات
-                            </p>
-                        </div>
+                    <div className={`p-6 rounded-xl text-center border shadow-sm ${financialOverview.net >= 0 ? 'bg-orange-50 border-orange-200' : 'bg-red-50 border-red-200'}`}>
+                        <p className={`text-xl font-bold mb-3 ${financialOverview.net >= 0 ? 'text-orange-800' : 'text-red-800'}`}>
+                            صافي الربح / الخسارة
+                        </p>
+                        <p className={`text-4xl font-extrabold dir-ltr ${financialOverview.net >= 0 ? 'text-orange-600' : 'text-red-600'}`}>
+                            {roundToNearest5(financialOverview.net).toLocaleString()} EGP
+                        </p>
+                        <p className={`text-sm mt-3 font-medium ${financialOverview.net >= 0 ? 'text-orange-700' : 'text-red-700'}`}>
+                            المبلغ المستلم - المصروفات
+                        </p>
                     </div>
-                </FullScreenSection>
-            );
-        }
+                </div>
+            </FullScreenSection>
+        );
 
-        if (activeSection === 'new') {
-            return (
-                <FullScreenSection
-                    onBack={() => setActiveSection(null)}
-                    title="الطلاب الجدد (اليوم)"
-                    icon={<UserPlusIcon className="w-8 h-8 text-blue-500" />}
-                >
-                    <GroupedStudentList
-                        groupedData={newStudentsByGroup}
-                        expandedSet={expandedNewGroups}
-                        onToggle={toggleNewGroup}
-                        onViewStudent={onViewStudent}
-                        dateField="joiningDate"
-                    />
-                </FullScreenSection>
-            );
-        }
 
-        if (activeSection === 'archived') {
-            return (
-                <FullScreenSection
-                    onBack={() => setActiveSection(null)}
-                    title="الطلاب المؤرشفون (اليوم)"
-                    icon={<ArchiveIcon className="w-8 h-8 text-orange-500" />}
-                >
-                    <GroupedStudentList
-                        groupedData={archivedStudentsByGroup}
-                        expandedSet={expandedArchivedGroups}
-                        onToggle={toggleArchivedGroup}
-                        onViewStudent={onViewStudent}
-                        dateField="archiveDate"
-                    />
-                </FullScreenSection>
-            );
-        }
+        const newStudentsModal = activeSection === 'new' && (
+            <FullScreenSection
+                onBack={() => setActiveSection(null)}
+                title="الطلاب الجدد (اليوم)"
+                icon={<UserPlusIcon className="w-8 h-8 text-blue-500" />}
+            >
+                <GroupedStudentList
+                    groupedData={newStudentsByGroup}
+                    expandedSet={expandedNewGroups}
+                    onToggle={toggleNewGroup}
+                    onViewStudent={onViewStudent}
+                    dateField="joiningDate"
+                />
+            </FullScreenSection>
+        );
 
-        if (activeSection === 'notes') {
-            return (
-                <FullScreenSection
-                    onBack={() => setActiveSection(null)}
-                    title="أحدث الملحوظات للمراجعة"
-                    icon={<ClipboardListIcon className="w-8 h-8 text-yellow-500" />}
-                >
-                    <div className="space-y-4">
-                        {unacknowledgedNotes.length > 0 ? unacknowledgedNotes.map(note => {
-                            const student = students.find(s => s.id === note.studentId);
-                            return (
-                                <div key={note.id} className="bg-white rounded-lg border border-yellow-200 shadow-sm p-4 hover:shadow-md transition-shadow">
-                                    <div className="mb-3">
-                                        <h3 className="font-bold text-gray-900 text-lg leading-relaxed">{note.content}</h3>
-                                    </div>
 
-                                    <div className="flex items-center justify-between border-t pt-3 mt-2">
-                                        <div className="flex items-center gap-2 text-sm text-gray-500">
-                                            <span className="font-medium bg-gray-100 px-2 py-0.5 rounded text-gray-700">{note.authorName}</span>
-                                            {student && (
-                                                <>
-                                                    <span className="text-gray-300">|</span>
-                                                    <button
-                                                        onClick={() => onViewStudent(student.id)}
-                                                        className="text-blue-600 hover:text-blue-800 hover:underline font-bold"
-                                                    >
-                                                        {student.name}
-                                                    </button>
-                                                </>
-                                            )}
-                                        </div>
+        const archivedModal = activeSection === 'archived' && (
+            <FullScreenSection
+                onBack={() => setActiveSection(null)}
+                title="الطلاب المؤرشفون (اليوم)"
+                icon={<ArchiveIcon className="w-8 h-8 text-orange-500" />}
+            >
+                <GroupedStudentList
+                    groupedData={archivedStudentsByGroup}
+                    expandedSet={expandedArchivedGroups}
+                    onToggle={toggleArchivedGroup}
+                    onViewStudent={onViewStudent}
+                    dateField="archiveDate"
+                />
+            </FullScreenSection>
+        );
 
-                                        <div className="flex items-center gap-2 flex-shrink-0">
-                                            {student && (
+
+        const notesModal = activeSection === 'notes' && (
+            <FullScreenSection
+                onBack={() => setActiveSection(null)}
+                title="أحدث الملحوظات للمراجعة"
+                icon={<ClipboardListIcon className="w-8 h-8 text-yellow-500" />}
+            >
+                <div className="space-y-4">
+                    {unacknowledgedNotes.length > 0 ? unacknowledgedNotes.map(note => {
+                        const student = students.find(s => s.id === note.studentId);
+                        return (
+                            <div key={note.id} className="bg-white rounded-lg border border-yellow-200 shadow-sm p-4 hover:shadow-md transition-shadow">
+                                <div className="mb-3">
+                                    <h3 className="font-bold text-gray-900 text-lg leading-relaxed">{note.content}</h3>
+                                </div>
+
+                                <div className="flex items-center justify-between border-t pt-3 mt-2">
+                                    <div className="flex items-center gap-2 text-sm text-gray-500">
+                                        <span className="font-medium bg-gray-100 px-2 py-0.5 rounded text-gray-700">{note.authorName}</span>
+                                        {student && (
+                                            <>
+                                                <span className="text-gray-300">|</span>
                                                 <button
-                                                    onClick={() => handleWhatsAppClick(student, note.content)}
-                                                    className="p-2 rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
-                                                    title="إرسال عبر واتساب"
+                                                    onClick={() => onViewStudent(student.id)}
+                                                    className="text-blue-600 hover:text-blue-800 hover:underline font-bold"
                                                 >
-                                                    <WhatsAppIcon className="w-5 h-5" />
+                                                    {student.name}
                                                 </button>
-                                            )}
-                                            <button
-                                                onClick={() => onToggleAcknowledge(note.id)}
-                                                className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 transition-colors border border-green-200"
-                                                title="تأكيد المراجعة"
-                                            >
-                                                <CheckCircleIcon className="w-4 h-4" />
-                                                <span className="text-sm font-semibold">تمت المراجعة</span>
-                                            </button>
-                                        </div>
-                                    </div>
-                                </div>
-                            );
-                        }) : (
-                            <div className="text-center py-16 bg-gray-50 rounded-2xl border border-gray-100 border-dashed">
-                                <CheckCircleIcon className="w-20 h-20 text-green-200 mx-auto mb-4" />
-                                <p className="text-gray-500 text-xl">لا توجد ملحوظات جديدة للمراجعة</p>
-                            </div>
-                        )}
-                    </div>
-                </FullScreenSection>
-            );
-        }
-
-        if (activeSection === 'parentVisits') {
-            return (
-                <FullScreenSection
-                    onBack={() => setActiveSection(null)}
-                    title="تقرير زيارات أولياء الأمور"
-                    icon={<UsersIcon className="w-8 h-8 text-indigo-500" />}
-                >
-                    <div className="space-y-8">
-                        {/* Summary Cards */}
-                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
-                            <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl text-center shadow-sm">
-                                <p className="text-indigo-800 font-bold mb-2">زيارات اليوم</p>
-                                <p className="text-4xl font-black text-indigo-600 tracking-tight">{visitStats.todayVisits}</p>
-                                <p className="text-xs text-indigo-400 mt-2 font-medium">بتوقيت القاهرة</p>
-                            </div>
-                            <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl text-center shadow-sm">
-                                <p className="text-blue-800 font-bold mb-2">زيارات أمس</p>
-                                <p className="text-4xl font-black text-blue-600 tracking-tight">{visitStats.yesterdayVisits}</p>
-                                <p className="text-xs text-blue-400 mt-2 font-medium">إجمالي اليوم السابق</p>
-                            </div>
-                            <div className="bg-gray-50 border border-gray-100 p-6 rounded-2xl text-center shadow-sm">
-                                <p className="text-gray-800 font-bold mb-2">إجمالي الزيارات</p>
-                                <p className="text-4xl font-black text-gray-600 tracking-tight">{visitStats.totalVisits}</p>
-                                <p className="text-xs text-gray-400 mt-2 font-medium">منذ بدء التفعيل</p>
-                            </div>
-                        </div>
-
-                        {/* History Table */}
-                        <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
-                            <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
-                                <h3 className="font-bold text-gray-800">سجل الزيارات اليومي</h3>
-                                <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full font-bold">آخر {visitStats.history.length} يوم</span>
-                            </div>
-                            <div className="overflow-x-auto">
-                                <table className="w-full text-right">
-                                    <thead className="bg-gray-50 text-gray-500 text-sm">
-                                        <tr>
-                                            <th className="px-6 py-4 font-bold text-right">التاريخ</th>
-                                            <th className="px-6 py-4 font-bold text-right">اليوم</th>
-                                            <th className="px-6 py-4 font-bold text-right">عدد الزوار المميزين</th>
-                                        </tr>
-                                    </thead>
-                                    <tbody className="divide-y divide-gray-100">
-                                        {visitStats.history.map((h, idx) => {
-                                            const date = parseCairoDateString(h.date);
-                                            const dayName = getArabicDayName(date);
-                                            return (
-                                                <tr key={h.date} className={`hover:bg-gray-50 transition-colors ${idx === 0 ? 'bg-indigo-50/30' : ''}`}>
-                                                    <td className="px-6 py-4 font-medium text-gray-900 dir-ltr text-right">{h.date}</td>
-                                                    <td className="px-6 py-4 text-gray-600">{dayName}</td>
-                                                    <td className="px-6 py-4">
-                                                        <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${idx === 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}`}>
-                                                            {h.count} زيارة
-                                                        </span>
-                                                    </td>
-                                                </tr>
-                                            );
-                                        })}
-                                        {visitStats.history.length === 0 && (
-                                            <tr>
-                                                <td colSpan={3} className="px-6 py-10 text-center text-gray-400">لا توجد بيانات متاحة بعد.</td>
-                                            </tr>
+                                            </>
                                         )}
-                                    </tbody>
-                                </table>
+                                    </div>
+
+                                    <div className="flex items-center gap-2 flex-shrink-0">
+                                        {student && (
+                                            <button
+                                                onClick={() => handleWhatsAppClick(student, note.content)}
+                                                className="p-2 rounded-full bg-green-50 text-green-600 hover:bg-green-100 transition-colors"
+                                                title="إرسال عبر واتساب"
+                                            >
+                                                <WhatsAppIcon className="w-5 h-5" />
+                                            </button>
+                                        )}
+                                        <button
+                                            onClick={() => onToggleAcknowledge(note.id)}
+                                            className="flex items-center gap-2 px-3 py-1.5 rounded-full bg-green-50 text-green-700 hover:bg-green-100 hover:text-green-800 transition-colors border border-green-200"
+                                            title="تأكيد المراجعة"
+                                        >
+                                            <CheckCircleIcon className="w-4 h-4" />
+                                            <span className="text-sm font-semibold">تمت المراجعة</span>
+                                        </button>
+                                    </div>
+                                </div>
                             </div>
+                        );
+                    }) : (
+                        <div className="text-center py-16 bg-gray-50 rounded-2xl border border-gray-100 border-dashed">
+                            <CheckCircleIcon className="w-20 h-20 text-green-200 mx-auto mb-4" />
+                            <p className="text-gray-500 text-xl">لا توجد ملحوظات جديدة للمراجعة</p>
+                        </div>
+                    )}
+                </div>
+            </FullScreenSection>
+        );
+
+
+        const parentVisitsModal = activeSection === 'parentVisits' && (
+            <FullScreenSection
+                onBack={() => setActiveSection(null)}
+                title="تقرير زيارات أولياء الأمور"
+                icon={<UsersIcon className="w-8 h-8 text-indigo-500" />}
+            >
+                <div className="space-y-8">
+                    {/* Summary Cards */}
+                    <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-6">
+                        <div className="bg-indigo-50 border border-indigo-100 p-6 rounded-2xl text-center shadow-sm">
+                            <p className="text-indigo-800 font-bold mb-2">زيارات اليوم</p>
+                            <p className="text-4xl font-black text-indigo-600 tracking-tight">{visitStats.todayVisits}</p>
+                            <p className="text-xs text-indigo-400 mt-2 font-medium">بتوقيت القاهرة</p>
+                        </div>
+                        <div className="bg-blue-50 border border-blue-100 p-6 rounded-2xl text-center shadow-sm">
+                            <p className="text-blue-800 font-bold mb-2">زيارات أمس</p>
+                            <p className="text-4xl font-black text-blue-600 tracking-tight">{visitStats.yesterdayVisits}</p>
+                            <p className="text-xs text-blue-400 mt-2 font-medium">إجمالي اليوم السابق</p>
+                        </div>
+                        <div className="bg-gray-50 border border-gray-100 p-6 rounded-2xl text-center shadow-sm">
+                            <p className="text-gray-800 font-bold mb-2">إجمالي الزيارات</p>
+                            <p className="text-4xl font-black text-gray-600 tracking-tight">{visitStats.totalVisits}</p>
+                            <p className="text-xs text-gray-400 mt-2 font-medium">منذ بدء التفعيل</p>
                         </div>
                     </div>
-                </FullScreenSection>
-            );
-        }
 
-        if (activeSection === 'leaveRequests') {
-            const pendingRequests = leaveRequests.filter(r => r.status === 'pending');
-            const pastRequests = leaveRequests.filter(r => r.status !== 'pending');
-
-            return (
-                <FullScreenSection
-                    onBack={() => setActiveSection(null)}
-                    title="طلبات الإجازات"
-                    icon={<CalendarCheckIcon className="w-8 h-8 text-amber-500" />}
-                >
-                    <div className="space-y-4">
-                        {pendingRequests.length > 0 ? pendingRequests.map(request => (
-                            <div key={request.id} className="bg-white rounded-2xl border border-amber-100 shadow-sm p-6 hover:shadow-md transition-shadow">
-                                <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
-                                    <div className="flex-1 text-right" dir="rtl">
-                                        <div className="flex items-center gap-3 mb-2">
-                                            <h3 className="text-lg font-black text-gray-800">{request.studentName}</h3>
-                                            <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-black">
-                                                {request.days} {request.days === 1 ? 'يوم' : request.days === 2 ? 'يومين' : 'أيام'}
-                                            </span>
-                                        </div>
-                                        <p className="text-gray-600 font-bold mb-3 bg-gray-50 p-3 rounded-xl border border-gray-100 italic">
-                                            "{request.reason}"
-                                        </p>
-                                        <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-gray-400">
-                                            <div className="flex items-center gap-1">
-                                                <UserIcon className="w-3.5 h-3.5" />
-                                                <span>ولي الأمر: {request.parentName}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                <WhatsAppIcon className="w-3.5 h-3.5" />
-                                                <span className="dir-ltr">{request.parentPhone}</span>
-                                            </div>
-                                            <div className="flex items-center gap-1">
-                                                <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
-                                                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
-                                                </svg>
-                                                <span>بتاريخ: {new Date(request.date).toLocaleDateString('ar-EG')}</span>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
-                                        <button
-                                            onClick={() => onUpdateLeaveStatus(request.id, 'rejected')}
-                                            className="px-6 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-black text-sm"
-                                        >
-                                            رفض
-                                        </button>
-                                        <button
-                                            onClick={() => onUpdateLeaveStatus(request.id, 'approved')}
-                                            className="px-6 py-2.5 rounded-xl bg-teal-500 text-white hover:bg-teal-600 shadow-lg shadow-teal-500/20 transition-all font-black text-sm"
-                                        >
-                                            موافقة
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
-                        )) : (
-                            <div className="text-center py-20 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-100">
-                                <CalendarCheckIcon className="w-20 h-20 text-gray-200 mx-auto mb-4" />
-                                <p className="text-gray-500 text-xl font-bold">لا توجد طلبات إجازة معلقة حالياً</p>
-                            </div>
-                        )}
-
-                        {pastRequests.length > 0 && (
-                            <div className="mt-12">
-                                <h4 className="text-sm font-black text-gray-400 mb-4 px-2 tracking-widest uppercase text-right">الطلبات السابقة</h4>
-                                <div className="space-y-3 opacity-60">
-                                    {pastRequests.slice(0, 10).map(request => (
-                                        <div key={request.id} className="bg-gray-50/50 rounded-xl p-4 flex items-center justify-between border border-gray-100 text-right" dir="rtl">
-                                            <div>
-                                                <p className="font-bold text-gray-700 text-sm">{request.studentName}</p>
-                                                <p className="text-[10px] text-gray-400 font-bold">{request.days} أيام - {request.status === 'approved' ? 'مقبول' : 'مرفوض'}</p>
-                                            </div>
-                                            <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${request.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
-                                                {request.status === 'approved' ? '✓ تم القبول' : '✗ تم الرفض'}
-                                            </span>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
+                    {/* History Table */}
+                    <div className="bg-white rounded-2xl border shadow-sm overflow-hidden">
+                        <div className="bg-gray-50 px-6 py-4 border-b flex justify-between items-center">
+                            <h3 className="font-bold text-gray-800">سجل الزيارات اليومي</h3>
+                            <span className="text-xs bg-gray-200 text-gray-600 px-2 py-1 rounded-full font-bold">آخر {visitStats.history.length} يوم</span>
+                        </div>
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-right">
+                                <thead className="bg-gray-50 text-gray-500 text-sm">
+                                    <tr>
+                                        <th className="px-6 py-4 font-bold text-right">التاريخ</th>
+                                        <th className="px-6 py-4 font-bold text-right">اليوم</th>
+                                        <th className="px-6 py-4 font-bold text-right">عدد الزوار المميزين</th>
+                                    </tr>
+                                </thead>
+                                <tbody className="divide-y divide-gray-100">
+                                    {visitStats.history.map((h, idx) => {
+                                        const date = parseCairoDateString(h.date);
+                                        const dayName = getArabicDayName(date);
+                                        return (
+                                            <tr key={h.date} className={`hover:bg-gray-50 transition-colors ${idx === 0 ? 'bg-indigo-50/30' : ''}`}>
+                                                <td className="px-6 py-4 font-medium text-gray-900 dir-ltr text-right">{h.date}</td>
+                                                <td className="px-6 py-4 text-gray-600">{dayName}</td>
+                                                <td className="px-6 py-4">
+                                                    <span className={`inline-flex items-center px-3 py-1 rounded-full text-sm font-bold ${idx === 0 ? 'bg-indigo-100 text-indigo-700' : 'bg-gray-100 text-gray-700'}`}>
+                                                        {h.count} زيارة
+                                                    </span>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                    {visitStats.history.length === 0 && (
+                                        <tr>
+                                            <td colSpan={3} className="px-6 py-10 text-center text-gray-400">لا توجد بيانات متاحة بعد.</td>
+                                        </tr>
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
                     </div>
-                </FullScreenSection>
-            );
-        }
+                </div>
+            </FullScreenSection>
+        );
+
+
+        const leaveRequestsModal = activeSection === 'leaveRequests' && (
+            <FullScreenSection
+                onBack={() => setActiveSection(null)}
+                title="طلبات الإجازات"
+                icon={<CalendarCheckIcon className="w-8 h-8 text-amber-500" />}
+            >
+                <div className="space-y-4">
+                    {pendingRequests.length > 0 ? pendingRequests.map(request => (
+                        <div key={request.id} className="bg-white rounded-2xl border border-amber-100 shadow-sm p-6 hover:shadow-md transition-shadow">
+                            <div className="flex flex-col md:flex-row md:items-center justify-between gap-4">
+                                <div className="flex-1 text-right" dir="rtl">
+                                    <div className="flex items-center gap-3 mb-2">
+                                        <h3 className="text-lg font-black text-gray-800">{request.studentName}</h3>
+                                        <span className="bg-amber-100 text-amber-700 px-3 py-1 rounded-full text-xs font-black">
+                                            {request.days} {request.days === 1 ? 'يوم' : request.days === 2 ? 'يومين' : 'أيام'}
+                                        </span>
+                                    </div>
+                                    <p className="text-gray-600 font-bold mb-3 bg-gray-50 p-3 rounded-xl border border-gray-100 italic">
+                                        "{request.reason}"
+                                    </p>
+                                    <div className="flex flex-wrap items-center gap-4 text-xs font-bold text-gray-400">
+                                        <div className="flex items-center gap-1">
+                                            <UserIcon className="w-3.5 h-3.5" />
+                                            <span>ولي الأمر: {request.parentName}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <WhatsAppIcon className="w-3.5 h-3.5" />
+                                            <span className="dir-ltr">{request.parentPhone}</span>
+                                        </div>
+                                        <div className="flex items-center gap-1">
+                                            <svg xmlns="http://www.w3.org/2000/svg" className="w-3.5 h-3.5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z" />
+                                            </svg>
+                                            <span>بتاريخ: {new Date(request.date).toLocaleDateString('ar-EG')}</span>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                <div className="flex items-center gap-2 shrink-0 self-end md:self-center">
+                                    <button
+                                        onClick={() => onUpdateLeaveStatus(request.id, 'rejected')}
+                                        className="px-6 py-2.5 rounded-xl bg-red-50 text-red-600 hover:bg-red-100 transition-colors font-black text-sm"
+                                    >
+                                        رفض
+                                    </button>
+                                    <button
+                                        onClick={() => onUpdateLeaveStatus(request.id, 'approved')}
+                                        className="px-6 py-2.5 rounded-xl bg-teal-500 text-white hover:bg-teal-600 shadow-lg shadow-teal-500/20 transition-all font-black text-sm"
+                                    >
+                                        موافقة
+                                    </button>
+                                </div>
+                            </div>
+                        </div>
+                    )) : (
+                        <div className="text-center py-20 bg-gray-50 rounded-[2.5rem] border-2 border-dashed border-gray-100">
+                            <CalendarCheckIcon className="w-20 h-20 text-gray-200 mx-auto mb-4" />
+                            <p className="text-gray-500 text-xl font-bold">لا توجد طلبات إجازة معلقة حالياً</p>
+                        </div>
+                    )}
+
+                    {pastRequests.length > 0 && (
+                        <div className="mt-12">
+                            <h4 className="text-sm font-black text-gray-400 mb-4 px-2 tracking-widest uppercase text-right">الطلبات السابقة</h4>
+                            <div className="space-y-3 opacity-60">
+                                {pastRequests.slice(0, 10).map(request => (
+                                    <div key={request.id} className="bg-gray-50/50 rounded-xl p-4 flex items-center justify-between border border-gray-100 text-right" dir="rtl">
+                                        <div>
+                                            <p className="font-bold text-gray-700 text-sm">{request.studentName}</p>
+                                            <p className="text-[10px] text-gray-400 font-bold">{request.days} أيام - {request.status === 'approved' ? 'مقبول' : 'مرفوض'}</p>
+                                        </div>
+                                        <span className={`text-[10px] font-black px-2 py-0.5 rounded-full ${request.status === 'approved' ? 'bg-green-100 text-green-700' : 'bg-red-100 text-red-700'}`}>
+                                            {request.status === 'approved' ? '✓ تم القبول' : '✗ تم الرفض'}
+                                        </span>
+                                    </div>
+                                ))}
+                            </div>
+                        </div>
+                    )}
+                </div>
+            </FullScreenSection>
+        );
+
 
         // Dashboard View (Default)
         return (
@@ -721,6 +753,12 @@ const GeneralViewPage: React.FC<GeneralViewPageProps> = ({ students, notes, grou
                     />
 
                 </div>
+                {financeModal}
+                {newStudentsModal}
+                {archivedModal}
+                {notesModal}
+                {parentVisitsModal}
+                {leaveRequestsModal}
             </div>
         );
     };
