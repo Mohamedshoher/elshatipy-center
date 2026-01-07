@@ -52,11 +52,10 @@ const UnpaidStudentsPage: React.FC<UnpaidStudentsPageProps> = ({ groups, student
                 return record.date.startsWith(selectedMonth) && record.status === 'present';
             }).length;
 
-            // New rule: Student must attend 10+ sessions OR be in an 'Iqraa' group
+            // Only show if student attended 5+ sessions (unless Iqra'a group)
             const group = groups.find(g => g.id === student.groupId);
             const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
-
-            if (!isIqraaGroup && attendanceInMonth < 10) return false;
+            if (!isIqraaGroup && attendanceInMonth < 5) return false;
 
             // New 15-day rule from joining date
             const joiningDate = parseCairoDateString(student.joiningDate);

@@ -43,7 +43,7 @@ const DebtorsPage: React.FC<DebtorsPageProps> = ({ students, groups, onPayDebt, 
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="mb-6">
                 <h1 className="text-2xl font-bold text-gray-800 mb-2">المدينون</h1>
-                <p className="text-gray-600">الطلاب المؤرشفون الذين لديهم مصروفات مستحقة (حضروا 10 حصص أو أكثر ولم يدفعوا)</p>
+                <p className="text-gray-600">الطلاب المؤرشفون الذين لديهم مصروفات مستحقة (حضروا 5 حصص أو أكثر ولم يدفعوا)</p>
             </div>
 
             <div className="space-y-6">

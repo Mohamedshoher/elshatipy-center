@@ -146,13 +146,13 @@ const DirectorReportsPage: React.FC<DirectorReportsPageProps> = ({ groups, stude
                     const isUnpaid = new Date(selectedMonth) >= new Date(student.joiningDate.substring(0, 7)) && (!feeRecord || !feeRecord.paid);
                     if (!isUnpaid) return false;
 
-                    // New rule: Student must attend 10+ sessions OR be in an 'Iqraa' group
+                    // New rule: Student must attend 5+ sessions OR be in an 'Iqraa' group
                     const attendanceInMonth = student.attendance.filter(record => {
                         return record.date.startsWith(selectedMonth) && record.status === AttendanceEnum.PRESENT;
                     }).length;
 
                     const isIqraaGroup = group.name.includes('إقراء') || group.name.includes('اقراء');
-                    if (!isIqraaGroup && attendanceInMonth < 10) return false;
+                    if (!isIqraaGroup && attendanceInMonth < 5) return false;
 
                     return true;
                 });

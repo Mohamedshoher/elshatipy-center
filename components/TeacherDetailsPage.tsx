@@ -281,7 +281,7 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
 
                     const group = groups.find(g => g.id === s.groupId);
                     const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
-                    const meetsAttendanceRule = isIqraaGroup || attendanceInMonth >= 10;
+                    const meetsAttendanceRule = isIqraaGroup || attendanceInMonth >= 5;
 
                     // 15-day grace period rule
                     let isWithinGracePeriod = false;
@@ -421,7 +421,7 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
 
                 const group = groups.find(g => g.id === s.groupId);
                 const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
-                const meetsAttendanceRule = isIqraaGroup || attendanceInMonth >= 10;
+                const meetsAttendanceRule = isIqraaGroup || attendanceInMonth >= 5;
 
                 // 15-day grace period rule
                 let isWithinGracePeriod = false;

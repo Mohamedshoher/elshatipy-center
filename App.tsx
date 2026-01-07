@@ -1090,7 +1090,7 @@ const App: React.FC = () => {
             if (month > currentMonth) return; // Skip future months
 
             const count = attendanceByMonth[month] || 0;
-            const meetsAttendanceRule = isIqraaGroup || count >= 10;
+            const meetsAttendanceRule = isIqraaGroup || count >= 5;
 
             if (meetsAttendanceRule) {
                 const feeRecord = studentToArchive.fees.find(f => f.month === month);
