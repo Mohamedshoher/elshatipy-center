@@ -142,7 +142,8 @@ export const useAutomationChecks = ({
                     }
                 }
 
-                // 2. فحص الغياب المتصل - 3 أيام
+                // 2. فحص الغياب المتصل - 3 أيام (تم إلغاؤه بناءً على طلب المستخدم)
+                /*
                 if (IS_AFTER_MIDNIGHT && lastAbsenceCheck !== yesterdayString && isWorkday && !isHoliday) {
                     batch.set(automationRef, { lastAbsenceCheck: yesterdayString }, { merge: true });
                     operationsCount++;
@@ -180,6 +181,7 @@ export const useAutomationChecks = ({
                         }
                     }
                 }
+                */
 
                 // 3. الفحص الأسبوعي
                 if (dayOfWeek === 4 && IS_AFTER_12_05) {

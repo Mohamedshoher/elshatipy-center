@@ -91,10 +91,10 @@ const DirectorNotificationsPage: React.FC<DirectorNotificationsPageProps> = Reac
   };
 
   const filteredAndSortedNotifications = useMemo(() => {
-    let result = notifications;
+    let result = notifications.filter(n => !n.content.startsWith('📢 تنبيه غياب:'));
 
     if (filterDate || filterTargetId !== 'all') {
-      result = notifications.filter(n => {
+      result = result.filter(n => {
         // Filter by Date
         if (filterDate && !n.date.startsWith(filterDate)) return false;
 

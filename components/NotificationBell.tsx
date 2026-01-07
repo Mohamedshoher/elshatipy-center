@@ -41,7 +41,7 @@ const NotificationBell: React.FC<NotificationBellProps> = ({ currentUser, notifi
                 // 3. Check if NOT deleted by current user
                 const isDeleted = n.deletedBy?.includes(currentUser.id);
 
-                return isTarget && !isDeleted;
+                return isTarget && !isDeleted && !n.content.startsWith('📢 تنبيه غياب:');
             })
             .sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
     }, [notifications, currentUser.id, teacherGroups]);

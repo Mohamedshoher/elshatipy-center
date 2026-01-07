@@ -14,7 +14,8 @@ const DirectorNotificationBell: React.FC<DirectorNotificationBellProps> = ({ not
     const [isOpen, setIsOpen] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
 
-    const unreadNotifications = notifications.filter(n => !n.isRead);
+    const unreadNotifications = notifications.filter(n => !n.isRead && (n as any).type !== 'student_consecutive_absence');
+    const filteredNotifications = notifications.filter(n => (n as any).type !== 'student_consecutive_absence');
 
     const toggleDropdown = () => {
         setIsOpen(prev => !prev);
@@ -43,7 +44,7 @@ const DirectorNotificationBell: React.FC<DirectorNotificationBellProps> = ({ not
     }, []);
 
     const handleClearAll = () => {
-        const allNotificationIds = notifications.map(n => n.id);
+        const allNotificationIds = filteredNotifications.map(n => n.id);
         if (allNotificationIds.length > 0) {
             if (window.confirm("هل أنت متأكد من مسح جميع الإشعارات؟")) {
                 onDelete(allNotificationIds);
@@ -83,7 +84,7 @@ const DirectorNotificationBell: React.FC<DirectorNotificationBellProps> = ({ not
                 <div className="absolute left-0 mt-2 w-[90vw] max-w-sm bg-white rounded-lg shadow-xl z-50 overflow-hidden flex flex-col max-h-[80vh]">
                     <div className="flex justify-between items-center py-3 px-4 border-b bg-gray-50">
                         <span className="font-bold text-gray-700">الإشعارات</span>
-                        {notifications.length > 0 && (
+                        {filteredNotifications.length > 0 && (
                             <button
                                 onClick={handleClearAll}
                                 className="text-xs font-semibold text-red-600 hover:bg-red-100 px-2 py-1 rounded transition-colors"
@@ -93,8 +94,8 @@ const DirectorNotificationBell: React.FC<DirectorNotificationBellProps> = ({ not
                         )}
                     </div>
                     <div className="overflow-y-auto flex-1">
-                        {notifications.length > 0 ? (
-                            notifications.map(n => (
+                        {filteredNotifications.length > 0 ? (
+                            filteredNotifications.map(n => (
                                 <div key={n.id} className={`p-4 border-b transition-colors duration-300 ${!n.isRead ? 'bg-blue-50' : 'bg-white'}`}>
                                     <div className="mb-2">
                                         <p className="text-gray-800 text-base break-words">{renderContent(n)}</p>
