@@ -1063,9 +1063,36 @@ const App: React.FC = () => {
             }
         });
 
-        // Check each month for unpaid fees with 10+ attendance
-        Object.entries(attendanceByMonth).forEach(([month, count]) => {
-            if (count >= 10) {
+        // Check months for unpaid fees with 10+ attendance (or Iqraa exception)
+        const group = groups.find(g => g.id === studentToArchive.groupId);
+        const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
+        const joiningMonth = studentToArchive.joiningDate.substring(0, 7);
+        const currentMonth = getCairoDateString().substring(0, 7);
+
+        // Determine which months to check for debt
+        let monthsToEvaluate: string[] = [];
+        if (isIqraaGroup) {
+            // For Iqra'a groups, check all months from joining date to current month
+            let start = new Date(joiningMonth + '-01');
+            let end = new Date(currentMonth + '-01');
+            while (start <= end) {
+                monthsToEvaluate.push(start.toISOString().substring(0, 7));
+                start.setMonth(start.getMonth() + 1);
+            }
+        } else {
+            // For other groups, check months with 10+ attendance, plus the current month if it has attendance
+            const monthsWithAttendance = Object.keys(attendanceByMonth);
+            monthsToEvaluate = Array.from(new Set([...monthsWithAttendance, currentMonth]));
+        }
+
+        monthsToEvaluate.forEach(month => {
+            if (month < joiningMonth) return; // Skip months before joining date
+            if (month > currentMonth) return; // Skip future months
+
+            const count = attendanceByMonth[month] || 0;
+            const meetsAttendanceRule = isIqraaGroup || count >= 10;
+
+            if (meetsAttendanceRule) {
                 const feeRecord = studentToArchive.fees.find(f => f.month === month);
                 if (!feeRecord || !feeRecord.paid) {
                     debtMonths.push(month);
@@ -1073,7 +1100,10 @@ const App: React.FC = () => {
             }
         });
 
-        const hasDebt = debtMonths.length > 0;
+        // Ensure no duplicates and sort
+        const uniqueDebtMonths = Array.from(new Set(debtMonths)).sort();
+
+        const hasDebt = uniqueDebtMonths.length > 0;
 
         // Close modal immediately for faster UX
         setStudentToArchive(null);
@@ -1090,7 +1120,7 @@ const App: React.FC = () => {
             };
 
             if (hasDebt) {
-                updateData.debtMonths = debtMonths;
+                updateData.debtMonths = uniqueDebtMonths;
             }
 
             await updateDoc(doc(db, 'students', studentId), updateData);

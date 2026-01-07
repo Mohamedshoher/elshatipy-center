@@ -7,7 +7,7 @@ import CurrencyDollarIcon from './icons/CurrencyDollarIcon';
 import CalendarCheckIcon from './icons/CalendarCheckIcon';
 import UsersIcon from './icons/UsersIcon';
 import WhatsAppIcon from './icons/WhatsAppIcon';
-import { getCairoDateString, getCairoNow } from '../services/cairoTimeHelper';
+import { getCairoDateString, getCairoNow, parseCairoDateString } from '../services/cairoTimeHelper';
 
 interface TeacherReportPageProps {
   teacher: Teacher;
@@ -59,38 +59,76 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
     return students.filter(s => groupIds.includes(s.groupId) && !s.isArchived);
   }, [students, assignedGroups]);
 
-  const { collectedByTeacher, collectedByDirector, totalRevenue } = useMemo(() => {
-    const groupIds = assignedGroups.map(g => g.id);
+  const { collectedByTeacher, collectedByDirector, totalCollectedRevenueLocal, totalExpectedRevenue } = useMemo(() => {
+    const groupIds = new Set(assignedGroups.map(g => g.id));
     let byTeacher = 0;
     let byDirector = 0;
-    let total = 0;
+    let collectedTotal = 0;
+    let expectedTotal = 0;
+
+    const monthPrefix = selectedMonth;
 
     students.forEach(s => {
-      s.fees.forEach(fee => {
-        const isMatch = fee.month === selectedMonth && fee.paid && fee.amountPaid;
-        if (!isMatch) return;
+      if (groupIds.has(s.groupId)) {
+        // Collected Logic
+        s.fees.forEach(fee => {
+          if (fee.month === monthPrefix && fee.paid && fee.amountPaid) {
+            const amount = fee.amountPaid || 0;
+            const isCollectedByThisTeacher = fee.collectedBy === teacher.id;
+            const isCollectedByDirector = fee.collectedBy === 'director';
+            const isInTeacherGroup = groupIds.has(s.groupId);
 
-        const amount = fee.amountPaid || 0;
-        const isCollectedByThisTeacher = fee.collectedBy === teacher.id;
-        const isCollectedByDirector = fee.collectedBy === 'director';
-        const isInTeacherGroup = groupIds.includes(s.groupId);
+            if (isCollectedByThisTeacher) {
+              byTeacher += amount;
+              collectedTotal += amount;
+            } else if (isCollectedByDirector && isInTeacherGroup) {
+              byDirector += amount;
+              collectedTotal += amount;
+            } else if (!fee.collectedBy && isInTeacherGroup) {
+              byTeacher += amount;
+              collectedTotal += amount;
+            }
+          }
+        });
 
-        // Logic matches TeacherDetailsPage for consistency
-        if (isCollectedByThisTeacher) {
-          byTeacher += amount;
-          total += amount;
-        } else if (isCollectedByDirector && isInTeacherGroup) {
-          byDirector += amount;
-          total += amount;
-        } else if (!fee.collectedBy && isInTeacherGroup) {
-          // Legacy support: assume teacher if in group and no collector is specified
-          byTeacher += amount;
-          total += amount;
+        // Expected Logic (Matches TeacherDetailsPage)
+        const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
+        const hasPaidCurrentMonth = !!monthFee;
+
+        const attendanceInMonth = s.attendance.filter(record => {
+          return record.date.startsWith(monthPrefix) && record.status === 'present';
+        }).length;
+
+        const group = assignedGroups.find(g => g.id === s.groupId);
+        const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
+        const meetsAttendanceRule = isIqraaGroup || attendanceInMonth >= 10;
+
+        // 15-day grace period rule
+        let isWithinGracePeriod = false;
+        if (!hasPaidCurrentMonth) {
+          const joiningDate = parseCairoDateString(s.joiningDate);
+          joiningDate.setHours(0, 0, 0, 0);
+          const [year, monthNum] = selectedMonth.split('-').map(Number);
+          const lastDayDate = new Date(year, monthNum, 0);
+          const checkDate = getCairoNow() < lastDayDate ? getCairoNow() : lastDayDate;
+          checkDate.setHours(0, 0, 0, 0);
+          const diffTime = checkDate.getTime() - joiningDate.getTime();
+          const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+          if (diffDays < 15) isWithinGracePeriod = true;
         }
-      });
+
+        if (hasPaidCurrentMonth || (!s.isArchived && meetsAttendanceRule && !isWithinGracePeriod)) {
+          expectedTotal += (s.monthlyFee || 0);
+        }
+      }
     });
 
-    return { collectedByTeacher: byTeacher, collectedByDirector: byDirector, totalRevenue: total };
+    return {
+      collectedByTeacher: byTeacher,
+      collectedByDirector: byDirector,
+      totalCollectedRevenueLocal: collectedTotal,
+      totalExpectedRevenue: expectedTotal
+    };
   }, [students, assignedGroups, selectedMonth, teacher.id]);
 
   const collectedAmount = collectedByTeacher;
@@ -111,7 +149,7 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
     // If paymentType is not set, default to SALARY for backward compatibility
     const isPartnership = teacher.paymentType === PaymentType.PARTNERSHIP;
     const baseSalary = isPartnership ? 0 : (teacher.salary || 0);
-    const partnershipAmount = isPartnership ? (totalRevenue * (teacher.partnershipPercentage || 0) / 100) : 0;
+    const partnershipAmount = isPartnership ? (totalExpectedRevenue * (teacher.partnershipPercentage || 0) / 100) : 0;
 
     const adjustments = teacherPayrollAdjustments.find(p => p.teacherId === teacher.id && p.month === selectedMonth) || { bonus: 0, isPaid: false };
     const absenceDays = attendanceForMonth.reduce((total, record) => total + getAbsenceValue(record.status), 0);
@@ -141,7 +179,7 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
       finalSalary,
       isPaid: adjustments.isPaid
     };
-  }, [teacher, selectedMonth, teacherPayrollAdjustments, attendanceForMonth, financialSettings, collectedAmount]);
+  }, [teacher, selectedMonth, teacherPayrollAdjustments, attendanceForMonth, financialSettings, totalExpectedRevenue]);
 
   const bonusRecordsWithReason = useMemo(() =>
     attendanceForMonth.filter(r => getBonusValue(r.status) > 0 && r.reason),
@@ -156,7 +194,8 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
     let message = `*تقرير الأداء والراتب - ${monthName}*\n`;
     message += `*المدرس/ة:* ${teacher.name}\n\n`;
     message += `*--- ملخص الأداء ---*\n`;
-    message += `*إجمالي دخل مجموعاتك:* ${totalRevenue.toLocaleString()} EGP\n`;
+    message += `*إجمالي الدخل المتوقع:* ${totalExpectedRevenue.toLocaleString()} EGP\n`;
+    message += `*إجمالي ما تم تحصيله:* ${totalCollectedRevenueLocal.toLocaleString()} EGP\n`;
     message += `*ما حصلته أنت:* ${collectedByTeacher.toLocaleString()} EGP\n`;
     if (collectedByDirector > 0) {
       message += `*حصلته الإدارة مباشرة:* ${collectedByDirector.toLocaleString()} EGP\n`;
@@ -268,8 +307,12 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
                     <span className="font-bold text-green-700">🤝 شراكة ({teacher.partnershipPercentage}%)</span>
                   </div>
                   <div className="flex justify-between items-center border-b pb-2">
-                    <span className="text-gray-600">إجمالي دخل المجموعات:</span>
-                    <span className="font-bold">{totalRevenue.toLocaleString()} EGP</span>
+                    <span className="text-gray-600">إجمالي الدخل المتوقع:</span>
+                    <span className="font-bold">{totalExpectedRevenue.toLocaleString()} EGP</span>
+                  </div>
+                  <div className="flex justify-between items-center border-b pb-2">
+                    <span className="text-gray-600">إجمالي ما تم تحصيله:</span>
+                    <span className="font-bold">{totalCollectedRevenueLocal.toLocaleString()} EGP</span>
                   </div>
                   <div className="flex justify-between items-center border-b pb-2">
                     <span className="text-gray-600">ما حصله المدرس:</span>

@@ -18,6 +18,7 @@ import BonusReasonModal from './BonusReasonModal';
 import DeductionReasonModal from './DeductionReasonModal';
 import TeacherAttendanceCalendar from './TeacherAttendanceCalendar';
 import AttendanceActionModal from './AttendanceActionModal';
+import { getCairoNow, parseCairoDateString } from '../services/cairoTimeHelper';
 
 interface TeacherDetailsPageProps {
     onBack: () => void;
@@ -269,8 +270,34 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                     const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
                     const hasPaidCurrentMonth = !!monthFee;
 
-                    // Add monthly fee to expected expenses if active or if archived but paid
-                    if (!s.isArchived || hasPaidCurrentMonth) {
+                    // Add to totalCollectedRevenue if a fee was paid for this month, regardless of who collected it
+                    if (monthFee) {
+                        totalCollectedRevenue += (monthFee.amountPaid || 0);
+                    }
+
+                    const attendanceInMonth = s.attendance.filter(record => {
+                        return record.date.startsWith(monthPrefix) && record.status === 'present';
+                    }).length;
+
+                    const group = groups.find(g => g.id === s.groupId);
+                    const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
+                    const meetsAttendanceRule = isIqraaGroup || attendanceInMonth >= 10;
+
+                    // 15-day grace period rule
+                    let isWithinGracePeriod = false;
+                    if (!hasPaidCurrentMonth) {
+                        const joiningDate = parseCairoDateString(s.joiningDate);
+                        joiningDate.setHours(0, 0, 0, 0);
+                        const [year, monthNum] = selectedMonth.split('-').map(Number);
+                        const lastDayDate = new Date(year, monthNum, 0);
+                        const checkDate = getCairoNow() < lastDayDate ? getCairoNow() : lastDayDate;
+                        checkDate.setHours(0, 0, 0, 0);
+                        const diffTime = checkDate.getTime() - joiningDate.getTime();
+                        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                        if (diffDays < 15) isWithinGracePeriod = true;
+                    }
+
+                    if (hasPaidCurrentMonth || (!s.isArchived && meetsAttendanceRule && !isWithinGracePeriod)) {
                         totalExpectedExpenses += (s.monthlyFee || 0);
                     }
 
@@ -280,17 +307,14 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                         // If collected by this teacher, it counts towards their handed-over balance
                         if (monthFee.collectedBy === teacher.id) {
                             collectedByTeacher += amount;
-                            totalCollectedRevenue += amount;
                         }
                         // If collected by director but student is in this teacher's group, it counts towards total revenue for commission/partnership
                         else if (monthFee.collectedBy === 'director') {
                             collectedByDirector += amount;
-                            totalCollectedRevenue += amount;
                         }
                         // Legacy support or default
                         else if (!monthFee.collectedBy) {
                             collectedByTeacher += amount;
-                            totalCollectedRevenue += amount;
                         }
                     }
                 }
@@ -391,7 +415,29 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                 const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
                 const hasPaidCurrentMonth = !!monthFee;
 
-                if (!s.isArchived || hasPaidCurrentMonth) {
+                const attendanceInMonth = s.attendance.filter(record => {
+                    return record.date.startsWith(monthPrefix) && record.status === 'present';
+                }).length;
+
+                const group = groups.find(g => g.id === s.groupId);
+                const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
+                const meetsAttendanceRule = isIqraaGroup || attendanceInMonth >= 10;
+
+                // 15-day grace period rule
+                let isWithinGracePeriod = false;
+                if (!hasPaidCurrentMonth) {
+                    const joiningDate = parseCairoDateString(s.joiningDate);
+                    joiningDate.setHours(0, 0, 0, 0);
+                    const [year, monthNum] = selectedMonth.split('-').map(Number);
+                    const lastDayDate = new Date(year, monthNum, 0);
+                    const checkDate = getCairoNow() < lastDayDate ? getCairoNow() : lastDayDate;
+                    checkDate.setHours(0, 0, 0, 0);
+                    const diffTime = checkDate.getTime() - joiningDate.getTime();
+                    const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+                    if (diffDays < 15) isWithinGracePeriod = true;
+                }
+
+                if (hasPaidCurrentMonth || (!s.isArchived && meetsAttendanceRule && !isWithinGracePeriod)) {
                     const expected = s.monthlyFee || 0;
                     if (expected > 0) {
                         const paid = monthFee?.amountPaid || 0;
