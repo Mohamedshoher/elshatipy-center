@@ -39,9 +39,6 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
     checkDate.setHours(0, 0, 0, 0);
 
     students.forEach(student => {
-      // Skip archived students
-      if (student.isArchived) return;
-
       // Only consider students who have joined on or before the selected month
       if (student.joiningDate.substring(0, 7) > selectedMonth) {
         return;
@@ -50,53 +47,61 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
       const feeRecord = student.fees.find(f => f.month === selectedMonth);
       const isPaid = !!feeRecord?.paid;
 
-      // New rule: For unpaid students, joining date must be at least 15 days ago
-      if (!isPaid) {
-        const joiningDate = parseCairoDateString(student.joiningDate);
-        joiningDate.setHours(0, 0, 0, 0);
-
-        const diffTime = checkDate.getTime() - joiningDate.getTime();
-        const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
-
-        if (diffDays < 15) {
-          // Skip this student in the unpaid section if they haven't been here for 15 days
-          return;
-        }
-
-        // New rule: Student must attend 5+ sessions OR be in an 'Iqraa' group
-        const attendanceInMonth = student.attendance.filter(record => {
-          return record.date.startsWith(selectedMonth) && record.status === 'present';
-        }).length;
-
-        const group = groups.find(g => g.id === student.groupId);
-        const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
-
-        if (!isIqraaGroup && attendanceInMonth < 5) {
-          // Skip if they didn't attend enough days (unless it's an Iqraa group)
-          return;
-        }
-      }
-
-      totalDue += student.monthlyFee;
-
+      // If student paid, include them in total collected (even if archived)
       if (isPaid) {
         totalCollected += feeRecord?.amountPaid || student.monthlyFee;
         if (!paidStudentsByGroup[student.groupId]) {
           paidStudentsByGroup[student.groupId] = [];
         }
         paidStudentsByGroup[student.groupId].push(student);
-      } else {
-        if (!unpaidStudentsByGroup[student.groupId]) {
-          unpaidStudentsByGroup[student.groupId] = [];
+
+        // Add to totalDue as well since they should have paid
+        if (!student.isArchived) {
+          totalDue += student.monthlyFee;
         }
-        unpaidStudentsByGroup[student.groupId].push(student);
+        return; // Continue to next student
       }
+
+      // For unpaid students, skip archived ones
+      if (student.isArchived) return;
+
+      // New rule: For unpaid students, joining date must be at least 15 days ago
+      const joiningDate = parseCairoDateString(student.joiningDate);
+      joiningDate.setHours(0, 0, 0, 0);
+
+      const diffTime = checkDate.getTime() - joiningDate.getTime();
+      const diffDays = Math.floor(diffTime / (1000 * 60 * 60 * 24));
+
+      if (diffDays < 15) {
+        // Skip this student in the unpaid section if they haven't been here for 15 days
+        return;
+      }
+
+      // New rule: Student must attend 5+ sessions OR be in an 'Iqraa' group
+      const attendanceInMonth = student.attendance.filter(record => {
+        return record.date.startsWith(selectedMonth) && record.status === 'present';
+      }).length;
+
+      const group = groups.find(g => g.id === student.groupId);
+      const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
+
+      if (!isIqraaGroup && attendanceInMonth < 5) {
+        // Skip if they didn't attend enough days (unless it's an Iqraa group)
+        return;
+      }
+
+      // This student is unpaid and meets all criteria
+      totalDue += student.monthlyFee;
+      if (!unpaidStudentsByGroup[student.groupId]) {
+        unpaidStudentsByGroup[student.groupId] = [];
+      }
+      unpaidStudentsByGroup[student.groupId].push(student);
     });
 
     const totalRemaining = totalDue - totalCollected;
 
     return { totalCollected, totalRemaining, paidStudentsByGroup, unpaidStudentsByGroup };
-  }, [students, selectedMonth]);
+  }, [students, selectedMonth, groups]);
 
   const handleIndividualWhatsAppReminder = (student: Student) => {
     const monthName = new Date(selectedMonth + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' });
@@ -165,10 +170,11 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
                           <li key={student.id} className="flex items-center justify-between bg-white p-2 rounded-md hover:bg-blue-50 transition-colors">
                             <button
                               onClick={() => onViewStudent(student.id)}
-                              className="flex-grow text-right flex items-center"
+                              className="flex-grow text-right flex items-center gap-2"
                             >
-                              <UserIcon className="w-5 h-5 ml-2 text-gray-400" />
-                              {student.name}
+                              <UserIcon className="w-5 h-5 text-gray-400" />
+                              <span>{student.name}</span>
+                              {student.isArchived && <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">مؤرشف</span>}
                             </button>
                             {isUnpaidSection && onSendWhatsApp && (currentUserRole === 'director' || currentUserRole === 'supervisor') && (
                               <button

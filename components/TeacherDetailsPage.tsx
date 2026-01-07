@@ -124,6 +124,7 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
     const [calendarSelectedDate, setCalendarSelectedDate] = useState<string | null>(null);
     const [isActionModalOpen, setIsActionModalOpen] = useState(false);
     const [isDeficitDetailsOpen, setIsDeficitDetailsOpen] = useState(false);
+    const [isCollectedDetailsOpen, setIsCollectedDetailsOpen] = useState(false);
 
     const employee = teacher || supervisor;
     const isSupervisor = !!supervisor;
@@ -249,13 +250,14 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
     }, [employeeId, teacherAttendance, selectedMonth]);
 
     const payrollData = useMemo(() => {
-        if (!employeeId) return { baseSalary: 0, adjustments: { bonus: 0, isPaid: false }, absenceDays: 0, bonusDays: 0, absenceDeduction: 0, attendanceBonus: 0, manualBonusTotal: 0, finalSalary: 0, isPaid: false, isPartnership: false, partnershipAmount: 0, collectedAmount: 0, totalHandedOver: 0, deliveryDeficit: 0, collectedByTeacher: 0, collectedByDirector: 0, totalCollectedRevenue: 0, groupExpensesAmount: 0, receivedFromDirectorAmount: 0, totalExpectedExpenses: 0, groupDeficit: 0 };
+        if (!employeeId) return { baseSalary: 0, adjustments: { bonus: 0, isPaid: false }, absenceDays: 0, bonusDays: 0, absenceDeduction: 0, attendanceBonus: 0, manualBonusTotal: 0, finalSalary: 0, isPaid: false, isPartnership: false, partnershipAmount: 0, collectedAmount: 0, totalHandedOver: 0, deliveryDeficit: 0, collectedByTeacher: 0, collectedByDirector: 0, totalCollectedRevenue: 0, groupExpensesAmount: 0, receivedFromDirectorAmount: 0, totalExpectedExpenses: 0, groupDeficit: 0, collectedStudents: [] };
 
         // Calculate collected amount - differentiate between teacher and director collection
         let collectedByTeacher = 0;
         let collectedByDirector = 0;
         let totalCollectedRevenue = 0;
         let totalExpectedExpenses = 0;
+        let collectedStudents: { name: string, amount: number, isArchived: boolean, isTransferred: boolean, groupName?: string }[] = [];
 
         if (!isSupervisor && teacher) {
             const teacherGroupIds = new Set(
@@ -265,14 +267,37 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
             const monthPrefix = selectedMonth;
 
             students.forEach(s => {
-                // Only consider students in the teacher's groups
+                const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
+
+                // 1. Calculate Cash Held by Teacher (From ANY student, even if transferred/archived)
+                if (monthFee && monthFee.collectedBy === teacher.id) {
+                    const amount = monthFee.amountPaid || 0;
+                    collectedByTeacher += amount;
+
+                    const isTransferred = !teacherGroupIds.has(s.groupId) && !s.isArchived;
+                    const groupName = groups.find(g => g.id === s.groupId)?.name;
+
+                    collectedStudents.push({
+                        name: s.name,
+                        amount: amount,
+                        isArchived: s.isArchived,
+                        isTransferred: isTransferred,
+                        groupName: groupName
+                    });
+                }
+
+                // 2. Only consider students in the teacher's groups for Revenue and Expected Expenses
                 if (teacherGroupIds.has(s.groupId)) {
-                    const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
                     const hasPaidCurrentMonth = !!monthFee;
 
                     // Add to totalCollectedRevenue if a fee was paid for this month, regardless of who collected it
                     if (monthFee) {
                         totalCollectedRevenue += (monthFee.amountPaid || 0);
+
+                        // If collected by director but student is in this teacher's group, count it (already added to revenue mainly)
+                        if (monthFee.collectedBy === 'director') {
+                            collectedByDirector += (monthFee.amountPaid || 0);
+                        }
                     }
 
                     const attendanceInMonth = s.attendance.filter(record => {
@@ -299,23 +324,6 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
 
                     if (hasPaidCurrentMonth || (!s.isArchived && meetsAttendanceRule && !isWithinGracePeriod)) {
                         totalExpectedExpenses += (s.monthlyFee || 0);
-                    }
-
-                    if (monthFee) {
-                        const amount = monthFee.amountPaid || 0;
-
-                        // If collected by this teacher, it counts towards their handed-over balance
-                        if (monthFee.collectedBy === teacher.id) {
-                            collectedByTeacher += amount;
-                        }
-                        // If collected by director but student is in this teacher's group, it counts towards total revenue for commission/partnership
-                        else if (monthFee.collectedBy === 'director') {
-                            collectedByDirector += amount;
-                        }
-                        // Legacy support or default
-                        else if (!monthFee.collectedBy) {
-                            collectedByTeacher += amount;
-                        }
                     }
                 }
             });
@@ -400,7 +408,8 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
             groupExpensesAmount,
             receivedFromDirectorAmount,
             totalExpectedExpenses,
-            groupDeficit
+            groupDeficit,
+            collectedStudents: collectedStudents.sort((a, b) => b.amount - a.amount)
         };
     }, [employeeId, employeeSalary, selectedMonth, teacherPayrollAdjustments, attendanceForMonth, financialSettings, teacherCollections, teacherManualBonuses, teacher, isSupervisor, groups, students]);
 
@@ -930,9 +939,13 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                             </div>
 
                             {/* 2. ما حصله المدرس */}
-                            <div className="bg-blue-50 p-4 rounded-2xl border border-blue-100 text-center flex flex-col justify-center">
+                            <div
+                                onClick={() => setIsCollectedDetailsOpen(true)}
+                                className="bg-blue-50 p-4 rounded-2xl border border-blue-100 text-center flex flex-col justify-center cursor-pointer hover:bg-blue-100 transition-colors"
+                            >
                                 <p className="text-xs font-bold text-blue-400 mb-1 uppercase tracking-wider">ما حصله المدرس</p>
                                 <p className="text-xl font-black text-blue-700">{payrollData.collectedByTeacher.toLocaleString()} ج.م</p>
+                                <span className="text-[10px] text-blue-400 font-bold underline mt-1">عرض التفاصيل</span>
                             </div>
 
                             {/* 3. ما حصله المدير */}
@@ -1661,6 +1674,53 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                 currentStatus={attendanceForMonth.find(r => r.date === calendarSelectedDate)?.status}
                 onSetStatus={handleActionSelect}
             />
+
+            {/* Collected Students Modal */}
+            {isCollectedDetailsOpen && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+                        <div className="p-6 border-b flex justify-between items-center bg-gray-50">
+                            <h3 className="text-lg font-black text-gray-800">تفاصيل ما حصله المدرس ({payrollData.collectedStudents.length})</h3>
+                            <button onClick={() => setIsCollectedDetailsOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
+                                <span className="text-gray-500 text-xl font-bold">✕</span>
+                            </button>
+                        </div>
+                        <div className="p-6 max-h-[60vh] overflow-y-auto">
+                            <div className="space-y-3">
+                                {payrollData.collectedStudents.length > 0 ? (
+                                    payrollData.collectedStudents.map((s, idx) => (
+                                        <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
+                                            <div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="font-bold text-gray-800">{s.name}</span>
+                                                    {s.isArchived && <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">مؤرشف</span>}
+                                                    {s.isTransferred && <span className="px-2 py-0.5 bg-orange-100 text-orange-600 rounded text-[10px] font-bold">منقول</span>}
+                                                </div>
+                                                {s.groupName && <p className="text-xs text-gray-500 mt-1">{s.groupName}</p>}
+                                            </div>
+                                            <span className="font-black text-teal-600">{s.amount.toLocaleString()} ج.م</span>
+                                        </div>
+                                    ))
+                                ) : (
+                                    <p className="text-center text-gray-500 italic py-4">لا توجد بيانات متاحة.</p>
+                                )}
+                            </div>
+                        </div>
+                        <div className="p-6 bg-gray-50 border-t">
+                            <div className="flex justify-between items-center text-lg font-black">
+                                <span className="text-gray-700">الإجمالي:</span>
+                                <span className="text-teal-700">{payrollData.collectedByTeacher.toLocaleString()} ج.م</span>
+                            </div>
+                            <button
+                                onClick={() => setIsCollectedDetailsOpen(false)}
+                                className="mt-4 w-full py-3 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 transition-colors"
+                            >
+                                إغلاق
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div >
     );
 };

@@ -2649,7 +2649,7 @@ const App: React.FC = () => {
                     <TestsReportPage students={teacherStudents.students} groups={visibleGroups} onViewStudent={handleViewStudent} onBack={() => handleBackButton()} />
                 } />
                 <Route path="/financial_report" element={
-                    <FinancialReportPage students={teacherStudents.students} groups={visibleGroups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />
+                    <FinancialReportPage students={teacherStudents.allStudents} groups={visibleGroups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />
                 } />
 
                 {/* Sub-views as Route wrappers or catch-all */}
