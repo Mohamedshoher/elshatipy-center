@@ -375,22 +375,30 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
         const myId = currentUser.role === 'director' ? 'director' : currentUser.uid;
 
         // Listen both for messages sent TO me (for unreads and sorting) and FROM me (for sorting)
-        // Optimized: We limit these to the last 100 messages to populate recent chats list efficiently
+        // Optimized: We limit these to the last 100 messages for efficiency
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+
         const qTo = query(
             collection(db, 'messages'),
-            where('receiverId', '==', myId)
+            where('receiverId', '==', myId),
+            orderBy('timestamp', 'desc'),
+            limit(100)
         );
 
         const qFrom = query(
             collection(db, 'messages'),
-            where('senderId', '==', myId)
+            where('senderId', '==', myId),
+            orderBy('timestamp', 'desc'),
+            limit(100)
         );
 
-        // Separate query strictly for unread counts (no limit, but should be small number of docs)
+        // Separate query strictly for unread counts
         const qUnreads = query(
             collection(db, 'messages'),
             where('receiverId', '==', myId),
-            where('read', '==', false)
+            where('read', '==', false),
+            limit(200) // Safety limit for unreads
         );
 
         const updateStats = (snapshot: any, isOutgoing: boolean) => {
@@ -724,10 +732,12 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
     useEffect(() => {
         if (currentUser.role === 'parent') return; // Parents have fixed list
 
-        // Listen to ALL incoming messages for Director/Supervisor to discover new contacts (Parents)
+        // Listen to RECENT incoming messages for Director/Supervisor to discover new contacts
         const q = query(
             collection(db, 'messages'),
-            where('receiverId', '==', currentUser.role === 'director' ? 'director' : currentUser.uid)
+            where('receiverId', '==', currentUser.role === 'director' ? 'director' : currentUser.uid),
+            orderBy('timestamp', 'desc'),
+            limit(50)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {

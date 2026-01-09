@@ -1,4 +1,4 @@
-import React, { useState, useEffect, useCallback, useMemo, lazy, Suspense } from 'react';
+import React, { useState, useEffect, useMemo, useCallback, lazy, Suspense, useRef } from 'react';
 import type { Student, AttendanceStatus, TestRecord, Group, FeePayment, Teacher, CurrentUser, Staff, Expense, TeacherAttendanceRecord, TeacherPayrollAdjustment, FinancialSettings, Note, WeeklySchedule, TeacherCollectionRecord, Notification, DirectorNotification, ProgressPlan, ProgressPlanRecord, GroupType, Supervisor, TeacherManualBonus, Donation, Parent, UserRole, Badge, SalaryPayment, ParentVisit, LeaveRequest } from './types';
 import { ExpenseCategory, TeacherAttendanceStatus, DayOfWeek, TestType as TestTypeEnum, DirectorNotificationType } from './types';
 import { getCairoNow, getCairoDateString, getYesterdayDateString, getCairoTimeInMinutes, isCairoAfterMidnight, isCairoAfter12_05, getCairoDayOfWeek, isCairoWorkday } from './services/cairoTimeHelper';
@@ -267,17 +267,23 @@ const App: React.FC = () => {
     const [studentTypeFilter, setStudentTypeFilter] = useState<GroupType>('all');
 
 
-    // --- 1. Public Data Listeners (Load once with periodic refresh, not real-time) ---
+    // --- 1. Public Data Fetch (Load once at startup) ---
     useEffect(() => {
-        const publicCollections: { name: string, setter: React.Dispatch<any>, cacheKey: string }[] = [
-            { name: 'teachers', setter: setTeachers, cacheKey: 'shatibi_cache_teachers' },
-            { name: 'supervisors', setter: setSupervisors, cacheKey: 'shatibi_cache_supervisors' },
-            { name: 'parents', setter: setParents, cacheKey: 'shatibi_cache_parents' },
+        const publicCollections: { name: string, setter: React.Dispatch<any>, roles?: string[] }[] = [
+            { name: 'teachers', setter: setTeachers },
+            { name: 'supervisors', setter: setSupervisors },
+            { name: 'parents', setter: setParents, roles: ['director', 'supervisor'] },
         ];
 
         const loadPublicData = async () => {
-            for (const { name, setter, cacheKey } of publicCollections) {
+            for (const { name, setter, roles } of publicCollections) {
+                // If roles are specified, only fetch if currentUser matches
+                if (roles && currentUser && !roles.includes(currentUser.role)) {
+                    continue;
+                }
+
                 try {
+                    console.log(`Fetching ${name}...`);
                     const snapshot = await getDocs(collection(db, name));
                     const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
                     setter(data);
@@ -288,11 +294,8 @@ const App: React.FC = () => {
         };
 
         loadPublicData();
-        
-        // Refresh every 5 minutes instead of real-time
-        const interval = setInterval(loadPublicData, 5 * 60 * 1000);
-        return () => clearInterval(interval);
-    }, []);
+        // Removed setInterval to protect from 180K+ reads/hour leak
+    }, [currentUser?.role]);
 
     // --- 2. Protected Data Listeners (Only after Login) ---
     useEffect(() => {
@@ -344,14 +347,28 @@ const App: React.FC = () => {
                     return () => { };
                 }
             } else if (currentUser.role === 'teacher') {
-                // If they have groups, we could scope by groupId. 
-                // However, teachers usually have < 10 groups, so if we have them we can use them.
-                // For now, to keep it robust against group changes, we use the active filter.
+                // IMPORTANT: Only fetch students for groups taught by this teacher
+                const teacherGroupIds = groups.filter(g => g.teacherId === currentUser.id).map(g => g.id);
+                if (teacherGroupIds.length > 0) {
+                    // Firestore 'in' limit is 30. Teachers usually have < 30 groups.
+                    activeStudentsQuery = query(
+                        collection(db, 'students'),
+                        where('isArchived', '==', false),
+                        where('groupId', 'in', teacherGroupIds.slice(0, 30))
+                    );
+                } else {
+                    // No groups yet, wait or return empty
+                    setActiveStudentsRaw([]);
+                    return () => { };
+                }
             }
 
             return onSnapshot(activeStudentsQuery, (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
                 setActiveStudentsRaw(data);
+                setIsDataLoading(false);
+            }, (err) => {
+                console.error("Students listener error:", err);
                 setIsDataLoading(false);
             });
         };
@@ -374,14 +391,19 @@ const App: React.FC = () => {
         });
 
         // Add teacherAttendance for Director (needed for automation checks)
+        // Optimization: Only fetch attendance from the last 120 days
+        const fourMonthsAgo = new Date();
+        fourMonthsAgo.setDate(fourMonthsAgo.getDate() - 120);
+        const dateThreshold = fourMonthsAgo.toISOString().split('T')[0];
+
         if (currentUser.role === 'director' || currentUser.role === 'supervisor') {
-            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), limit(1000)), (snapshot) => {
+            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('date', '>=', dateThreshold), limit(1000)), (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 setTeacherAttendance(data);
             });
             unsubscribers.push(unsub);
         } else if (currentUser.role === 'teacher') {
-            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('teacherId', '==', currentUser.id), limit(500)), (snapshot) => {
+            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('teacherId', '==', currentUser.id), where('date', '>=', dateThreshold), limit(500)), (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 setTeacherAttendance(data);
             });
@@ -398,73 +420,93 @@ const App: React.FC = () => {
         return () => unsubscribers.forEach(unsub => unsub());
     }, [currentUser]);
 
-    // 2e. Defer heavy finance listeners to only run when on relevant pages
+    // 2e. Finance listeners - Persistent during session to avoid re-fetches on navigation
     useEffect(() => {
-        if (!currentUser) return;
-
-        const isFinanceRelatedPage = ['/finance', '/director-reports', '/financial-report', '/teacher-manager', '/general-view', '/fee-collection'].includes(location.pathname) || !!teacherForDetails || !!supervisorForDetails;
-        if (!isFinanceRelatedPage) {
-            // We don't clear the state here to avoid flickering, but we don't start new listeners
+        if (!currentUser) {
+            setStaff([]);
+            setExpenses([]);
+            setTeacherPayrollAdjustments([]);
+            setTeacherCollections([]);
+            setTeacherManualBonuses([]);
+            setSalaryPayments([]);
+            setDonations([]);
             return;
         }
 
         const unsubscribers: (() => void)[] = [];
+        const fourMonthsAgo = new Date();
+        fourMonthsAgo.setDate(fourMonthsAgo.getDate() - 120);
+        const dateThreshold = fourMonthsAgo.toISOString().split('T')[0];
+        // For month-based collections, we need a prefix check or similar. 
+        // But for collections like expenses and collections that use date fields, we can use the threshold.
+
         const financeCollections = [
             { name: 'staff', setter: setStaff, directorOnly: true },
-            { name: 'expenses', setter: setExpenses, directorOnly: true },
+            { name: 'expenses', setter: setExpenses, directorOnly: true, dateFilter: 'date' },
             { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments },
-            { name: 'teacherCollections', setter: setTeacherCollections },
-            { name: 'teacherManualBonuses', setter: setTeacherManualBonuses },
-            { name: 'salaryPayments', setter: setSalaryPayments },
-            { name: 'donations', setter: setDonations, directorOnly: true },
+            { name: 'teacherCollections', setter: setTeacherCollections, dateFilter: 'date' },
+            { name: 'teacherManualBonuses', setter: setTeacherManualBonuses, dateFilter: 'date' },
+            { name: 'salaryPayments', setter: setSalaryPayments, dateFilter: 'date' },
+            { name: 'donations', setter: setDonations, directorOnly: true, dateFilter: 'date' },
         ];
 
-        financeCollections.forEach(({ name, setter, directorOnly }) => {
+        financeCollections.forEach(({ name, setter, directorOnly, dateFilter }) => {
             if (directorOnly && currentUser.role !== 'director' && currentUser.role !== 'supervisor') return;
 
-            let q = query(collection(db, name));
+            let constraints: any[] = [limit(1000)];
             if (currentUser.role === 'teacher') {
-                q = query(collection(db, name), where('teacherId', '==', currentUser.id));
+                constraints = [where('teacherId', '==', currentUser.id), limit(500)];
             }
+
+            if (dateFilter) {
+                constraints.push(where(dateFilter, '>=', dateThreshold));
+            }
+
+            const q = query(collection(db, name), ...constraints);
 
             const unsub = onSnapshot(q, (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 setter(data);
-            });
+            }, (err) => console.error(`Finance listener error (${name}):`, err));
             unsubscribers.push(unsub);
         });
 
         return () => unsubscribers.forEach(unsub => unsub());
-    }, [currentUser, location.pathname, teacherForDetails, supervisorForDetails]);
+    }, [currentUser?.id, groups.length]); // Re-run if groups length changes to capture teacher groups correctly
 
-    // 2d. Fragmented Snapshot for Archived Students (Lazy Loaded with Limit)
+    // 2d. Archived Students - Optimized to fetch only once per session or when explicitly needed
+    const lastArchiveFetchRef = useRef<string | null>(null);
     useEffect(() => {
         if (!currentUser) {
             setArchivedStudentsRaw([]);
+            lastArchiveFetchRef.current = null;
             return;
         }
 
-        // Load archived students for pages that need them for financial calculations or reporting
+        const currentUserId = currentUser.role === 'director' ? 'director' : (currentUser as any).id;
+
+        // Only fetch if director/supervisor, or if on relevant pages and haven't fetched in this session
         const relevantPages = ['/archive', '/finance', '/teacher-manager', '/director-reports', '/financial-report', '/fee-collection', '/debtors', '/general-view', '/teacher-report', '/staff-details'];
         const isNeeded = relevantPages.includes(location.pathname) ||
             currentUser.role === 'director' ||
             currentUser.role === 'supervisor' ||
             !!viewingTeacherReportId;
 
-        if (!isNeeded) {
-            setArchivedStudentsRaw([]);
+        if (!isNeeded || lastArchiveFetchRef.current === currentUserId) {
             return;
         }
 
-        console.log("Loading archived students snapshot...");
-        const archivedQuery = query(collection(db, 'students'), where('isArchived', '==', true), limit(2000));
-        const unsub = onSnapshot(archivedQuery, (snapshot) => {
+        console.log("Loading archived students (one-time fetch)...");
+        const archivedQuery = query(collection(db, 'students'), where('isArchived', '==', true), limit(1000));
+
+        // Use getDocs instead of onSnapshot for archives to save continuous reads
+        getDocs(archivedQuery).then((snapshot) => {
             const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
             setArchivedStudentsRaw(data);
-        });
+            lastArchiveFetchRef.current = currentUserId;
+        }).catch(err => console.error("Archive fetch error:", err));
 
-        return () => unsub();
-    }, [currentUser, location.pathname, viewingTeacherReportId]);
+    }, [currentUser?.role, (currentUser as any)?.id, location.pathname, viewingTeacherReportId]);
 
     // Optimized Notifications Fetching (Last 30 Days)
     useEffect(() => {

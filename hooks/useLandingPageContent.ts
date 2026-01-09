@@ -1,6 +1,6 @@
 import { useState, useEffect } from 'react';
 import { db } from '../services/firebase';
-import { doc, onSnapshot, setDoc, updateDoc } from 'firebase/firestore';
+import { doc, onSnapshot, setDoc, updateDoc, getDoc } from 'firebase/firestore';
 import type { LandingPageContent } from '../types';
 
 // IDs محددة لكل نوع محتوى
@@ -25,6 +25,15 @@ export const useLandingPageContent = () => {
 
   // جلب المسودة (للمدير فقط)
   useEffect(() => {
+    // التحقق من الصلاحية من localStorage للهوك
+    const userStr = localStorage.getItem('shatibi-center-currentUser');
+    const isDirector = userStr && (userStr.includes('"director"') || userStr.includes('"supervisor"'));
+
+    if (!isDirector) {
+      setLoadingDraft(false);
+      return;
+    }
+
     const unsubscribe = onSnapshot(
       doc(db, 'landingPageContent', DRAFT_DOC_ID),
       (snapshot) => {
@@ -46,11 +55,11 @@ export const useLandingPageContent = () => {
     return unsubscribe;
   }, []);
 
-  // جلب المحتوى المنشور (للصفحة الرئيسية)
+  // جلب المحتوى المنشور (لجميع الزوار - جلب مرة واحدة لتوفير القراءات)
   useEffect(() => {
-    const unsubscribe = onSnapshot(
-      doc(db, 'landingPageContent', PUBLISHED_DOC_ID),
-      (snapshot) => {
+    const fetchPublished = async () => {
+      try {
+        const snapshot = await getDoc(doc(db, 'landingPageContent', PUBLISHED_DOC_ID));
         if (snapshot.exists()) {
           const data = snapshot.data() as LandingPageContent;
           setPublishedContent(data);
@@ -59,16 +68,15 @@ export const useLandingPageContent = () => {
           setPublishedContent(null);
           localStorage.removeItem('shatibi_landing_cache');
         }
-        setLoadingPublished(false);
-      },
-      (error) => {
+      } catch (error) {
         console.error('خطأ في جلب المحتوى المنشور:', error);
-        setErrorPublished(error.message);
+        setErrorPublished((error as any).message);
+      } finally {
         setLoadingPublished(false);
       }
-    );
+    };
 
-    return unsubscribe;
+    fetchPublished();
   }, []);
 
   // حفظ مسودة محتوى
