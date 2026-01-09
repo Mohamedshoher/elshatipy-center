@@ -267,7 +267,7 @@ const App: React.FC = () => {
     const [studentTypeFilter, setStudentTypeFilter] = useState<GroupType>('all');
 
 
-    // --- 1. Public Data Listeners (Always active for Login) ---
+    // --- 1. Public Data Listeners (Load once with periodic refresh, not real-time) ---
     useEffect(() => {
         const publicCollections: { name: string, setter: React.Dispatch<any>, cacheKey: string }[] = [
             { name: 'teachers', setter: setTeachers, cacheKey: 'shatibi_cache_teachers' },
@@ -275,18 +275,23 @@ const App: React.FC = () => {
             { name: 'parents', setter: setParents, cacheKey: 'shatibi_cache_parents' },
         ];
 
-        const unsubscribers = publicCollections.map(({ name, setter, cacheKey }) =>
-            onSnapshot(collection(db, name), (snapshot) => {
-                const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                setter(data);
-            }, (error) => {
-                console.error(`Error fetching public ${name}: `, error.message);
-            })
-        );
-
-        return () => {
-            unsubscribers.forEach(unsub => unsub());
+        const loadPublicData = async () => {
+            for (const { name, setter, cacheKey } of publicCollections) {
+                try {
+                    const snapshot = await getDocs(collection(db, name));
+                    const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
+                    setter(data);
+                } catch (error) {
+                    console.error(`Error fetching public ${name}: `, (error as any).message);
+                }
+            }
         };
+
+        loadPublicData();
+        
+        // Refresh every 5 minutes instead of real-time
+        const interval = setInterval(loadPublicData, 5 * 60 * 1000);
+        return () => clearInterval(interval);
     }, []);
 
     // --- 2. Protected Data Listeners (Only after Login) ---
@@ -355,13 +360,13 @@ const App: React.FC = () => {
 
         // 2c. Other Collections (Role Scoped for Teachers)
         const essentialCollections = [
-            { name: 'notes', setter: setNotes },
-            { name: 'parentVisits', setter: setParentVisits },
-            { name: 'leaveRequests', setter: setLeaveRequests },
+            { name: 'notes', setter: setNotes, limit: 500 },
+            { name: 'parentVisits', setter: setParentVisits, limit: 500 },
+            { name: 'leaveRequests', setter: setLeaveRequests, limit: 500 },
         ];
 
-        essentialCollections.forEach(({ name, setter }) => {
-            const unsub = onSnapshot(query(collection(db, name)), (snapshot) => {
+        essentialCollections.forEach(({ name, setter, limit: limitCount }) => {
+            const unsub = onSnapshot(query(collection(db, name), limit(limitCount)), (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 setter(data);
             });
@@ -370,13 +375,13 @@ const App: React.FC = () => {
 
         // Add teacherAttendance for Director (needed for automation checks)
         if (currentUser.role === 'director' || currentUser.role === 'supervisor') {
-            const unsub = onSnapshot(query(collection(db, 'teacherAttendance')), (snapshot) => {
+            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), limit(1000)), (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 setTeacherAttendance(data);
             });
             unsubscribers.push(unsub);
         } else if (currentUser.role === 'teacher') {
-            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('teacherId', '==', currentUser.id)), (snapshot) => {
+            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('teacherId', '==', currentUser.id), limit(500)), (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 setTeacherAttendance(data);
             });
@@ -432,7 +437,7 @@ const App: React.FC = () => {
         return () => unsubscribers.forEach(unsub => unsub());
     }, [currentUser, location.pathname, teacherForDetails, supervisorForDetails]);
 
-    // 2d. Fragmented Snapshot for Archived Students (Lazy Loaded)
+    // 2d. Fragmented Snapshot for Archived Students (Lazy Loaded with Limit)
     useEffect(() => {
         if (!currentUser) {
             setArchivedStudentsRaw([]);
@@ -452,7 +457,7 @@ const App: React.FC = () => {
         }
 
         console.log("Loading archived students snapshot...");
-        const archivedQuery = query(collection(db, 'students'), where('isArchived', '==', true));
+        const archivedQuery = query(collection(db, 'students'), where('isArchived', '==', true), limit(2000));
         const unsub = onSnapshot(archivedQuery, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
             setArchivedStudentsRaw(data);
@@ -475,7 +480,8 @@ const App: React.FC = () => {
         // Temporarily simplifying query to debug stack overflow
         const q = query(
             collection(db, 'notifications'),
-            where('date', '>=', dateString)
+            where('date', '>=', dateString),
+            limit(500)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {
@@ -504,7 +510,8 @@ const App: React.FC = () => {
         // Temporarily simplifying query to debug stack overflow
         const q = query(
             collection(db, 'directorNotifications'),
-            where('date', '>=', dateString)
+            where('date', '>=', dateString),
+            limit(500)
         );
 
         const unsubscribe = onSnapshot(q, (snapshot) => {

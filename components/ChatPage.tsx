@@ -307,7 +307,7 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
 
     // 2. Presence Update
     useEffect(() => {
-        const unsubscribe = onSnapshot(collection(db, 'presence'), (snapshot) => {
+        const unsubscribe = onSnapshot(query(collection(db, 'presence'), where('lastSeen', '>', new Date(Date.now() - 30 * 60 * 1000))), (snapshot) => {
             const presenceMap = new Map();
             snapshot.forEach(doc => presenceMap.set(doc.id, doc.data()));
 
