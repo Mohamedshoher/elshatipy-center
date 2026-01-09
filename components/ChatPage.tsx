@@ -463,19 +463,23 @@ const ChatPage: React.FC<ChatPageProps> = ({ currentUser, teachers, groups, stud
     // 4. Presence Heartbeat
     useEffect(() => {
         const updatePresence = async () => {
-            const myId = currentUser.role === 'director' ? 'director' : currentUser.uid;
-            const userRef = doc(db, 'presence', myId);
-            await setDoc(userRef, {
-                lastSeen: serverTimestamp(),
-                name: currentUser.name,
-                role: currentUser.role
-            }, { merge: true });
+            try {
+                const myId = currentUser.role === 'director' ? 'director' : currentUser.uid;
+                const userRef = doc(db, 'presence', myId);
+                await setDoc(userRef, {
+                    lastSeen: serverTimestamp(),
+                    name: currentUser.name,
+                    role: currentUser.role
+                }, { merge: true });
+            } catch (err) {
+                console.warn("Presence update failed (suppressed):", err);
+            }
         };
 
         updatePresence();
         const interval = setInterval(updatePresence, 60000);
         return () => clearInterval(interval);
-    }, [currentUser]);
+    }, [currentUser.uid, currentUser.role, currentUser.name]);
 
     // 3. Listen for Messages (Optimized with Caching)
     useEffect(() => {

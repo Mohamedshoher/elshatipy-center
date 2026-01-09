@@ -321,61 +321,70 @@ const App: React.FC = () => {
         let groupsQuery = query(collection(db, 'groups'));
         if (currentUser.role === 'teacher') {
             groupsQuery = query(collection(db, 'groups'), where('teacherId', '==', currentUser.id));
-        } else if (currentUser.role === 'parent') {
-            // Parents don't really need all groups, maybe only those their children are in
-            // But for now, we'll keep it simple to not break ParentView
         }
+
         const unsubGroups = onSnapshot(groupsQuery, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Group));
             setGroups(data);
         });
         unsubscribers.push(unsubGroups);
 
-        // 2b. Active Students (Role Scoped + Fragmented)
-        const fetchStudents = () => {
-            let activeStudentsQuery = query(collection(db, 'students'), where('isArchived', '==', false));
+        return () => unsubscribers.forEach(unsub => unsub());
+    }, [currentUser?.id, currentUser?.role]);
 
-            if (currentUser.role === 'parent') {
-                // Use the latest studentIds from the live parents state if available
-                const liveParent = parents.find(p => p.id === (currentUser as any).id);
-                const studentIds = liveParent ? liveParent.studentIds : (currentUser as any).studentIds;
+    // 2b. Active Students (Reactive to groups for teachers)
+    useEffect(() => {
+        if (!currentUser) return;
 
-                if (studentIds && studentIds.length > 0) {
-                    activeStudentsQuery = query(collection(db, 'students'), where(documentId(), 'in', studentIds.slice(0, 30)));
-                } else {
-                    setActiveStudentsRaw([]);
-                    return () => { };
-                }
-            } else if (currentUser.role === 'teacher') {
-                // IMPORTANT: Only fetch students for groups taught by this teacher
-                const teacherGroupIds = groups.filter(g => g.teacherId === currentUser.id).map(g => g.id);
-                if (teacherGroupIds.length > 0) {
-                    // Firestore 'in' limit is 30. Teachers usually have < 30 groups.
-                    activeStudentsQuery = query(
-                        collection(db, 'students'),
-                        where('isArchived', '==', false),
-                        where('groupId', 'in', teacherGroupIds.slice(0, 30))
-                    );
-                } else {
-                    // No groups yet, wait or return empty
-                    setActiveStudentsRaw([]);
-                    return () => { };
-                }
+        let activeStudentsQuery = query(collection(db, 'students'), where('isArchived', '==', false));
+
+        if (currentUser.role === 'parent') {
+            const liveParent = parents.find(p => p.id === (currentUser as any).id);
+            const studentIds = liveParent ? liveParent.studentIds : (currentUser as any).studentIds;
+
+            if (studentIds && studentIds.length > 0) {
+                activeStudentsQuery = query(collection(db, 'students'), where(documentId(), 'in', studentIds.slice(0, 30)));
+            } else {
+                setActiveStudentsRaw([]);
+                setIsDataLoading(false);
+                return;
             }
+        } else if (currentUser.role === 'teacher') {
+            // IMPORTANT: Only fetch students for groups taught by this teacher
+            // We need to wait for groups if they are not yet loaded
+            if (groups.length === 0) return;
 
-            return onSnapshot(activeStudentsQuery, (snapshot) => {
-                const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
-                setActiveStudentsRaw(data);
+            const teacherGroupIds = groups.filter(g => g.teacherId === currentUser.id).map(g => g.id);
+            if (teacherGroupIds.length > 0) {
+                // Remove 'isArchived' filter for teachers so they can see archived students
+                // in their ledger/financial reports if they paid fees.
+                activeStudentsQuery = query(
+                    collection(db, 'students'),
+                    where('groupId', 'in', teacherGroupIds.slice(0, 30))
+                );
+            } else {
+                setActiveStudentsRaw([]);
                 setIsDataLoading(false);
-            }, (err) => {
-                console.error("Students listener error:", err);
-                setIsDataLoading(false);
-            });
-        };
-        const unsubActiveStudents = fetchStudents();
-        unsubscribers.push(unsubActiveStudents);
+                return;
+            }
+        }
 
-        // 2c. Other Collections (Role Scoped for Teachers)
+        const unsub = onSnapshot(activeStudentsQuery, (snapshot) => {
+            const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
+            setActiveStudentsRaw(data);
+            setIsDataLoading(false);
+        }, (err) => {
+            console.error("Students listener error:", err);
+            setIsDataLoading(false);
+        });
+
+        return () => unsub();
+    }, [currentUser?.id, currentUser?.role, groups.length, parents.length]);
+
+    // 2c. Other Collections (Role Scoped for Teachers)
+    useEffect(() => {
+        if (!currentUser) return;
+        const unsubscribers: (() => void)[] = [];
         const essentialCollections = [
             { name: 'notes', setter: setNotes, limit: 500 },
             { name: 'parentVisits', setter: setParentVisits, limit: 500 },

@@ -7,8 +7,7 @@ const BELL_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2869/2869-pr
 const CHAT_SOUND_URL = 'https://assets.mixkit.co/active_storage/sfx/2357/2357-preview.mp3'; // Sweet message sound
 
 // VAPID مفتاح عام (يجب الحصول عليه من لوحة تحكم Firebase -> Cloud Messaging)
-// هذا مفتاح تجريبي، يرجى استبداله بمفتاحك الحقيقي ليعمل في الإنتاج
-const VAPID_KEY = "BDbX... (Replace with your actual VAPID key)";
+const VAPID_KEY = ""; // اتركه فارغاً مؤقتاً لحين إضافة مفتاح حقيقي
 
 export const requestNotificationPermission = async () => {
     if (!('Notification' in window)) {
@@ -31,6 +30,10 @@ export const registerFCMToken = async (userId: string) => {
         const hasPermission = await requestNotificationPermission();
         if (!hasPermission) return;
 
+        if (!VAPID_KEY) {
+            console.warn("FCM VAPID_KEY is missing. Notifications might not work.");
+            return;
+        }
         const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });
         if (currentToken) {
             console.log("FCM Token registered:", currentToken);
