@@ -24,7 +24,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisor
     const [parentError, setParentError] = useState('');
 
     const activeTeachers = teachers.filter(t => t.status === TeacherStatus.ACTIVE);
-    const DIRECTOR_PASSWORD = 'admin123';
+    const DIRECTOR_PASSWORD = '446699';
 
     const handleDirectorLogin = (e: React.FormEvent) => {
         e.preventDefault();
@@ -328,3 +328,4 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisor
 };
 
 export default LoginScreen;
+
