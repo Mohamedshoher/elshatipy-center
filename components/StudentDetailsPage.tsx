@@ -15,6 +15,7 @@ import ArrowRightIcon from './icons/ArrowRightIcon';
 import CheckCircleIcon from './icons/CheckCircleIcon';
 import CheckIcon from './icons/CheckIcon';
 import PlanSection from './PlanSection';
+import StudentAttendanceCalendar from './StudentAttendanceCalendar';
 
 interface StudentDetailsPageProps {
     student: Student;
@@ -68,7 +69,7 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
     const [testMonthFilter, setTestMonthFilter] = useState('all');
     const [testTypeFilter, setTestTypeFilter] = useState<'all' | TestType>('all');
     const [testSortOrder, setTestSortOrder] = useState<'asc' | 'desc'>('desc');
-    const [attendanceMonthFilter, setAttendanceMonthFilter] = useState('all');
+    const [attendanceMonthFilter, setAttendanceMonthFilter] = useState(() => new Date().toISOString().substring(0, 7));
     const [attendanceSortOrder, setAttendanceSortOrder] = useState<'asc' | 'desc'>('desc');
     const [reportPeriod, setReportPeriod] = useState<string>(() => new Date().toISOString().substring(0, 7));
     const [newPlan, setNewPlan] = useState<ProgressPlan>({});
@@ -239,6 +240,13 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
         });
         return tests;
     }, [student.tests, testMonthFilter, testTypeFilter, testSortOrder]);
+
+    const attendanceStats = useMemo(() => {
+        const monthRecords = student.attendance.filter(r => r.date.startsWith(attendanceMonthFilter));
+        const present = monthRecords.filter(r => r.status === AttendanceStatusEnum.PRESENT).length;
+        const absent = monthRecords.filter(r => r.status === AttendanceStatusEnum.ABSENT).length;
+        return { present, absent };
+    }, [student.attendance, attendanceMonthFilter]);
 
     const filteredAndSortedAttendance = useMemo(() => {
         const sorted = [...student.attendance].sort((a, b) => {
@@ -442,21 +450,56 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
             {/* Content */}
             <main className="container mx-auto p-4 flex-grow">
                 {activeTab === 'attendanceLog' && (
-                    <div>
-                        <div className="flex justify-between items-center mb-4">
-                            <h4 className="font-bold text-gray-700">سجل الحضور والغياب</h4>
-                            <div className="flex gap-2">
-                                <select value={attendanceMonthFilter} onChange={e => setAttendanceMonthFilter(e.target.value)} className="text-sm px-2 py-1 border rounded-md bg-white">
-                                    <option value="all">كل الشهور</option>
-                                    {attendanceMonths.map(m => <option key={m} value={m}>{new Date(m + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' })}</option>)}
-                                </select>
-                                <select value={attendanceSortOrder} onChange={e => setAttendanceSortOrder(e.target.value as 'asc' | 'desc')} className="text-sm px-2 py-1 border rounded-md bg-white">
-                                    <option value="desc">الأحدث أولاً</option>
-                                    <option value="asc">الأقدم أولاً</option>
-                                </select>
+                    <div className="max-w-4xl mx-auto space-y-6">
+                        {/* Summary Cards */}
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
+                                <div className="p-3 bg-green-50 rounded-2xl mb-3">
+                                    <CalendarCheckIcon className="w-8 h-8 text-green-600" />
+                                </div>
+                                <p className="text-xs font-bold text-gray-500 mb-1">صافي أيام الحضور</p>
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-3xl font-black text-green-600">{attendanceStats.present}</span>
+                                    <span className="text-xs font-bold text-green-500">يوم</span>
+                                </div>
+                            </div>
+                            <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100 flex flex-col items-center justify-center text-center">
+                                <div className="p-3 bg-red-50 rounded-2xl mb-3">
+                                    <ClockIcon className="w-8 h-8 text-red-600" />
+                                </div>
+                                <p className="text-xs font-bold text-gray-500 mb-1">صافي أيام الغياب</p>
+                                <div className="flex items-baseline gap-1">
+                                    <span className="text-3xl font-black text-red-600">{attendanceStats.absent}</span>
+                                    <span className="text-xs font-bold text-red-500">يوم</span>
+                                </div>
                             </div>
                         </div>
+
+                        {/* Calendar Header with Select */}
+                        <div className="bg-white p-6 rounded-3xl shadow-sm border border-gray-100">
+                            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-6">
+                                <h4 className="font-black text-gray-800 text-lg">التقويم الشهري للحضور</h4>
+                                <div className="flex items-center gap-3">
+                                    <label className="text-sm font-bold text-gray-500">اختر الشهر:</label>
+                                    <input
+                                        type="month"
+                                        value={attendanceMonthFilter}
+                                        onChange={(e) => setAttendanceMonthFilter(e.target.value)}
+                                        className="px-4 py-2 border rounded-xl bg-gray-50 text-sm font-bold outline-none focus:ring-2 focus:ring-blue-100 transition-all"
+                                    />
+                                </div>
+                            </div>
+
+                            <StudentAttendanceCalendar
+                                month={attendanceMonthFilter}
+                                attendanceRecords={student.attendance}
+                            />
+                        </div>
+
+                        {/* Old List View (Optional: could be kept but user asked for calendar like teacher) */}
+                        {/* 
                         <div className="space-y-3">
+                            <h4 className="font-bold text-gray-700 mt-8 mb-4">التفاصيل اليومية</h4>
                             {filteredAndSortedAttendance.length > 0 ? filteredAndSortedAttendance.map(record => (
                                 <div key={record.date} className="flex justify-between items-center bg-white p-4 rounded-xl shadow-sm border border-gray-100">
                                     <span className="font-medium text-gray-700">{new Date(record.date).toLocaleDateString('ar-EG', { weekday: 'long', year: 'numeric', month: 'long', day: 'numeric' })}</span>
@@ -468,6 +511,7 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
                                 </div>
                             )) : <p className="text-gray-500 text-center py-20 bg-white rounded-xl">لا يوجد سجل حضور مسجل.</p>}
                         </div>
+                        */}
                     </div>
                 )}
 

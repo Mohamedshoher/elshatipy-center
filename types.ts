@@ -381,13 +381,31 @@ export interface DirectorNotification {
 }
 
 // LANDING PAGE CONTENT TYPES
-export type PageSectionType = 'text' | 'image' | 'video' | 'testimonial' | 'cta' | 'advertisement' | 'slider' | 'youtube_shorts' | 'student_certificates';
+export type PageSectionType = 'text' | 'image' | 'video' | 'testimonial' | 'cta' | 'advertisement' | 'slider' | 'youtube_shorts' | 'student_certificates' | 'library' | 'data_collection';
 
 export interface SliderImage {
   id: string;
   url: string;
   caption?: string;
   imagePosition?: string;
+}
+
+export interface LibraryItem {
+  id: string;
+  title: string;
+  description?: string;
+  fileUrl: string;
+  thumbnailUrl?: string; // Optional cover image
+  category?: string;     // e.g., 'PDF', 'Research', 'Book'
+}
+
+export interface FormField {
+  id: string;
+  label: string;
+  type: 'text' | 'tel' | 'number' | 'textarea' | 'select';
+  placeholder?: string;
+  required: boolean;
+  options?: string[]; // for select type
 }
 
 export interface PageSection {
@@ -435,6 +453,14 @@ export interface PageSection {
 
   imagePosition?: string;        // وضعية الصورة (CSS object-position مثل 'center 20%')
 
+  // نوع "library": مكتبة ملفات وأبحاث
+  libraryItems?: LibraryItem[];
+
+  // نوع "data_collection": تجميع بيانات
+  formFields?: FormField[];
+  submitButtonText?: string;
+  successMessage?: string;
+
   isActive: boolean;             // هل القسم مفعل أم مخفي؟
   createdAt: string;             // تاريخ الإنشاء
   updatedAt: string;             // آخر تحديث
@@ -474,5 +500,14 @@ export interface LeaveRequest {
   reason: string;
   date: string; // ISO String
   status: 'pending' | 'approved' | 'rejected';
+}
+
+export interface LandingPageInquiry {
+  id: string;
+  sectionId: string;
+  sectionTitle: string;
+  data: Record<string, any>;
+  status: 'new' | 'viewed' | 'resolved';
+  createdAt: string;
 }
 

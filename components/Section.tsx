@@ -2,6 +2,8 @@ import React from 'react';
 import type { PageSection, Student } from '../types';
 import Slider from './Slider';
 import BadgeCertificatesSlider from './BadgeCertificatesSlider';
+import { collection, addDoc } from 'firebase/firestore';
+import { db } from '../services/firebase';
 
 interface SectionProps {
   section: PageSection;
@@ -278,7 +280,244 @@ const Section: React.FC<SectionProps> = ({ section, students = [] }) => {
       {section.type === 'student_certificates' && (
         <BadgeCertificatesSlider section={section} students={students || []} />
       )}
+
+      {section.type === 'library' && (
+        <div className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-white via-blue-50/20 to-indigo-50/20">
+          <div className="max-w-7xl mx-auto">
+            {section.title && (
+              <h2 className="text-4xl sm:text-5xl font-extrabold bg-gradient-to-r from-blue-700 to-indigo-700 bg-clip-text text-transparent py-2 mb-4 text-center">
+                {section.title}
+              </h2>
+            )}
+            {section.description && (
+              <p className="text-xl text-gray-600 mb-12 text-center font-medium max-w-3xl mx-auto">
+                {section.description}
+              </p>
+            )}
+
+            {section.libraryItems && section.libraryItems.length > 0 ? (
+              <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-4 xl:grid-cols-5 gap-6 sm:gap-8">
+                {section.libraryItems.map((item) => (
+                  <div key={item.id} className="group flex flex-col bg-white rounded-3xl overflow-hidden shadow-lg hover:shadow-2xl transition-all duration-500 transform hover:-translate-y-2 border border-blue-50">
+                    {/* Item Cover */}
+                    <div className="relative aspect-[3/4] overflow-hidden bg-gray-100">
+                      {item.thumbnailUrl ? (
+                        <img
+                          src={item.thumbnailUrl}
+                          alt={item.title}
+                          className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-700"
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center bg-gradient-to-br from-blue-50 to-indigo-100 text-blue-300">
+                          <span className="text-6xl mb-2">📚</span>
+                          <span className="text-xs font-bold opacity-40 uppercase tracking-widest">{item.category || 'PDF'}</span>
+                        </div>
+                      )}
+
+                      {/* Category Badge */}
+                      <div className="absolute top-4 right-4 bg-white/90 backdrop-blur-md px-3 py-1 rounded-full text-[10px] font-black text-blue-600 shadow-sm">
+                        {item.category || 'ملف'}
+                      </div>
+
+                      {/* Hover Overlay with Button */}
+                      <div className="absolute inset-0 bg-blue-900/60 opacity-0 group-hover:opacity-100 transition-opacity duration-300 flex items-center justify-center p-4">
+                        <a
+                          href={item.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="w-full py-3 bg-white text-blue-700 rounded-xl font-bold text-sm text-center shadow-xl hover:bg-blue-50 transition-colors transform translate-y-4 group-hover:translate-y-0 transition-transform"
+                        >
+                          فتح الملف 📖
+                        </a>
+                      </div>
+                    </div>
+
+                    {/* Item Info */}
+                    <div className="p-5 flex-1 flex flex-col">
+                      <h4 className="text-lg font-bold text-gray-900 mb-2 line-clamp-2 leading-tight group-hover:text-blue-600 transition-colors">
+                        {item.title}
+                      </h4>
+                      {item.description && (
+                        <p className="text-xs text-gray-500 line-clamp-3 mb-4 leading-relaxed">
+                          {item.description}
+                        </p>
+                      )}
+
+                      {/* Mobile Only Quick Action */}
+                      <div className="mt-auto sm:hidden">
+                        <a
+                          href={item.fileUrl}
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className="block w-full py-2 bg-blue-50 text-blue-600 rounded-xl text-xs font-bold text-center border border-blue-100"
+                        >
+                          تحميل/فتح
+                        </a>
+                      </div>
+                    </div>
+                  </div>
+                ))}
+              </div>
+            ) : (
+              <div className="text-center py-20 bg-gray-50 rounded-3xl border-2 border-dashed border-gray-200">
+                <p className="text-gray-400 font-bold">لا توجد ملفات في المكتبة حالياً</p>
+              </div>
+            )}
+          </div>
+        </div>
+      )}
+      {section.type === 'data_collection' && (
+        <div className="py-20 px-4 sm:px-6 lg:px-8 bg-gradient-to-br from-purple-50 via-white to-blue-50/30">
+          <div className="max-w-4xl mx-auto">
+            <div className="bg-white rounded-[2.5rem] shadow-2xl overflow-hidden border border-purple-100 relative">
+              <div className="absolute top-0 right-0 w-32 h-32 bg-purple-600/5 rounded-bl-[5rem]"></div>
+
+              <div className="p-8 md:p-12 relative z-10">
+                <div className="text-center mb-10">
+                  {section.title && (
+                    <h2 className="text-4xl md:text-5xl font-black text-gray-900 mb-4 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 bg-clip-text text-transparent">
+                      {section.title}
+                    </h2>
+                  )}
+                  {section.description && (
+                    <p className="text-lg text-gray-600 max-w-2xl mx-auto font-medium leading-relaxed">
+                      {section.description}
+                    </p>
+                  )}
+                </div>
+
+                <DataCollectionForm section={section} />
+              </div>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
+  );
+};
+
+const DataCollectionForm: React.FC<{ section: PageSection }> = ({ section }) => {
+  const [formData, setFormData] = React.useState<Record<string, any>>({});
+  const [isSubmitting, setIsSubmitting] = React.useState(false);
+  const [isSuccess, setIsSuccess] = React.useState(false);
+  const [error, setError] = React.useState<string | null>(null);
+
+  const handleSubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setIsSubmitting(true);
+    setError(null);
+
+    try {
+      const missingFields = (section.formFields || []).filter(f => f.required && !formData[f.id]);
+      if (missingFields.length > 0) {
+        throw new Error(`يرجى إكمال الحقول المطلوبة: ${missingFields.map(f => f.label).join(', ')}`);
+      }
+
+      await addDoc(collection(db, 'landingPageInquiries'), {
+        sectionId: section.id,
+        sectionTitle: section.title,
+        data: formData,
+        status: 'new',
+        createdAt: new Date().toISOString(),
+      });
+
+      setIsSuccess(true);
+      setFormData({});
+    } catch (err) {
+      setError(err instanceof Error ? err.message : 'حدث خطأ أثناء الإرسال');
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
+
+  if (isSuccess) {
+    return (
+      <div className="text-center py-12 animate-in fade-in zoom-in duration-500">
+        <div className="w-24 h-24 bg-green-100 rounded-full flex items-center justify-center mx-auto mb-6 shadow-inner">
+          <span className="text-5xl">✅</span>
+        </div>
+        <h3 className="text-2xl font-bold text-gray-900 mb-2">تم الإرسال بنجاح!</h3>
+        <p className="text-lg text-gray-600 mb-8">{section.successMessage || 'تم استلام بياناتك بنجاح، شكراً لتواصلك معنا.'}</p>
+        <button
+          onClick={() => setIsSuccess(false)}
+          className="text-purple-600 font-bold hover:underline"
+        >
+          إرسال طلب آخر
+        </button>
+      </div>
+    );
+  }
+
+  return (
+    <form onSubmit={handleSubmit} className="space-y-6">
+      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+        {(section.formFields || []).map((field) => (
+          <div key={field.id} className={field.type === 'textarea' ? 'md:col-span-2' : ''}>
+            <label className="block text-sm font-bold text-gray-700 mb-2 mr-2">
+              {field.label} {field.required && <span className="text-red-500">*</span>}
+            </label>
+
+            {field.type === 'textarea' ? (
+              <textarea
+                value={formData[field.id] || ''}
+                onChange={e => setFormData({ ...formData, [field.id]: e.target.value })}
+                required={field.required}
+                placeholder={field.placeholder}
+                rows={4}
+                className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-purple-500 focus:bg-white outline-none transition-all resize-none shadow-sm"
+              />
+            ) : field.type === 'select' ? (
+              <select
+                value={formData[field.id] || ''}
+                onChange={e => setFormData({ ...formData, [field.id]: e.target.value })}
+                required={field.required}
+                className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-purple-500 focus:bg-white outline-none transition-all shadow-sm appearance-none cursor-pointer"
+              >
+                <option value="">اختر {field.label}...</option>
+                {(field.options || []).map(opt => (
+                  <option key={opt} value={opt}>{opt}</option>
+                ))}
+              </select>
+            ) : (
+              <input
+                type={field.type}
+                value={formData[field.id] || ''}
+                onChange={e => setFormData({ ...formData, [field.id]: e.target.value })}
+                required={field.required}
+                placeholder={field.placeholder}
+                className="w-full p-4 bg-gray-50 border-2 border-gray-100 rounded-2xl focus:border-purple-500 focus:bg-white outline-none transition-all shadow-sm"
+              />
+            )}
+          </div>
+        ))}
+      </div>
+
+      {error && (
+        <div className="p-4 bg-red-50 text-red-600 rounded-xl font-bold text-sm animate-pulse">
+          ⚠️ {error}
+        </div>
+      )}
+
+      <div className="pt-4">
+        <button
+          type="submit"
+          disabled={isSubmitting}
+          className="w-full py-5 bg-gradient-to-r from-purple-600 via-indigo-600 to-blue-600 hover:from-purple-700 hover:via-indigo-700 hover:to-blue-700 text-white font-black text-xl rounded-2xl shadow-xl hover:shadow-2xl transition-all transform hover:scale-[1.02] active:scale-95 disabled:opacity-50 disabled:cursor-not-allowed flex items-center justify-center gap-3"
+        >
+          {isSubmitting ? (
+            <>
+              <div className="w-5 h-5 border-4 border-white border-t-transparent rounded-full animate-spin"></div>
+              جاري الإرسال...
+            </>
+          ) : (
+            <>
+              <span>{section.submitButtonText || 'إرسال المعلومات'}</span>
+              <span className="text-2xl translate-y-0.5">🚀</span>
+            </>
+          )}
+        </button>
+      </div>
+    </form>
   );
 };
 

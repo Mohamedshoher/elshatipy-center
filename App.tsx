@@ -514,16 +514,20 @@ const App: React.FC = () => {
         // For month-based collections, we need a prefix check or similar. 
         // But for collections like expenses and collections that use date fields, we can use the threshold.
 
-        const isFinancePage = location.pathname.includes('/finance') || location.pathname.includes('/financial-report') || location.pathname.includes('/general-view');
+        const isFinancePage = location.pathname.includes('/finance') ||
+            location.pathname.includes('/financial-report') ||
+            location.pathname.includes('/staff-details') || // Teacher Details Page
+            location.pathname.includes('/fee-collection') ||
+            location.pathname.includes('/general-view');
 
         const financeCollections = [
             { name: 'staff', setter: setStaff, directorOnly: true, limit: 100 },
-            { name: 'expenses', setter: setExpenses, directorOnly: true, dateFilter: 'date', limit: isFinancePage ? 500 : 50 },
-            { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments, limit: isFinancePage ? 300 : 50 },
-            { name: 'teacherCollections', setter: setTeacherCollections, dateFilter: 'date', limit: isFinancePage ? 500 : 50 },
-            { name: 'teacherManualBonuses', setter: setTeacherManualBonuses, dateFilter: 'date', limit: isFinancePage ? 300 : 50 },
-            { name: 'salaryPayments', setter: setSalaryPayments, dateFilter: 'date', limit: isFinancePage ? 300 : 50 },
-            { name: 'donations', setter: setDonations, directorOnly: true, dateFilter: 'date', limit: isFinancePage ? 300 : 50 },
+            { name: 'expenses', setter: setExpenses, directorOnly: true, dateFilter: 'date', limit: isFinancePage ? 1000 : 200 },
+            { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments, limit: isFinancePage ? 500 : 100 },
+            { name: 'teacherCollections', setter: setTeacherCollections, dateFilter: 'date', limit: isFinancePage ? 1000 : 300 },
+            { name: 'teacherManualBonuses', setter: setTeacherManualBonuses, dateFilter: 'date', limit: isFinancePage ? 500 : 100 },
+            { name: 'salaryPayments', setter: setSalaryPayments, dateFilter: 'date', limit: isFinancePage ? 500 : 100 },
+            { name: 'donations', setter: setDonations, directorOnly: true, dateFilter: 'date', limit: isFinancePage ? 500 : 100 },
         ];
 
         financeCollections.forEach(({ name, setter, directorOnly, dateFilter, limit: customLimit }) => {
@@ -538,6 +542,12 @@ const App: React.FC = () => {
 
             if (dateFilter) {
                 constraints.push(where(dateFilter, '>=', dateThreshold));
+                // Add orderBy to ensure we get the latest data when limited
+                // Note: This matches the 'date' field in 'where' and 'limit' which works without composite index for Director
+                // For Teacher, it might require index, but we'll try to use it for Director at least.
+                if (currentUser.role === 'director' || currentUser.role === 'supervisor') {
+                    constraints.push(orderBy(dateFilter, 'desc'));
+                }
             }
 
             const q = query(collection(db, name), ...constraints);
@@ -551,7 +561,7 @@ const App: React.FC = () => {
         });
 
         return () => unsubscribers.forEach(unsub => unsub());
-    }, [currentUser?.id, groups.length]); // Re-run if groups length changes to capture teacher groups correctly
+    }, [currentUser?.id, groups.length, location.pathname]); // Re-run if roles, groups or page changes
 
     // 2d. Archived Students - Optimized to fetch only once per session or when explicitly needed
     const lastArchiveFetchRef = useRef<string | null>(null);

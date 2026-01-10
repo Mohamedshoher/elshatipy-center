@@ -1,5 +1,5 @@
 
-import React from 'react';
+import React, { useState } from 'react';
 import StudentCard from './StudentCard';
 import { Student, Group, CurrentUser, UserRole } from '../types';
 
@@ -30,10 +30,16 @@ const ArchivePage: React.FC<ArchivePageProps> = ({
     onDeleteStudentPermanently,
     supervisorFilteredData
 }) => {
+    const [selectedGroupId, setSelectedGroupId] = useState<string>('all');
+
     let studentsToDisplay = students.filter(s => s.isArchived);
     if (searchTerm) {
         const searchLower = searchTerm.toLowerCase();
         studentsToDisplay = studentsToDisplay.filter(s => s.name.toLowerCase().includes(searchLower));
+    }
+
+    if (selectedGroupId !== 'all') {
+        studentsToDisplay = studentsToDisplay.filter(s => s.groupId === selectedGroupId);
     }
 
     studentsToDisplay = studentsToDisplay.filter(s => {
@@ -60,6 +66,24 @@ const ArchivePage: React.FC<ArchivePageProps> = ({
 
     return (
         <div className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
+            <div className="flex flex-col sm:flex-row justify-between items-center gap-4 mb-8">
+                <h1 className="text-3xl font-black text-gray-800">الأرشيف</h1>
+
+                <div className="flex items-center gap-2 bg-white px-4 py-2 rounded-2xl border border-gray-100 shadow-sm w-full sm:w-auto">
+                    <label className="text-sm font-bold text-gray-500 whitespace-nowrap">تصفية حسب المجموعة:</label>
+                    <select
+                        value={selectedGroupId}
+                        onChange={(e) => setSelectedGroupId(e.target.value)}
+                        className="bg-transparent border-none focus:ring-0 text-sm font-bold text-gray-700 outline-none cursor-pointer"
+                    >
+                        <option value="all">الكل</option>
+                        {groups.map(g => (
+                            <option key={g.id} value={g.id}>{g.name}</option>
+                        ))}
+                    </select>
+                </div>
+            </div>
+
             <div className="space-y-6">
                 {studentsToDisplay.length > 0 ? (
                     studentsToDisplay.map(student => (

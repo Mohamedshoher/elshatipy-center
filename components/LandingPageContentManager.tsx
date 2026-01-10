@@ -3,6 +3,7 @@ import type { LandingPageContent, PageSection, CurrentUser } from '../types';
 import { useLandingPageContent } from '../hooks/useLandingPageContent';
 import SectionForm from './SectionForm';
 import SectionPreview from './SectionPreview';
+import InquiriesManager from './InquiriesManager';
 import XIcon from './icons/XIcon';
 import UserPlusIcon from './icons/UserPlusIcon';
 import CheckCircleIcon from './icons/CheckCircleIcon';
@@ -28,7 +29,7 @@ const LandingPageContentManager: React.FC<LandingPageContentManagerProps> = ({
   const [errorMessage, setErrorMessage] = useState<string | null>(null);
   const [successMessage, setSuccessMessage] = useState<string | null>(null);
   const [previewMode, setPreviewMode] = useState(false);
-  const [activeTab, setActiveTab] = useState<'hero' | 'sections'>('hero');
+  const [activeTab, setActiveTab] = useState<'hero' | 'sections' | 'inquiries'>('hero');
   const [draggedSectionId, setDraggedSectionId] = useState<string | null>(null);
 
   // تهيئة المحتوى عند التحميل
@@ -327,6 +328,18 @@ const LandingPageContentManager: React.FC<LandingPageContentManagerProps> = ({
                 <span className="whitespace-nowrap">الأقسام ({editingContent?.sections.length || 0})</span>
               </span>
             </button>
+            <button
+              onClick={() => setActiveTab('inquiries')}
+              className={`flex-1 px-3 py-2 md:px-6 md:py-3 font-bold rounded-lg transition-all transform ${activeTab === 'inquiries'
+                ? 'bg-gradient-to-r from-purple-600 to-indigo-600 text-white shadow-lg scale-100 md:scale-105'
+                : 'text-gray-600 hover:bg-gray-100 hover:text-gray-800'
+                }`}
+            >
+              <span className="flex items-center justify-center gap-1.5 md:gap-2 text-sm md:text-base">
+                <span className="text-lg md:text-xl">📩</span>
+                <span className="whitespace-nowrap">الطلبات</span>
+              </span>
+            </button>
           </div>
 
           {/* قسم البطل - تصميم محسّن */}
@@ -441,6 +454,14 @@ const LandingPageContentManager: React.FC<LandingPageContentManagerProps> = ({
                   </button>
                 </>
               )}
+            </div>
+          )}
+
+          {/* تجميع البيانات */}
+          {activeTab === 'inquiries' && (
+            <div className="animate-in fade-in duration-500">
+              {/* سيتم إنشاء مكون InquiriesManager لاحقاً أو تضمينه هنا */}
+              <InquiriesManager />
             </div>
           )}
         </div>

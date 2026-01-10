@@ -104,6 +104,16 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
       return;
     }
 
+    if (formData.type === 'library' && (!formData.libraryItems || formData.libraryItems.length === 0)) {
+      alert('يرجى إضافة ملف واحد على الأقل للمكتبة');
+      return;
+    }
+
+    if (formData.type === 'data_collection' && (!formData.formFields || formData.formFields.length === 0)) {
+      alert('يرجى إضافة حقل واحد على الأقل للنموذج');
+      return;
+    }
+
     onSave(formData);
   };
 
@@ -143,6 +153,8 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
               <option value="advertisement">إعلان</option>
               <option value="slider">سلايدر صور (Slideshow)</option>
               <option value="student_certificates">🎖️ شهادات تقدير الطلاب</option>
+              <option value="library">📚 مكتبة الملفات والأبحاث (PDF)</option>
+              <option value="data_collection">フォーム تجميع بيانات (نماذج)</option>
             </select>
           </div>
 
@@ -551,29 +563,271 @@ const SectionForm: React.FC<SectionFormProps> = ({ section, onSave, onCancel }) 
             </div>
           )}
 
-          {formData.type === 'student_certificates' && (
-            <div className="bg-yellow-50 p-4 rounded-xl border border-yellow-200">
-              <h3 className="text-lg font-bold text-yellow-800 mb-2">🎖️ إعدادات قسم شهادات التقدير</h3>
-              <p className="text-sm text-yellow-700 mb-4">
-                سيقوم هذا القسم تلقائياً بعرض الطلاب الحاصلين على أوسمة في شكل شهادات تقدير متحركة.
-                سيتم ترتيبهم حسب الأحدث حصولاً على الأوسمة أو الأكثر تميزاً.
-              </p>
+          {formData.type === 'library' && (
+            <div className="space-y-6">
+              <div className="bg-blue-50 p-4 rounded-xl border border-blue-200">
+                <h3 className="text-lg font-bold text-blue-800 mb-4 flex items-center gap-2">
+                  <span>📚</span> إدارة ملفات المكتبة (PDF/أبحاث)
+                </h3>
 
-              <div className="bg-white p-4 rounded-lg border border-yellow-100">
-                <label className="block text-sm font-semibold text-gray-700 mb-2">
-                  عدد الشهادات (الطلاب) للعرض *
-                </label>
-                <input
-                  type="number"
-                  value={formData.sliderInterval || 10} // Using sliderInterval to store count for simplicity, or add new field
-                  onChange={e => handleInputChange('sliderInterval', parseInt(e.target.value) || 10)}
-                  min="3"
-                  max="50"
-                  className="w-full p-3 border border-gray-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-yellow-500"
-                />
-                <p className="text-xs text-gray-500 mt-1">
-                  الحد الأقصى لعدد الطلاب الذين سيظهرون في السلايدر.
-                </p>
+                <div className="space-y-4 max-h-[400px] overflow-y-auto p-2">
+                  {(formData.libraryItems || []).map((item, index) => (
+                    <div key={item.id} className="bg-white p-4 rounded-lg border border-gray-200 shadow-sm relative group">
+                      <button
+                        onClick={() => {
+                          const newItems = (formData.libraryItems || []).filter(i => i.id !== item.id);
+                          handleInputChange('libraryItems', newItems);
+                        }}
+                        className="absolute top-2 left-2 p-1.5 bg-red-100 text-red-600 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200"
+                        title="حذف الملف"
+                      >
+                        <XIcon className="w-4 h-4" />
+                      </button>
+
+                      <div className="space-y-3">
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">عنوان الملف/الكتاب *</label>
+                            <input
+                              type="text"
+                              value={item.title}
+                              onChange={e => {
+                                const newItems = [...(formData.libraryItems || [])];
+                                newItems[index] = { ...item, title: e.target.value };
+                                handleInputChange('libraryItems', newItems);
+                              }}
+                              className="w-full text-xs p-2 border border-blue-100 rounded focus:ring-1 focus:ring-blue-500"
+                              placeholder="مثال: كتاب الأربعون النووية"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">روبط الملف (PDF / Drive) *</label>
+                            <input
+                              type="url"
+                              value={item.fileUrl}
+                              onChange={e => {
+                                let url = e.target.value;
+                                if (url.includes('drive.google.com') && url.includes('/file/d/')) {
+                                  const match = url.match(/\/file\/d\/([^/]+)/);
+                                  if (match && match[1]) {
+                                    url = `https://drive.google.com/uc?export=view&id=${match[1]}`;
+                                    // Auto-set thumbnail if not set
+                                    if (!item.thumbnailUrl) {
+                                      const newItems = [...(formData.libraryItems || [])];
+                                      newItems[index] = {
+                                        ...item,
+                                        fileUrl: url,
+                                        thumbnailUrl: `https://drive.google.com/thumbnail?id=${match[1]}&sz=w500`
+                                      };
+                                      handleInputChange('libraryItems', newItems);
+                                      return;
+                                    }
+                                  }
+                                }
+                                const newItems = [...(formData.libraryItems || [])];
+                                newItems[index] = { ...item, fileUrl: url };
+                                handleInputChange('libraryItems', newItems);
+                              }}
+                              className="w-full text-xs p-2 border border-blue-100 rounded focus:ring-1 focus:ring-blue-500"
+                              placeholder="رابط التحميل المباشر أو Drive"
+                            />
+                          </div>
+                        </div>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
+                          <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">رابط صورة الغلاف (اختياري)</label>
+                            <input
+                              type="url"
+                              value={item.thumbnailUrl || ''}
+                              onChange={e => {
+                                let url = e.target.value;
+                                if (url.includes('drive.google.com') && url.includes('/file/d/')) {
+                                  const match = url.match(/\/file\/d\/([^/]+)/);
+                                  if (match && match[1]) {
+                                    url = `https://drive.google.com/thumbnail?id=${match[1]}&sz=w500`;
+                                  }
+                                }
+                                const newItems = [...(formData.libraryItems || [])];
+                                newItems[index] = { ...item, thumbnailUrl: url };
+                                handleInputChange('libraryItems', newItems);
+                              }}
+                              className="w-full text-xs p-2 border border-blue-100 rounded focus:ring-1 focus:ring-blue-500"
+                              placeholder="رابط صورة الغلاف (يظهر في المقدمة)"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-xs font-bold text-gray-500 mb-1">وصف قصير</label>
+                            <input
+                              type="text"
+                              value={item.description || ''}
+                              onChange={e => {
+                                const newItems = [...(formData.libraryItems || [])];
+                                newItems[index] = { ...item, description: e.target.value };
+                                handleInputChange('libraryItems', newItems);
+                              }}
+                              className="w-full text-xs p-2 border border-blue-100 rounded focus:ring-1 focus:ring-blue-500"
+                              placeholder="معلومات بسيطة عن الملف"
+                            />
+                          </div>
+                        </div>
+
+                        {/* Preview Item Card Tiny */}
+                        <div className="mt-2 p-2 bg-gray-50 rounded-lg flex items-center gap-3 border border-dashed border-gray-200">
+                          <div className="w-12 h-16 bg-white border rounded flex items-center justify-center overflow-hidden shrink-0">
+                            {item.thumbnailUrl ? (
+                              <img src={item.thumbnailUrl} alt="Thumbnail" className="w-full h-full object-cover" />
+                            ) : (
+                              <span className="text-xl">📄</span>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <p className="text-[10px] font-bold text-gray-800 truncate">{item.title || 'بدون عنوان'}</p>
+                            <p className="text-[9px] text-blue-500 truncate">{item.fileUrl || 'لا يوجد رابط'}</p>
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                  ))}
+                </div>
+
+                <button
+                  onClick={() => {
+                    const newItem = { id: `lib-${Date.now()}`, title: '', fileUrl: '', description: '', category: 'PDF' };
+                    handleInputChange('libraryItems', [...(formData.libraryItems || []), newItem]);
+                  }}
+                  className="w-full mt-4 py-3 border-2 border-dashed border-blue-300 rounded-lg text-blue-700 font-bold hover:bg-blue-100 transition-colors flex items-center justify-center gap-2"
+                >
+                  <span>➕</span> إضافة ملف جديد للمكتبة
+                </button>
+              </div>
+            </div>
+          )}
+
+          {formData.type === 'data_collection' && (
+            <div className="space-y-6">
+              <div className="bg-purple-50 p-4 rounded-xl border border-purple-200">
+                <h3 className="text-lg font-bold text-purple-800 mb-4 flex items-center gap-2">
+                  <span>📝</span> بناء نموذج تجميع البيانات
+                </h3>
+
+                <div className="space-y-6">
+                  <div className="grid grid-cols-1 md:grid-cols-2 gap-4 bg-white p-4 rounded-xl border border-purple-100">
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">نص زر الإرسال</label>
+                      <input
+                        type="text"
+                        value={formData.submitButtonText || 'إرسال'}
+                        onChange={e => handleInputChange('submitButtonText', e.target.value)}
+                        className="w-full p-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-purple-500"
+                        placeholder="مثال: سجل الآن"
+                      />
+                    </div>
+                    <div>
+                      <label className="block text-xs font-bold text-gray-500 mb-1">رسالة النجاح بعد الإرسال</label>
+                      <input
+                        type="text"
+                        value={formData.successMessage || 'تم استلام بياناتك بنجاح، شكراً لك!'}
+                        onChange={e => handleInputChange('successMessage', e.target.value)}
+                        className="w-full p-2 border border-gray-200 rounded-lg focus:ring-1 focus:ring-purple-500"
+                        placeholder="رسالة تظهر للمستخدم بعد النجاح"
+                      />
+                    </div>
+                  </div>
+
+                  <div className="space-y-4 max-h-[500px] overflow-y-auto p-2">
+                    <label className="block text-sm font-bold text-purple-700">الحقول المطلوبة في النموذج:</label>
+                    {(formData.formFields || []).map((field, index) => (
+                      <div key={field.id} className="bg-white p-4 rounded-xl border border-gray-200 shadow-sm relative group">
+                        <button
+                          onClick={() => {
+                            const newFields = (formData.formFields || []).filter(f => f.id !== field.id);
+                            handleInputChange('formFields', newFields);
+                          }}
+                          className="absolute top-2 left-2 p-1.5 bg-red-100 text-red-600 rounded-md opacity-0 group-hover:opacity-100 transition-opacity hover:bg-red-200 z-10"
+                        >
+                          <XIcon className="w-4 h-4" />
+                        </button>
+
+                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-4 items-start pt-2">
+                          <div className="lg:col-span-1">
+                            <label className="block text-[10px] font-bold text-gray-400 mb-1">تسمية الحقل</label>
+                            <input
+                              type="text"
+                              value={field.label}
+                              onChange={e => {
+                                const newFields = [...(formData.formFields || [])];
+                                newFields[index] = { ...field, label: e.target.value };
+                                handleInputChange('formFields', newFields);
+                              }}
+                              className="w-full text-xs p-2 border border-gray-200 rounded"
+                            />
+                          </div>
+                          <div>
+                            <label className="block text-[10px] font-bold text-gray-400 mb-1">نوع الإدخال</label>
+                            <select
+                              value={field.type}
+                              onChange={e => {
+                                const newFields = [...(formData.formFields || [])];
+                                newFields[index] = { ...field, type: e.target.value as any };
+                                handleInputChange('formFields', newFields);
+                              }}
+                              className="w-full text-xs p-2 border border-gray-200 rounded"
+                            >
+                              <option value="text">نص بسيط</option>
+                              <option value="tel">رقم هاتف</option>
+                              <option value="number">رقم</option>
+                              <option value="textarea">نص طويل</option>
+                              <option value="select">قائمة منسدلة</option>
+                            </select>
+                          </div>
+                          <div className={field.type === 'select' ? 'lg:col-span-2' : ''}>
+                            <label className="block text-[10px] font-bold text-gray-400 mb-1">
+                              {field.type === 'select' ? 'الخيارات (افصل بينها بفاصلة)' : 'نص توضيحي'}
+                            </label>
+                            <input
+                              type="text"
+                              value={field.type === 'select' ? (field.options || []).join(', ') : (field.placeholder || '')}
+                              onChange={e => {
+                                const newFields = [...(formData.formFields || [])];
+                                if (field.type === 'select') {
+                                  newFields[index] = { ...field, options: e.target.value.split(',').map(s => s.trim()).filter(s => s) };
+                                } else {
+                                  newFields[index] = { ...field, placeholder: e.target.value };
+                                }
+                                handleInputChange('formFields', newFields);
+                              }}
+                              className="w-full text-xs p-2 border border-gray-200 rounded"
+                            />
+                          </div>
+                          <div className="flex items-center gap-2 pt-6">
+                            <input
+                              type="checkbox"
+                              checked={field.required}
+                              onChange={e => {
+                                const newFields = [...(formData.formFields || [])];
+                                newFields[index] = { ...field, required: e.target.checked };
+                                handleInputChange('formFields', newFields);
+                              }}
+                              id={`req-${field.id}`}
+                            />
+                            <label htmlFor={`req-${field.id}`} className="text-[10px] font-bold text-gray-500">حقل إلزامي</label>
+                          </div>
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+
+                  <button
+                    onClick={() => {
+                      const newField = { id: `field-${Date.now()}`, label: '', type: 'text' as const, required: true, placeholder: '' };
+                      handleInputChange('formFields', [...(formData.formFields || []), newField]);
+                    }}
+                    className="w-full py-3 border-2 border-dashed border-purple-300 rounded-lg text-purple-700 font-bold hover:bg-purple-100 flex items-center justify-center gap-2"
+                  >
+                    <span>➕</span> إضافة حقل جديد للنموذج
+                  </button>
+                </div>
               </div>
             </div>
           )}

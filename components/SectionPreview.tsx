@@ -25,6 +25,9 @@ const SectionPreview: React.FC<SectionPreviewProps> = ({
       advertisement: 'إعلان',
       slider: 'سلايدر صور (Slideshow)',
       youtube_shorts: 'فيديوهات شورتس (YouTube Shorts)',
+      library: '📚 مكتبة الملفات والأبحاث',
+      student_certificates: '🎖️ شهادات التقدير',
+      data_collection: '📝 نموذج تجميع بيانات',
     };
     return labels[type] || type;
   };
@@ -47,6 +50,12 @@ const SectionPreview: React.FC<SectionPreviewProps> = ({
         return 'إعلان';
       case 'slider':
         return `سلايدر: ${(section.sliderImages || []).length} صور`;
+      case 'library':
+        return `مكتبة: ${(section.libraryItems || []).length} ملف`;
+      case 'student_certificates':
+        return 'شهادات تقدير تلقائية';
+      case 'data_collection':
+        return `نموذج: ${(section.formFields || []).length} حقل`;
       default:
         return '';
     }
@@ -71,11 +80,10 @@ const SectionPreview: React.FC<SectionPreviewProps> = ({
         </div>
       </div>
 
-      {/* صورة معاينة صغيرة */}
-      {(section.imageUrl || section.adImageUrl || (section.sliderImages && section.sliderImages.length > 0)) && (
+      {(section.imageUrl || section.adImageUrl || (section.sliderImages && section.sliderImages.length > 0) || (section.libraryItems && section.libraryItems.length > 0)) && (
         <div className="mb-4">
           <img
-            src={section.imageUrl || section.adImageUrl || section.sliderImages?.[0]?.url}
+            src={section.imageUrl || section.adImageUrl || section.sliderImages?.[0]?.url || section.libraryItems?.[0]?.thumbnailUrl || 'https://via.placeholder.com/150?text=Library'}
             alt={section.title}
             className="h-24 w-24 object-cover rounded border border-gray-100 shadow-sm"
           />
