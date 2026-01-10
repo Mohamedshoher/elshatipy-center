@@ -29,7 +29,7 @@ const LoginScreen: React.FC<LoginScreenProps> = ({ onLogin, teachers, supervisor
     const handleDirectorLogin = (e: React.FormEvent) => {
         e.preventDefault();
         if (directorPassword === DIRECTOR_PASSWORD) {
-            onLogin({ role: 'director' });
+            onLogin({ role: 'director', id: 'director', name: 'المدير العام' });
         } else {
             alert('كلمة مرور المدير غير صحيحة.');
             setDirectorPassword('');

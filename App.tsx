@@ -336,7 +336,7 @@ const App: React.FC = () => {
     useEffect(() => {
         if (!currentUser) return;
 
-        let activeStudentsQuery = query(collection(db, 'students'), where('isArchived', '==', false));
+        let activeStudentsQuery = query(collection(db, 'students'), where('isArchived', '==', false), limit(1500));
 
         if (currentUser.role === 'parent') {
             const liveParent = parents.find(p => p.id === (currentUser as any).id);
@@ -385,19 +385,34 @@ const App: React.FC = () => {
     useEffect(() => {
         if (!currentUser) return;
         const unsubscribers: (() => void)[] = [];
-        const essentialCollections = [
-            { name: 'notes', setter: setNotes, limit: 500 },
-            { name: 'parentVisits', setter: setParentVisits, limit: 500 },
-            { name: 'leaveRequests', setter: setLeaveRequests, limit: 500 },
-        ];
+        const thirtyDaysAgo = new Date();
+        thirtyDaysAgo.setDate(thirtyDaysAgo.getDate() - 30);
+        const dateThreshold30 = thirtyDaysAgo.toISOString().split('T')[0];
 
-        essentialCollections.forEach(({ name, setter, limit: limitCount }) => {
-            const unsub = onSnapshot(query(collection(db, name), limit(limitCount)), (snapshot) => {
-                const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
-                setter(data);
-            });
-            unsubscribers.push(unsub);
+        // 2c. Notes (Unacknowledged only)
+        const unsubNotes = onSnapshot(query(collection(db, 'notes'), where('isAcknowledged', '==', false), limit(300)), (snap) => {
+            setNotes(snap.docs.map(d => ({ ...d.data(), id: d.id } as Note)));
+        }, (err) => {
+            console.warn("Notes listener failed, falling back:", err);
+            onSnapshot(query(collection(db, 'notes'), limit(300)), (s) => setNotes(s.docs.map(d => ({ ...d.data(), id: d.id } as Note))));
         });
+        unsubscribers.push(unsubNotes);
+
+        // 2d. Parent Visits (Last 30 days)
+        const unsubVisits = onSnapshot(query(collection(db, 'parentVisits'), where('date', '>=', dateThreshold30), limit(300)), (snap) => {
+            setParentVisits(snap.docs.map(d => ({ ...d.data(), id: d.id } as ParentVisit)));
+        }, (err) => {
+            onSnapshot(query(collection(db, 'parentVisits'), limit(300)), (s) => setParentVisits(s.docs.map(d => ({ ...d.data(), id: d.id } as ParentVisit))));
+        });
+        unsubscribers.push(unsubVisits);
+
+        // 2e. Leave Requests (Pending only)
+        const unsubLeave = onSnapshot(query(collection(db, 'leaveRequests'), where('status', '==', 'pending'), limit(100)), (snap) => {
+            setLeaveRequests(snap.docs.map(d => ({ ...d.data(), id: d.id } as LeaveRequest)));
+        }, (err) => {
+            onSnapshot(query(collection(db, 'leaveRequests'), limit(100)), (s) => setLeaveRequests(s.docs.map(d => ({ ...d.data(), id: d.id } as LeaveRequest))));
+        });
+        unsubscribers.push(unsubLeave);
 
         // Add teacherAttendance for Director (needed for automation checks)
         // Optimization: Only fetch attendance from the last 120 days
@@ -406,13 +421,13 @@ const App: React.FC = () => {
         const dateThreshold = fourMonthsAgo.toISOString().split('T')[0];
 
         if (currentUser.role === 'director' || currentUser.role === 'supervisor') {
-            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('date', '>=', dateThreshold), limit(1000)), (snapshot) => {
+            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('date', '>=', dateThreshold), limit(500)), (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 setTeacherAttendance(data);
             });
             unsubscribers.push(unsub);
         } else if (currentUser.role === 'teacher') {
-            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('teacherId', '==', currentUser.id), where('date', '>=', dateThreshold), limit(500)), (snapshot) => {
+            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('teacherId', '==', currentUser.id), where('date', '>=', dateThreshold), limit(300)), (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 setTeacherAttendance(data);
             });
@@ -450,21 +465,23 @@ const App: React.FC = () => {
         // But for collections like expenses and collections that use date fields, we can use the threshold.
 
         const financeCollections = [
-            { name: 'staff', setter: setStaff, directorOnly: true },
-            { name: 'expenses', setter: setExpenses, directorOnly: true, dateFilter: 'date' },
-            { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments },
-            { name: 'teacherCollections', setter: setTeacherCollections, dateFilter: 'date' },
-            { name: 'teacherManualBonuses', setter: setTeacherManualBonuses, dateFilter: 'date' },
-            { name: 'salaryPayments', setter: setSalaryPayments, dateFilter: 'date' },
-            { name: 'donations', setter: setDonations, directorOnly: true, dateFilter: 'date' },
+            { name: 'staff', setter: setStaff, directorOnly: true, limit: 100 },
+            { name: 'expenses', setter: setExpenses, directorOnly: true, dateFilter: 'date', limit: 500 },
+            { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments, limit: 300 },
+            { name: 'teacherCollections', setter: setTeacherCollections, dateFilter: 'date', limit: 500 },
+            { name: 'teacherManualBonuses', setter: setTeacherManualBonuses, dateFilter: 'date', limit: 300 },
+            { name: 'salaryPayments', setter: setSalaryPayments, dateFilter: 'date', limit: 300 },
+            { name: 'donations', setter: setDonations, directorOnly: true, dateFilter: 'date', limit: 300 },
         ];
 
-        financeCollections.forEach(({ name, setter, directorOnly, dateFilter }) => {
+        financeCollections.forEach(({ name, setter, directorOnly, dateFilter, limit: customLimit }) => {
             if (directorOnly && currentUser.role !== 'director' && currentUser.role !== 'supervisor') return;
 
-            let constraints: any[] = [limit(1000)];
+            const finalLimit = customLimit || 500;
+            let constraints: any[] = [limit(finalLimit)];
+
             if (currentUser.role === 'teacher') {
-                constraints = [where('teacherId', '==', currentUser.id), limit(500)];
+                constraints = [where('teacherId', '==', currentUser.id), limit(300)];
             }
 
             if (dateFilter) {
@@ -1257,10 +1274,10 @@ const App: React.FC = () => {
 
     const handleSaveFeePayment = async (details: { studentId: string; month: string; amountPaid: number; receiptNumber: string; }) => {
         try {
-            const studentDoc = await getDoc(doc(db, 'students', details.studentId));
-            if (!studentDoc.exists()) return;
-            const studentData = studentDoc.data() as Student;
-            const fees = [...studentData.fees];
+            const student = students.find(s => s.id === details.studentId);
+            if (!student) return;
+
+            const fees = [...(student.fees || [])];
             const feeIndex = fees.findIndex(f => f.month === details.month);
             const collectedBy = currentUser?.role === 'director' ? 'director' : currentUser?.id;
             const collectedByName = currentUser?.role === 'director' ? 'المدير' : currentUser?.name;
@@ -1273,10 +1290,15 @@ const App: React.FC = () => {
                 collectedBy,
                 collectedByName
             };
-            feeIndex > -1 ? (fees[feeIndex] = { ...fees[feeIndex], ...paymentData }) : fees.push({ month: details.month, amount: studentData.monthlyFee, ...paymentData });
+
+            if (feeIndex > -1) {
+                fees[feeIndex] = { ...fees[feeIndex], ...paymentData };
+            } else {
+                fees.push({ month: details.month, amount: student.monthlyFee, ...paymentData });
+            }
+
             await updateDoc(doc(db, 'students', details.studentId), { fees });
         } catch (error) { console.error("Error saving fee payment: ", error); }
-        // Modal is now closed before this function is called, so no need to close it here
     };
 
     const handleAddBadge = async (studentId: string, badge: Omit<Badge, 'id' | 'dateEarned'>) => {
@@ -1311,24 +1333,17 @@ const App: React.FC = () => {
             return;
         }
         try {
-            const studentRef = doc(db, 'students', studentId);
-            const studentDoc = await getDoc(studentRef);
-            if (!studentDoc.exists()) return;
+            const student = students.find(s => s.id === studentId);
+            if (!student) return;
 
-            const studentData = studentDoc.data() as Student;
-            const updatedFees = studentData.fees.map(fee => {
+            const updatedFees = (student.fees || []).map(fee => {
                 if (fee.month === month) {
-                    // Keep the original amount due, but mark as unpaid and remove payment details
-                    const { paymentDate, amountPaid, receiptNumber, ...rest } = fee;
-                    return {
-                        ...rest,
-                        paid: false,
-                    };
+                    const { paymentDate, amountPaid, receiptNumber, collectedBy, collectedByName, ...rest } = fee;
+                    return { ...rest, paid: false };
                 }
                 return fee;
             });
-            await updateDoc(studentRef, { fees: updatedFees });
-            // No alert needed for success, the UI update is enough and faster
+            await updateDoc(doc(db, 'students', studentId), { fees: updatedFees });
         } catch (error) {
             console.error("Error cancelling fee payment: ", error);
             alert("حدث خطأ أثناء إلغاء الدفعة.");
@@ -1337,14 +1352,11 @@ const App: React.FC = () => {
 
     const handlePayDebt = async (studentId: string, month: string, amount: number) => {
         try {
-            const studentRef = doc(db, 'students', studentId);
-            const studentDoc = await getDoc(studentRef);
-            if (!studentDoc.exists()) return;
-
-            const studentData = studentDoc.data() as Student;
+            const student = students.find(s => s.id === studentId);
+            if (!student) return;
 
             // 1. Update Fees
-            const fees = [...studentData.fees];
+            const fees = [...(student.fees || [])];
             const feeIndex = fees.findIndex(f => f.month === month);
             const paymentData = {
                 paid: true,
@@ -1358,23 +1370,19 @@ const App: React.FC = () => {
             if (feeIndex > -1) {
                 fees[feeIndex] = { ...fees[feeIndex], ...paymentData };
             } else {
-                fees.push({ month: month, amount: studentData.monthlyFee, ...paymentData });
+                fees.push({ month: month, amount: student.monthlyFee, ...paymentData });
             }
 
             // 2. Update Debt Months
-            const updatedDebtMonths = studentData.debtMonths?.filter(m => m !== month) || [];
+            const updatedDebtMonths = student.debtMonths?.filter(m => m !== month) || [];
             const hasRemainingDebt = updatedDebtMonths.length > 0;
 
             // 3. Save Updates
-            const updateData: any = {
+            await updateDoc(doc(db, 'students', studentId), {
                 fees,
                 debtMonths: updatedDebtMonths,
                 hasDebt: hasRemainingDebt
-            };
-
-            await updateDoc(studentRef, updateData);
-            // Alert removed as per user request
-
+            });
         } catch (error) {
             console.error("Error paying debt: ", error);
             alert("حدث خطأ أثناء دفع الدين.");

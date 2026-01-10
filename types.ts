@@ -207,7 +207,7 @@ export interface ParentVisit {
 }
 
 export type CurrentUser =
-  | { role: 'director' }
+  | { role: 'director'; id: 'director'; name: string; }
   | { role: 'teacher'; id: string; name: string; }
   | { role: 'supervisor'; id: string; name: string; section: GroupType[]; }
   | { role: 'parent'; id: string; name: string; phone: string; studentIds: string[]; };
