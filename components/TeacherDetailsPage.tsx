@@ -258,7 +258,7 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
         let collectedByDirector = 0;
         let totalCollectedRevenue = 0;
         let totalExpectedExpenses = 0;
-        let collectedStudents: { name: string, amount: number, isArchived: boolean, isTransferred: boolean, groupName?: string }[] = [];
+        let collectedStudents: { name: string, amount: number, isArchived: boolean, isTransferred: boolean, groupName?: string, receiptNumber?: string }[] = [];
 
         if (!isSupervisor && teacher) {
             const teacherGroupIds = new Set(
@@ -283,7 +283,8 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                         amount: amount,
                         isArchived: s.isArchived,
                         isTransferred: isTransferred,
-                        groupName: groupName
+                        groupName: groupName,
+                        receiptNumber: monthFee.receiptNumber || '' // Ensure it's never undefined
                     });
                 }
 
@@ -327,6 +328,13 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                         totalExpectedExpenses += (s.monthlyFee || 0);
                     }
                 }
+            });
+
+            // Sort by receipt number numerically
+            collectedStudents.sort((a, b) => {
+                const numA = parseInt(a.receiptNumber?.replace(/\D/g, '') || '999999');
+                const numB = parseInt(b.receiptNumber?.replace(/\D/g, '') || '999999');
+                return numA - numB;
             });
         }
 
@@ -1659,19 +1667,49 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                         <div className="p-6 max-h-[60vh] overflow-y-auto">
                             <div className="space-y-3">
                                 {payrollData.collectedStudents.length > 0 ? (
-                                    payrollData.collectedStudents.map((s, idx) => (
-                                        <div key={idx} className="flex justify-between items-center p-3 bg-gray-50 rounded-xl border border-gray-100">
-                                            <div>
-                                                <div className="flex items-center gap-2">
-                                                    <span className="font-bold text-gray-800">{s.name}</span>
-                                                    {s.isArchived && <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">مؤرشف</span>}
-                                                    {s.isTransferred && <span className="px-2 py-0.5 bg-orange-100 text-orange-600 rounded text-[10px] font-bold">منقول</span>}
+                                    payrollData.collectedStudents.map((s, idx) => {
+                                        // منطق اكتشاف الفجوات في الأرقام
+                                        let isGap = false;
+                                        if (idx > 0 && s.receiptNumber) {
+                                            const prevNum = parseInt(payrollData.collectedStudents[idx - 1].receiptNumber?.replace(/\D/g, '') || '0');
+                                            const currNum = parseInt(s.receiptNumber?.replace(/\D/g, '') || '0');
+                                            if (prevNum > 0 && currNum > prevNum + 1) {
+                                                isGap = true;
+                                            }
+                                        }
+
+                                        return (
+                                            <div key={idx} className={`flex items-center gap-3 p-3 bg-white rounded-xl border-2 shadow-sm transition-colors ${isGap ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
+                                                {/* خانة رقم الوصل - جهة اليمين */}
+                                                <div className="shrink-0 w-20">
+                                                    {s.receiptNumber ? (
+                                                        <div className={`flex flex-col items-center border rounded-lg py-1 px-1 shadow-sm ${isGap ? 'bg-red-600 border-red-700 text-white' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
+                                                            <span className={`text-[9px] font-bold leading-none mb-1 ${isGap ? 'text-white/90' : 'text-blue-600'}`}>
+                                                                {isGap ? 'فجوة/نقص' : 'رقم الوصل'}
+                                                            </span>
+                                                            <span className={`text-sm font-black ${isGap ? 'text-white' : 'text-blue-800'}`}>{s.receiptNumber}</span>
+                                                        </div>
+                                                    ) : (
+                                                        <div className="text-[10px] text-gray-300 italic text-center">بدون وصل</div>
+                                                    )}
                                                 </div>
-                                                {s.groupName && <p className="text-xs text-gray-500 mt-1">{s.groupName}</p>}
+
+                                                {/* بيانات الطالب */}
+                                                <div className="flex-1 min-w-0">
+                                                    <span className="font-bold text-gray-900 text-sm block truncate">{s.name}</span>
+                                                    <div className="flex items-center gap-2 mt-0.5">
+                                                        <p className="text-[10px] text-gray-500 font-medium truncate">{s.groupName || 'بدون مجموعة'}</p>
+                                                        {isGap && <span className="text-[9px] text-red-600 font-black bg-red-100 px-1 rounded animate-pulse">يوجد وصل مفقود قبل هذا!</span>}
+                                                    </div>
+                                                </div>
+
+                                                {/* المبلغ */}
+                                                <div className="shrink-0 text-left border-r pr-3 border-gray-100">
+                                                    <span className="font-black text-teal-600 text-md block">{s.amount.toLocaleString()} <small className="text-[10px]">ج.م</small></span>
+                                                </div>
                                             </div>
-                                            <span className="font-black text-teal-600">{s.amount.toLocaleString()} ج.م</span>
-                                        </div>
-                                    ))
+                                        );
+                                    })
                                 ) : (
                                     <p className="text-center text-gray-500 italic py-4">لا توجد بيانات متاحة.</p>
                                 )}

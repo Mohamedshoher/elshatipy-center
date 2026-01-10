@@ -5,18 +5,19 @@ interface FeePaymentModalProps {
   onClose: () => void;
   onSave: (details: { studentId: string; month: string; amountPaid: number; receiptNumber: string; }) => void;
   paymentDetails: { studentId: string; month: string; amount: number; } | null;
+  suggestedReceiptNumber?: string;
 }
 
-const FeePaymentModal: React.FC<FeePaymentModalProps> = ({ isOpen, onClose, onSave, paymentDetails }) => {
+const FeePaymentModal: React.FC<FeePaymentModalProps> = ({ isOpen, onClose, onSave, paymentDetails, suggestedReceiptNumber }) => {
   const [amountPaid, setAmountPaid] = useState('');
   const [receiptNumber, setReceiptNumber] = useState('');
 
   useEffect(() => {
     if (isOpen && paymentDetails) {
       setAmountPaid(paymentDetails.amount.toString());
-      setReceiptNumber('');
+      setReceiptNumber(suggestedReceiptNumber || '');
     }
-  }, [isOpen, paymentDetails]);
+  }, [isOpen, paymentDetails, suggestedReceiptNumber]);
 
   if (!isOpen || !paymentDetails) return null;
 
@@ -65,13 +66,14 @@ const FeePaymentModal: React.FC<FeePaymentModalProps> = ({ isOpen, onClose, onSa
             />
           </div>
           <div className="mb-6">
-            <label htmlFor="receiptNumber" className="block text-gray-600 mb-2">رقم الوصل (اختياري)</label>
+            <label htmlFor="receiptNumber" className="block text-gray-600 mb-2">رقم الوصل (إجباري)</label>
             <input
               type="text"
               id="receiptNumber"
               value={receiptNumber}
               onChange={(e) => setReceiptNumber(e.target.value)}
               className="w-full px-4 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-blue-500"
+              required
             />
           </div>
           <div className="flex flex-col sm:flex-row justify-end gap-4">

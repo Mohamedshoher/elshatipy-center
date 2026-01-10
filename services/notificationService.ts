@@ -31,7 +31,7 @@ export const registerFCMToken = async (userId: string) => {
         if (!hasPermission) return;
 
         if (!VAPID_KEY) {
-            console.warn("FCM VAPID_KEY is missing. Notifications might not work.");
+            // console.warn("FCM VAPID_KEY is missing. Notifications might not work.");
             return;
         }
         const currentToken = await getToken(messaging, { vapidKey: VAPID_KEY });

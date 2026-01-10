@@ -129,6 +129,7 @@ const App: React.FC = () => {
 
     const [financialSettings, setFinancialSettings] = useState<FinancialSettings>({ workingDaysPerMonth: 22, absenceDeductionPercentage: 100 });
 
+
     // --- Loading State ---
     const [isDataLoading, setIsDataLoading] = useState(true);
 
@@ -140,6 +141,31 @@ const App: React.FC = () => {
 
     // --- Local UI State & Session ---
     const [currentUser, setCurrentUser] = useLocalStorage<CurrentUser | null>('shatibi-center-currentUser', null);
+
+    const suggestedReceiptNumber = useMemo(() => {
+        if (!currentUser) return '';
+        const currentId = currentUser.role === 'director' ? 'director' : (currentUser as any).id;
+        let maxNum = 0;
+
+        // Combine all loaded students to find the highest numeric receipt for THIS collector
+        const allLoadedStudents = [...activeStudentsRaw, ...archivedStudentsRaw];
+
+        allLoadedStudents.forEach(s => {
+            s.fees?.forEach(f => {
+                if (f.paid && f.collectedBy === currentId && f.receiptNumber) {
+                    const cleanNum = f.receiptNumber.replace(/\D/g, '');
+                    if (cleanNum) {
+                        const num = parseInt(cleanNum);
+                        if (!isNaN(num) && num > maxNum) {
+                            maxNum = num;
+                        }
+                    }
+                }
+            });
+        });
+
+        return maxNum > 0 ? (maxNum + 1).toString() : '';
+    }, [activeStudentsRaw, archivedStudentsRaw, currentUser]);
 
     const handleUpdateLeaveStatus = async (requestId: string, status: 'approved' | 'rejected') => {
         try {
@@ -249,6 +275,9 @@ const App: React.FC = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [detailsModalState, setDetailsModalState] = useState<{ student: Student; initialTab: 'attendanceLog' | 'progressPlan' | 'tests' | 'fees' | 'notes' | 'reports' | 'badges'; } | null>(null);
 
+    // We'll use a local variable to prevent double-subscription within the SAME effect cycle
+    const activeUnsubRef = useRef<(() => void) | null>(null);
+
     const isOnline = useOnlineStatus();
 
     // Landing Page Content Manager State
@@ -276,20 +305,27 @@ const App: React.FC = () => {
         ];
 
         const loadPublicData = async () => {
-            for (const { name, setter, roles } of publicCollections) {
-                // If roles are specified, only fetch if currentUser matches
-                if (roles && currentUser && !roles.includes(currentUser.role)) {
-                    continue;
-                }
+            try {
+                // Filter collections to fetch based on current role
+                const toFetch = [
+                    { name: 'teachers', setter: setTeachers },
+                    { name: 'supervisors', setter: setSupervisors },
+                    { name: 'parents', setter: setParents, roles: ['director', 'supervisor'] },
+                ].filter(c => !c.roles || (currentUser && c.roles.includes(currentUser.role)));
 
-                try {
-                    console.log(`Fetching ${name}...`);
-                    const snapshot = await getDocs(collection(db, name));
+                // Execute all fetches in parallel
+                const fetchResults = await Promise.all(
+                    toFetch.map(c => getDocs(collection(db, c.name)))
+                );
+
+                fetchResults.forEach((snapshot, index) => {
+                    const { setter, name } = toFetch[index];
                     const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id }));
-                    setter(data);
-                } catch (error) {
-                    console.error(`Error fetching public ${name}: `, (error as any).message);
-                }
+                    (setter as any)(data);
+                    console.log(`⚡ ${name} loaded parallel`);
+                });
+            } catch (error) {
+                console.error(`Startup fetching error: `, error);
             }
         };
 
@@ -325,6 +361,7 @@ const App: React.FC = () => {
 
         const unsubGroups = onSnapshot(groupsQuery, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Group));
+            console.log(`📊 [Firestore Read] groups: ${snapshot.size} docs`);
             setGroups(data);
         });
         unsubscribers.push(unsubGroups);
@@ -332,16 +369,21 @@ const App: React.FC = () => {
         return () => unsubscribers.forEach(unsub => unsub());
     }, [currentUser?.id, currentUser?.role]);
 
-    // 2b. Active Students (Reactive to groups for teachers)
+    // 2b. Active Students - Initial load from any page
     useEffect(() => {
         if (!currentUser) return;
 
-        let activeStudentsQuery = query(collection(db, 'students'), where('isArchived', '==', false), limit(1500));
+        // Cleanup any existing subscription
+        if (activeUnsubRef.current) {
+            activeUnsubRef.current();
+            activeUnsubRef.current = null;
+        }
+
+        let activeStudentsQuery = query(collection(db, 'students'), where('isArchived', '==', false));
 
         if (currentUser.role === 'parent') {
             const liveParent = parents.find(p => p.id === (currentUser as any).id);
             const studentIds = liveParent ? liveParent.studentIds : (currentUser as any).studentIds;
-
             if (studentIds && studentIds.length > 0) {
                 activeStudentsQuery = query(collection(db, 'students'), where(documentId(), 'in', studentIds.slice(0, 30)));
             } else {
@@ -350,18 +392,13 @@ const App: React.FC = () => {
                 return;
             }
         } else if (currentUser.role === 'teacher') {
-            // IMPORTANT: Only fetch students for groups taught by this teacher
-            // We need to wait for groups if they are not yet loaded
-            if (groups.length === 0) return;
-
+            if (groups.length === 0) {
+                setIsDataLoading(true);
+                return; // Wait for groups to load
+            }
             const teacherGroupIds = groups.filter(g => g.teacherId === currentUser.id).map(g => g.id);
             if (teacherGroupIds.length > 0) {
-                // Remove 'isArchived' filter for teachers so they can see archived students
-                // in their ledger/financial reports if they paid fees.
-                activeStudentsQuery = query(
-                    collection(db, 'students'),
-                    where('groupId', 'in', teacherGroupIds.slice(0, 30))
-                );
+                activeStudentsQuery = query(collection(db, 'students'), where('groupId', 'in', teacherGroupIds.slice(0, 30)));
             } else {
                 setActiveStudentsRaw([]);
                 setIsDataLoading(false);
@@ -373,12 +410,24 @@ const App: React.FC = () => {
             const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
             setActiveStudentsRaw(data);
             setIsDataLoading(false);
+            // Single summary log instead of multiple logs
+            if (snapshot.metadata.fromCache) {
+                console.log(`🚀 [Cache] Loaded ${snapshot.size} students`);
+            } else {
+                console.log(`🌍 [Server] Syncing ${snapshot.size} students`);
+            }
         }, (err) => {
             console.error("Students listener error:", err);
             setIsDataLoading(false);
         });
 
-        return () => unsub();
+        activeUnsubRef.current = unsub;
+        return () => {
+            if (activeUnsubRef.current) {
+                activeUnsubRef.current();
+                activeUnsubRef.current = null;
+            }
+        };
     }, [currentUser?.id, currentUser?.role, groups.length, parents.length]);
 
     // 2c. Other Collections (Role Scoped for Teachers)
@@ -391,6 +440,7 @@ const App: React.FC = () => {
 
         // 2c. Notes (Unacknowledged only)
         const unsubNotes = onSnapshot(query(collection(db, 'notes'), where('isAcknowledged', '==', false), limit(300)), (snap) => {
+            console.log(`📊 [Firestore Read] notes: ${snap.size} docs`);
             setNotes(snap.docs.map(d => ({ ...d.data(), id: d.id } as Note)));
         }, (err) => {
             console.warn("Notes listener failed, falling back:", err);
@@ -464,14 +514,16 @@ const App: React.FC = () => {
         // For month-based collections, we need a prefix check or similar. 
         // But for collections like expenses and collections that use date fields, we can use the threshold.
 
+        const isFinancePage = location.pathname.includes('/finance') || location.pathname.includes('/financial-report') || location.pathname.includes('/general-view');
+
         const financeCollections = [
             { name: 'staff', setter: setStaff, directorOnly: true, limit: 100 },
-            { name: 'expenses', setter: setExpenses, directorOnly: true, dateFilter: 'date', limit: 500 },
-            { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments, limit: 300 },
-            { name: 'teacherCollections', setter: setTeacherCollections, dateFilter: 'date', limit: 500 },
-            { name: 'teacherManualBonuses', setter: setTeacherManualBonuses, dateFilter: 'date', limit: 300 },
-            { name: 'salaryPayments', setter: setSalaryPayments, dateFilter: 'date', limit: 300 },
-            { name: 'donations', setter: setDonations, directorOnly: true, dateFilter: 'date', limit: 300 },
+            { name: 'expenses', setter: setExpenses, directorOnly: true, dateFilter: 'date', limit: isFinancePage ? 500 : 50 },
+            { name: 'teacherPayrollAdjustments', setter: setTeacherPayrollAdjustments, limit: isFinancePage ? 300 : 50 },
+            { name: 'teacherCollections', setter: setTeacherCollections, dateFilter: 'date', limit: isFinancePage ? 500 : 50 },
+            { name: 'teacherManualBonuses', setter: setTeacherManualBonuses, dateFilter: 'date', limit: isFinancePage ? 300 : 50 },
+            { name: 'salaryPayments', setter: setSalaryPayments, dateFilter: 'date', limit: isFinancePage ? 300 : 50 },
+            { name: 'donations', setter: setDonations, directorOnly: true, dateFilter: 'date', limit: isFinancePage ? 300 : 50 },
         ];
 
         financeCollections.forEach(({ name, setter, directorOnly, dateFilter, limit: customLimit }) => {
@@ -492,6 +544,7 @@ const App: React.FC = () => {
 
             const unsub = onSnapshot(q, (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
+                console.log(`📊 [Firestore Read] ${name}: ${snapshot.size} docs`);
                 setter(data);
             }, (err) => console.error(`Finance listener error (${name}):`, err));
             unsubscribers.push(unsub);
@@ -528,6 +581,7 @@ const App: React.FC = () => {
         // Use getDocs instead of onSnapshot for archives to save continuous reads
         getDocs(archivedQuery).then((snapshot) => {
             const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
+            console.log(`📊 [Firestore Read] ARCHIVE (one-time): ${snapshot.size} docs`);
             setArchivedStudentsRaw(data);
             lastArchiveFetchRef.current = currentUserId;
         }).catch(err => console.error("Archive fetch error:", err));
@@ -2875,7 +2929,13 @@ const App: React.FC = () => {
                                     </>
                                 )}
 
-                                <FeePaymentModal isOpen={isFeeModalOpen} onClose={() => { setIsFeeModalOpen(false); setPaymentDetails(null); }} onSave={handleSaveFeePayment} paymentDetails={paymentDetails} />
+                                <FeePaymentModal
+                                    isOpen={isFeeModalOpen}
+                                    onClose={() => { setIsFeeModalOpen(false); setPaymentDetails(null); }}
+                                    onSave={handleSaveFeePayment}
+                                    paymentDetails={paymentDetails}
+                                    suggestedReceiptNumber={suggestedReceiptNumber}
+                                />
                                 <UnarchiveModal isOpen={!!studentToUnarchiveId} onClose={() => setStudentToUnarchiveId(null)} onConfirm={handleConfirmUnarchive} groups={groupsForUnarchiveModal} studentName={students.find(s => s.id === studentToUnarchiveId)?.name || ''} />
 
                                 {/* Chat System - Always mounted for instant opening */}
