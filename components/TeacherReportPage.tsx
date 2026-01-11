@@ -49,6 +49,7 @@ const getBonusValue = (status: TeacherAttendanceStatus): number => {
 
 const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, students, teacherAttendance, teacherPayrollAdjustments, financialSettings, onBack, teacherCollections, currentUserRole }) => {
   const [selectedMonth, setSelectedMonth] = useState(() => getCairoDateString().substring(0, 7));
+  const [isCollectedDetailsOpen, setIsCollectedDetailsOpen] = useState(false);
 
   const assignedGroups = useMemo(() => {
     return groups.filter(g => g.teacherId === teacher.id);
@@ -59,45 +60,54 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
     return students.filter(s => groupIds.includes(s.groupId) && !s.isArchived);
   }, [students, assignedGroups]);
 
-  const { collectedByTeacher, collectedByDirector, totalCollectedRevenueLocal, totalExpectedRevenue } = useMemo(() => {
-    const groupIds = new Set(assignedGroups.map(g => g.id));
+  const { collectedByTeacher, collectedByDirector, totalCollectedRevenueLocal, totalExpectedRevenue, collectedStudents } = useMemo(() => {
+    const teacherGroupIds = new Set(assignedGroups.map(g => g.id));
     let byTeacher = 0;
     let byDirector = 0;
     let collectedTotal = 0;
     let expectedTotal = 0;
+    const collectedStudentsList: { name: string, amount: number, isArchived: boolean, isTransferred: boolean, groupName?: string, receiptNumber?: string }[] = [];
 
     const monthPrefix = selectedMonth;
 
     students.forEach(s => {
-      if (groupIds.has(s.groupId)) {
-        // Collected Logic
-        s.fees.forEach(fee => {
-          if (fee.month === monthPrefix && fee.paid && fee.amountPaid) {
-            const amount = fee.amountPaid || 0;
-            const isCollectedByThisTeacher = fee.collectedBy === teacher.id;
-            const isCollectedByDirector = fee.collectedBy === 'director';
-            const isInTeacherGroup = groupIds.has(s.groupId);
+      const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
 
-            if (isCollectedByThisTeacher) {
-              byTeacher += amount;
-              collectedTotal += amount;
-            } else if (isCollectedByDirector && isInTeacherGroup) {
-              byDirector += amount;
-              collectedTotal += amount;
-            } else if (!fee.collectedBy && isInTeacherGroup) {
-              byTeacher += amount;
-              collectedTotal += amount;
-            }
+      // 1. Calculate Cash Held by Teacher (From ANY student, even if transferred/archived)
+      if (monthFee) {
+        const amount = monthFee.amountPaid || 0;
+        const isCollectedByThisTeacher = monthFee.collectedBy === teacher.id;
+        const isInGroupLegacy = !monthFee.collectedBy && teacherGroupIds.has(s.groupId);
+
+        if (isCollectedByThisTeacher || isInGroupLegacy) {
+          byTeacher += amount;
+
+          const isTransferred = !teacherGroupIds.has(s.groupId) && !s.isArchived;
+          const groupName = groups.find(g => g.id === s.groupId)?.name;
+
+          collectedStudentsList.push({
+            name: s.name,
+            amount: amount,
+            isArchived: s.isArchived,
+            isTransferred: isTransferred,
+            groupName: groupName,
+            receiptNumber: monthFee.receiptNumber || ''
+          });
+        }
+      }
+
+      // 2. Only consider students in the teacher's groups for Revenue and Expected Expenses
+      if (teacherGroupIds.has(s.groupId)) {
+        if (monthFee) {
+          collectedTotal += (monthFee.amountPaid || 0);
+          if (monthFee.collectedBy === 'director') {
+            byDirector += (monthFee.amountPaid || 0);
           }
-        });
+        }
 
-        // Expected Logic (Matches TeacherDetailsPage)
-        const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
-        const hasPaidCurrentMonth = !!monthFee;
-
-        const attendanceInMonth = s.attendance.filter(record => {
+        const attendanceInMonth = s.attendance?.filter(record => {
           return record.date.startsWith(monthPrefix) && record.status === 'present';
-        }).length;
+        }).length || 0;
 
         const group = assignedGroups.find(g => g.id === s.groupId);
         const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
@@ -105,7 +115,7 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
 
         // 15-day grace period rule
         let isWithinGracePeriod = false;
-        if (!hasPaidCurrentMonth) {
+        if (!monthFee) {
           const joiningDate = parseCairoDateString(s.joiningDate);
           joiningDate.setHours(0, 0, 0, 0);
           const [year, monthNum] = selectedMonth.split('-').map(Number);
@@ -117,19 +127,27 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
           if (diffDays < 15) isWithinGracePeriod = true;
         }
 
-        if (hasPaidCurrentMonth || (!s.isArchived && meetsAttendanceRule && !isWithinGracePeriod)) {
+        if (monthFee || (!s.isArchived && meetsAttendanceRule && !isWithinGracePeriod)) {
           expectedTotal += (s.monthlyFee || 0);
         }
       }
+    });
+
+    // Sort by receipt number
+    collectedStudentsList.sort((a, b) => {
+      const numA = parseInt(a.receiptNumber?.replace(/\D/g, '') || '0');
+      const numB = parseInt(b.receiptNumber?.replace(/\D/g, '') || '0');
+      return numA - numB;
     });
 
     return {
       collectedByTeacher: byTeacher,
       collectedByDirector: byDirector,
       totalCollectedRevenueLocal: collectedTotal,
-      totalExpectedRevenue: expectedTotal
+      totalExpectedRevenue: expectedTotal,
+      collectedStudents: collectedStudentsList
     };
-  }, [students, assignedGroups, selectedMonth, teacher.id]);
+  }, [students, assignedGroups, selectedMonth, teacher.id, groups]);
 
   const collectedAmount = collectedByTeacher;
 
@@ -156,7 +174,6 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
     const bonusDays = attendanceForMonth.reduce((total, record) => total + getBonusValue(record.status), 0);
 
     // Calculate daily rate for deductions/bonuses
-    // For partnership, we use the partnershipAmount as the "effective salary" for this month
     const effectiveSalary = isPartnership ? partnershipAmount : baseSalary;
 
     const dailyRate = effectiveSalary > 0 && financialSettings.workingDaysPerMonth > 0 ? effectiveSalary / financialSettings.workingDaysPerMonth : 0;
@@ -164,8 +181,8 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
     const attendanceBonus = dailyRate * bonusDays;
 
     const finalSalary = isPartnership
-      ? partnershipAmount + adjustments.bonus + attendanceBonus - absenceDeduction
-      : baseSalary + adjustments.bonus + attendanceBonus - absenceDeduction;
+      ? partnershipAmount + (adjustments.bonus || 0) + attendanceBonus - absenceDeduction
+      : baseSalary + (adjustments.bonus || 0) + attendanceBonus - absenceDeduction;
 
     return {
       baseSalary,
@@ -235,8 +252,8 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
       });
     }
 
-    if (payrollData.adjustments.bonus > 0) {
-      message += `*مكافآت إضافية:* +${payrollData.adjustments.bonus.toLocaleString()} EGP\n`;
+    if ((payrollData.adjustments.bonus || 0) > 0) {
+      message += `*مكافآت إضافية:* +${(payrollData.adjustments.bonus || 0).toLocaleString()} EGP\n`;
     }
 
     if (payrollData.absenceDeduction > 0) {
@@ -275,9 +292,29 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
   return (
     <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
       <div className="flex flex-col sm:flex-row justify-between items-start mb-6 gap-4">
-        <div className="bg-white p-4 rounded-xl shadow-lg">
+        <div className="bg-white p-4 rounded-xl shadow-lg w-full sm:w-64">
           <label htmlFor="month-filter" className="block text-sm font-medium text-gray-600 mb-1">عرض تقرير شهر</label>
-          <input type="month" id="month-filter" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+          <div className="space-y-2">
+            <input type="month" id="month-filter" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border rounded-lg bg-gray-50 focus:outline-none focus:ring-2 focus:ring-teal-500" />
+            <div className="flex gap-2">
+              <button
+                onClick={() => setSelectedMonth(getCairoDateString().substring(0, 7))}
+                className="flex-1 py-1 px-3 text-xs font-semibold rounded bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors border border-teal-200"
+              >
+                الشهر الحالي
+              </button>
+              <button
+                onClick={() => {
+                  const [year, month] = selectedMonth.split('-').map(Number);
+                  const date = new Date(year, month - 2, 1);
+                  setSelectedMonth(date.toISOString().substring(0, 7));
+                }}
+                className="flex-1 py-1 px-3 text-xs font-semibold rounded bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors border border-gray-200"
+              >
+                الشهر السابق
+              </button>
+            </div>
+          </div>
         </div>
         {(currentUserRole === 'director' || currentUserRole === 'supervisor') && (
           <button onClick={handleSendWhatsAppReport} className="flex items-center gap-2 bg-green-500 text-white font-bold py-2 px-4 rounded-lg shadow hover:bg-green-600 transition-all text-sm self-end sm:self-center" title="إرسال التقرير عبر واتساب">
@@ -314,10 +351,16 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
                     <span className="text-gray-600">إجمالي ما تم تحصيله:</span>
                     <span className="font-bold">{totalCollectedRevenueLocal.toLocaleString()} EGP</span>
                   </div>
-                  <div className="flex justify-between items-center border-b pb-2">
-                    <span className="text-gray-600">ما حصله المدرس:</span>
-                    <span className="font-bold text-blue-600">{collectedByTeacher.toLocaleString()} EGP</span>
-                  </div>
+                  <button
+                    onClick={() => setIsCollectedDetailsOpen(true)}
+                    className="w-full flex justify-between items-center border-b pb-2 hover:bg-blue-50 transition-colors p-1 rounded"
+                  >
+                    <span className="text-gray-600 flex items-center gap-1">
+                      ما حصله المدرس:
+                      <span className="text-[10px] bg-blue-100 text-blue-600 px-1 rounded">عرض التفاصيل</span>
+                    </span>
+                    <span className="font-bold text-blue-600 underline decoration-dotted">{collectedByTeacher.toLocaleString()} EGP</span>
+                  </button>
                   <div className="flex justify-between items-center border-b pb-2">
                     <span className="text-gray-600">محصل بواسطة المدير:</span>
                     <span className="font-bold text-indigo-600">{collectedByDirector.toLocaleString()} EGP</span>
@@ -440,6 +483,60 @@ const TeacherReportPage: React.FC<TeacherReportPageProps> = ({ teacher, groups, 
           </div>
         </div>
       </div>
+
+      {/* تفاصيل ما حصله المدرس Modal */}
+      {isCollectedDetailsOpen && (
+        <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
+          <div className="bg-white rounded-2xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
+            <div className="p-4 border-b flex justify-between items-center bg-gray-50 text-right">
+              <h3 className="text-lg font-black text-gray-800">تفاصيل ما حصله المدرس ({collectedStudents.length})</h3>
+              <button
+                onClick={() => setIsCollectedDetailsOpen(false)}
+                className="p-2 hover:bg-gray-200 rounded-full transition-colors order-first"
+              >
+                <span className="text-gray-500 text-xl font-bold">✕</span>
+              </button>
+            </div>
+            <div className="p-4 max-h-[60vh] overflow-y-auto" dir="rtl">
+              <div className="space-y-2">
+                {collectedStudents.length > 0 ? (
+                  collectedStudents.map((s, idx) => (
+                    <div key={idx} className="flex items-center gap-3 p-3 bg-white rounded-xl border border-gray-100 shadow-sm">
+                      <div className="shrink-0 w-16">
+                        {s.receiptNumber ? (
+                          <div className="flex flex-col items-center bg-blue-50 border border-blue-100 rounded py-1 px-1">
+                            <span className="text-[8px] text-blue-600 font-bold leading-none mb-0.5">رقم الوصل</span>
+                            <span className="text-xs font-black text-blue-800">{s.receiptNumber}</span>
+                          </div>
+                        ) : (
+                          <div className="text-[10px] text-gray-400 italic text-center">بدون وصل</div>
+                        )}
+                      </div>
+                      <div className="flex-1 min-w-0">
+                        <div className="flex items-center gap-1.5 flex-wrap">
+                          <span className="font-bold text-gray-800 text-sm truncate">{s.name}</span>
+                          {s.isArchived && <span className="px-1 py-0.5 bg-gray-100 text-gray-500 rounded text-[8px] font-bold border border-gray-200 uppercase">مؤرشف</span>}
+                          {s.isTransferred && <span className="px-1 py-0.5 bg-orange-100 text-orange-600 rounded text-[8px] font-bold border border-orange-200 uppercase">منقول</span>}
+                        </div>
+                        <p className="text-[9px] text-gray-400 font-medium truncate">{s.groupName || 'بدون مجموعة'}</p>
+                      </div>
+                      <div className="shrink-0 text-left border-r pr-3 border-gray-50">
+                        <span className="font-black text-teal-600 text-sm block">{s.amount.toLocaleString()} <small className="text-[8px]">ج.م</small></span>
+                      </div>
+                    </div>
+                  ))
+                ) : (
+                  <p className="text-center text-gray-500 italic py-8">لم يتم استلام أي مبالغ من الطلاب خلال هذا الشهر.</p>
+                )}
+              </div>
+            </div>
+            <div className="p-4 bg-gray-50 border-t flex justify-between items-center text-right">
+              <span className="font-bold text-gray-700">الإجمالي:</span>
+              <span className="text-lg font-black text-blue-600">{collectedByTeacher.toLocaleString()} EGP</span>
+            </div>
+          </div>
+        </div>
+      )}
     </main>
   );
 };

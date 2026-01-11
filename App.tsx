@@ -2453,7 +2453,7 @@ const App: React.FC = () => {
                     <TestsReportPage students={students} groups={groups} onViewStudent={handleViewStudent} onBack={() => handleBackButton()} />
                 } />
                 <Route path="/financial_report" element={
-                    <FinancialReportPage students={students} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />
+                    <FinancialReportPage students={allStudents} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} currentUserId={currentUser?.id} />
                 } />
 
                 {/* Sidebar Views */}
@@ -2491,8 +2491,8 @@ const App: React.FC = () => {
                 <Route path="/debtors" element={<DebtorsPage students={students} groups={groups} onPayDebt={handlePayDebt} onViewDetails={handleOpenStudentDetails} currentUserRole={currentUser?.role as UserRole} searchTerm={searchTerm} />} />
                 <Route path="/general-view" element={<GeneralViewPage students={allStudents} notes={notes} groups={groups} teachers={teachers} teacherCollections={collections} expenses={expenses} donations={donations || []} onDeleteExpense={handleDeleteExpense} onLogExpense={handleLogExpense} onAddDonation={handleAddDonation} onDeleteDonation={handleDeleteDonation} onToggleAcknowledge={handleToggleNoteAcknowledge} onViewStudent={handleViewStudent} onApproveStudent={handleApproveStudent} onRejectStudent={handleRejectStudent} onEditStudent={handleEditStudent} parentVisits={parentVisits} leaveRequests={leaveRequests} onUpdateLeaveStatus={handleUpdateLeaveStatus} />} />
                 <Route path="/reports" element={<DirectorReportsPage groups={groups} students={students} onBack={() => handleBackButton()} />} />
-                <Route path="/unpaid" element={<UnpaidStudentsPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} />} />
-                <Route path="/fee-collection" element={<FeeCollectionPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={students} teacherCollections={collections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />} />
+                <Route path="/unpaid" element={<UnpaidStudentsPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={allStudents} />} />
+                <Route path="/fee-collection" element={<FeeCollectionPage onBack={() => handleBackButton()} teachers={teachers} groups={groups} students={allStudents} teacherCollections={collections} onAddTeacherCollection={handleAddTeacherCollection} onDeleteTeacherCollection={handleDeleteTeacherCollection} />} />
 
                 {/* Catch-all for sub-views that aren't yet routed */}
                 <Route path="*" element={
@@ -2500,14 +2500,14 @@ const App: React.FC = () => {
                         if (viewingTeacherReportId) {
                             const reportTeacher = teachers.find(t => t.id === viewingTeacherReportId);
                             if (reportTeacher) {
-                                return <TeacherReportPage teacher={reportTeacher} groups={groups} students={students} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={() => handleBackButton()} teacherCollections={collections} currentUserRole={currentUser?.role} />;
+                                return <TeacherReportPage teacher={reportTeacher} groups={groups} students={allStudents} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={() => handleBackButton()} teacherCollections={collections} currentUserRole={currentUser?.role} />;
                             }
                         }
                         if (teacherForDetails || supervisorForDetails) return <TeacherDetailsPage
                             teacher={teacherForDetails}
                             supervisor={supervisorForDetails}
                             groups={groups}
-                            students={students}
+                            students={allStudents}
                             teacherAttendance={teacherAttendance}
                             teacherPayrollAdjustments={teacherPayrollAdjustments}
                             financialSettings={financialSettings}
@@ -2553,7 +2553,7 @@ const App: React.FC = () => {
                         if (viewingTeacherReportId) {
                             const reportTeacher = teachers.find(t => t.id === viewingTeacherReportId);
                             if (reportTeacher) {
-                                return <TeacherReportPage teacher={reportTeacher} groups={groups} students={students} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={() => handleBackButton()} teacherCollections={collections} currentUserRole={currentUser?.role} />;
+                                return <TeacherReportPage teacher={reportTeacher} groups={groups} students={allStudents} teacherAttendance={teacherAttendance} teacherPayrollAdjustments={teacherPayrollAdjustments} financialSettings={financialSettings} onBack={() => handleBackButton()} teacherCollections={collections} currentUserRole={currentUser?.role} />;
                             }
                         }
                         if (viewingGroup) return <GroupReportPage group={viewingGroup} students={students.filter(s => s.groupId === viewingGroup.id)} teacher={teachers.find(t => t.id === viewingGroup.teacherId)} onBack={() => handleBackButton()} currentUserRole={currentUser?.role} />;
@@ -2616,7 +2616,7 @@ const App: React.FC = () => {
                     <TestsReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} onBack={() => handleBackButton()} />
                 } />
                 <Route path="/financial_report" element={
-                    <FinancialReportPage students={activeStudents} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} />
+                    <FinancialReportPage students={students} groups={groups} onViewStudent={handleViewStudent} currentUserRole={currentUser?.role} currentUserId={currentUser?.id} />
                 } />
 
                 {/* Sidebar Views */}

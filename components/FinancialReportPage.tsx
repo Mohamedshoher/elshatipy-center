@@ -48,7 +48,6 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
 
   const financialData = useMemo(() => {
     let totalCollected = 0;
-    let totalDue = 0;
     const paidStudents: StudentWithFee[] = [];
     const unpaidStudents: Student[] = [];
 
@@ -63,33 +62,42 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
         return;
       }
 
-      const feeRecord = student.fees.find(f => f.month === selectedMonth);
+      const feeRecord = student.fees?.find(f => f.month === selectedMonth);
       const isPaid = !!feeRecord?.paid;
 
       if (isPaid) {
         const amountPaid = feeRecord?.amountPaid || student.monthlyFee;
-        totalCollected += amountPaid;
+        const isCollectedByThisTeacher = feeRecord?.collectedBy === currentUserId;
+        const isInTeacherGroup = teacherGroupIds?.has(student.groupId);
 
-        // Check if student is transferred (not in teacher's current groups but paid with them)
-        const isTransferred = teacherGroupIds
-          ? !student.isArchived && !teacherGroupIds.has(student.groupId)
-          : false;
+        // If teacher is viewing, only include if they collected it OR if collector is missing but student is in their group
+        const isTeacher = currentUserRole === 'teacher';
+        const shouldIncludeForTeacher = !isTeacher || isCollectedByThisTeacher || (!feeRecord?.collectedBy && isInTeacherGroup);
 
-        paidStudents.push({
-          ...student,
-          feeRecord,
-          amountPaid,
-          receiptNumber: feeRecord?.receiptNumber || '',
-          isTransferred
-        });
+        if (shouldIncludeForTeacher) {
+          totalCollected += amountPaid;
 
-        if (!student.isArchived) {
-          totalDue += student.monthlyFee;
+          // Check if student is transferred (not in teacher's current groups but paid with them)
+          const isTransferred = teacherGroupIds
+            ? !student.isArchived && !teacherGroupIds.has(student.groupId)
+            : false;
+
+          paidStudents.push({
+            ...student,
+            feeRecord,
+            amountPaid,
+            receiptNumber: feeRecord?.receiptNumber || '',
+            isTransferred
+          });
         }
         return;
       }
 
       if (student.isArchived) return;
+
+      const isInTeacherGroup = teacherGroupIds?.has(student.groupId);
+      // For unpaid students, only show if they are in the teacher's group (if viewing as teacher)
+      if (currentUserRole === 'teacher' && !isInTeacherGroup) return;
 
       const joiningDate = parseCairoDateString(student.joiningDate);
       joiningDate.setHours(0, 0, 0, 0);
@@ -101,9 +109,9 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
         return;
       }
 
-      const attendanceInMonth = student.attendance.filter(record => {
+      const attendanceInMonth = student.attendance?.filter(record => {
         return record.date.startsWith(selectedMonth) && record.status === 'present';
-      }).length;
+      }).length || 0;
 
       const group = groups.find(g => g.id === student.groupId);
       const isIqraaGroup = group?.name.includes('إقراء') || group?.name.includes('اقراء');
@@ -112,7 +120,6 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
         return;
       }
 
-      totalDue += student.monthlyFee;
       unpaidStudents.push(student);
     });
 
@@ -132,11 +139,11 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
       return receiptA.localeCompare(receiptB, 'ar', { numeric: true });
     });
 
-    const totalRemaining = totalDue - totalCollected;
+    const totalRemaining = unpaidStudents.reduce((sum, s) => sum + (s.monthlyFee || 0), 0);
     const totalLedger = ledgerStudents.reduce((sum, s) => sum + s.amountPaid, 0);
 
     return { totalCollected, totalRemaining, totalLedger, paidStudents, unpaidStudents, ledgerStudents };
-  }, [students, selectedMonth, groups, teacherGroupIds, currentUserRole]);
+  }, [students, selectedMonth, groups, teacherGroupIds, currentUserRole, currentUserId]);
 
   const handleIndividualWhatsAppReminder = (student: Student) => {
     const monthName = new Date(selectedMonth + '-02').toLocaleString('ar-EG', { month: 'long', year: 'numeric' });
@@ -158,22 +165,29 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
         <div className="bg-white rounded-xl shadow-lg p-6">
           <div className="flex flex-col sm:flex-row justify-between items-start gap-4 mb-6">
             <h2 className="text-2xl font-bold text-gray-800">تقرير المصروفات الشهري</h2>
-            <div className="w-full sm:w-auto max-w-xs flex items-center gap-2">
+            <div className="w-full sm:w-auto max-w-xs space-y-2">
               <label htmlFor="month-filter" className="sr-only">اختر الشهر</label>
               <input
                 type="month"
                 id="month-filter"
                 value={selectedMonth}
                 onChange={e => setSelectedMonth(e.target.value)}
-                className="flex-grow px-4 py-2 border rounded-lg bg-gray-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
+                className="w-full px-4 py-2 border rounded-lg bg-gray-50 shadow-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
               />
-              <button
-                onClick={handlePrevMonth}
-                className="p-2 bg-gray-100 text-gray-600 rounded-lg hover:bg-gray-200 transition-colors"
-                title="الشهر السابق"
-              >
-                <ArrowRightIcon className="w-5 h-5 transform rotate-180" />
-              </button>
+              <div className="flex gap-2">
+                <button
+                  onClick={() => setSelectedMonth(getCairoDateString().substring(0, 7))}
+                  className="flex-1 py-1 px-3 text-xs font-semibold rounded bg-blue-50 text-blue-700 hover:bg-blue-100 transition-colors border border-blue-200"
+                >
+                  الشهر الحالي
+                </button>
+                <button
+                  onClick={handlePrevMonth}
+                  className="flex-1 py-1 px-3 text-xs font-semibold rounded bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors border border-gray-200"
+                >
+                  الشهر السابق
+                </button>
+              </div>
             </div>
           </div>
 
@@ -297,8 +311,9 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
                               <span className="font-bold text-gray-800">{student.name}</span>
                               {student.isArchived && <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">مؤرشف</span>}
                               {student.isTransferred && <span className="px-2 py-0.5 bg-orange-100 text-orange-600 rounded text-[10px] font-bold">منقول</span>}
+                              {student.isPending && <span className="px-2 py-0.5 bg-yellow-100 text-yellow-600 rounded text-[10px] font-bold">قيد المراجعة</span>}
                             </div>
-                            <p className="text-xs text-gray-500">{group?.name || 'مجموعة غير معروفة'}</p>
+                            <p className="text-xs text-gray-500">{group?.name || 'مجموعة غير معروفة'} {student.feeRecord?.collectedByName && <span className="mr-2 text-cyan-600 font-semibold">• حصله: {student.feeRecord.collectedByName}</span>}</p>
                           </button>
                           <div className="text-left flex flex-col items-end gap-1">
                             <p className="text-lg font-black text-green-600">{student.amountPaid.toLocaleString()} ج.م</p>
@@ -357,10 +372,14 @@ const FinancialReportPage: React.FC<FinancialReportPageProps> = ({ students, gro
                                 <span className="font-bold text-gray-800">{student.name}</span>
                                 {student.isArchived && <span className="px-2 py-0.5 bg-gray-200 text-gray-600 rounded text-[10px] font-bold">مؤرشف</span>}
                                 {student.isTransferred && <span className="px-2 py-0.5 bg-orange-100 text-orange-600 rounded text-[10px] font-bold">منقول</span>}
+                                {student.isPending && <span className="px-2 py-0.5 bg-yellow-100 text-yellow-600 rounded text-[10px] font-bold">قيد المراجعة</span>}
                               </button>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-sm text-gray-600">
-                              {group?.name || 'مجموعة غير معروفة'}
+                              <div className="flex flex-col">
+                                <span>{group?.name || 'مجموعة غير معروفة'}</span>
+                                {student.feeRecord?.collectedByName && <span className="text-[10px] text-cyan-600 font-bold">حصله: {student.feeRecord.collectedByName}</span>}
+                              </div>
                             </td>
                             <td className="px-6 py-4 whitespace-nowrap text-center">
                               <span className="text-lg font-black text-green-600">{student.amountPaid.toLocaleString()} ج.م</span>

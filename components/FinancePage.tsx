@@ -10,6 +10,7 @@ import FinanceIncomeModal from './FinanceIncomeModal';
 import FinanceExpenseModal from './FinanceExpenseModal';
 import FinanceCollectionsModal from './FinanceCollectionsModal';
 import AttendanceCheckModal from './AttendanceCheckModal';
+import { getCairoDateString } from '../services/cairoTimeHelper';
 
 interface FinancePageProps {
     onBack: () => void;
@@ -96,7 +97,11 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
 
     const teacherCollectionsSummary = useMemo(() => {
         const collectionsThisMonth = teacherCollections.filter(c => c.month === selectedMonth);
-        const totalReceived = collectionsThisMonth.reduce((sum, c) => sum + c.amount, 0);
+        const handedOverByTeachers = collectionsThisMonth.reduce((sum, c) => sum + c.amount, 0);
+
+        const directorIncome = students.flatMap(s => s.fees || [])
+            .filter(f => f.month === selectedMonth && f.paid && f.collectedBy === 'director')
+            .reduce((sum, f) => sum + (f.amountPaid || 0), 0);
 
         const teacherTotals: { [key: string]: number } = {};
         collectionsThisMonth.forEach(collection => {
@@ -111,8 +116,13 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
             amount,
         })).sort((a, b) => b.amount - a.amount);
 
-        return { totalReceived, details };
-    }, [teacherCollections, teachers, selectedMonth]);
+        return {
+            totalReceived: handedOverByTeachers + directorIncome,
+            handedOverByTeachers,
+            directorIncome,
+            details
+        };
+    }, [teacherCollections, teachers, students, selectedMonth]);
 
     const financialOverview = useMemo(() => {
         const income = students.flatMap(s => s.fees)
@@ -229,7 +239,27 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
                 <div className="p-4 sm:p-6">
                     <div className="mb-6 max-w-xs">
                         <label htmlFor="month-filter" className="block text-sm font-medium text-gray-600 mb-1">عرض بيانات شهر</label>
-                        <input type="month" id="month-filter" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500" />
+                        <div className="space-y-2">
+                            <input type="month" id="month-filter" value={selectedMonth} onChange={e => setSelectedMonth(e.target.value)} className="w-full px-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-green-500" />
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setSelectedMonth(getCairoDateString().substring(0, 7))}
+                                    className="flex-1 py-1.5 px-3 text-sm font-bold rounded-lg bg-green-50 text-green-700 hover:bg-green-100 transition-colors border border-green-200"
+                                >
+                                    الشهر الحالي
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const [year, month] = selectedMonth.split('-').map(Number);
+                                        const date = new Date(year, month - 2, 1);
+                                        setSelectedMonth(date.toISOString().substring(0, 7));
+                                    }}
+                                    className="flex-1 py-1.5 px-3 text-sm font-bold rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors border border-gray-200"
+                                >
+                                    الشهر السابق
+                                </button>
+                            </div>
+                        </div>
                     </div>
                     {activeTab === 'overview' && (
                         <div className="space-y-6">
@@ -325,17 +355,18 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
                                             if (monthFee) {
                                                 const amount = monthFee.amountPaid || 0;
                                                 const isCollectedByThisTeacher = monthFee.collectedBy === entity.id;
-                                                const isCollectedByDirector = monthFee.collectedBy === 'director';
                                                 const isInTeacherGroup = teacherGroupIds.has(s.groupId);
 
+                                                // 1. Calculate Cash Held by Teacher
                                                 if (isCollectedByThisTeacher) {
                                                     collectedAmount += amount;
-                                                    teacherTotalRevenue += amount;
-                                                } else if (isCollectedByDirector && isInTeacherGroup) {
-                                                    teacherTotalRevenue += amount;
                                                 } else if (!monthFee.collectedBy && isInTeacherGroup) {
                                                     // Legacy fallback
                                                     collectedAmount += amount;
+                                                }
+
+                                                // 2. Calculate Revenue for Teacher's Groups (for Partnership)
+                                                if (isInTeacherGroup) {
                                                     teacherTotalRevenue += amount;
                                                 }
                                             }

@@ -34,10 +34,11 @@ export const filterSupervisorData = (
     const filteredGroupIds = filteredGroups.map(g => g.id);
     const filteredGroupNames = new Set(filteredGroups.map(g => g.name));
 
-    // 2. Students in those groups (including archived)
+    // 2. Students in those groups (including archived) + Students collected by teachers in this section
     const allFilteredStudents = allStudents.filter(s =>
         filteredGroupIds.includes(s.groupId) ||
-        (s.isArchived && s.archivedGroupName && filteredGroupNames.has(s.archivedGroupName))
+        (s.isArchived && s.archivedGroupName && filteredGroupNames.has(s.archivedGroupName)) ||
+        (s.fees?.some(f => f.paid && f.collectedBy && filteredTeacherIds.includes(f.collectedBy)))
     );
     const activeFilteredStudents = allFilteredStudents.filter(s => !s.isArchived && !s.isPending);
 
@@ -84,7 +85,8 @@ export const filterTeacherStudents = (
 
     const allFiltered = allStudents.filter(s =>
         teacherGroupIds.includes(s.groupId) ||
-        (s.isArchived && s.archivedGroupName && teacherGroupNames.has(s.archivedGroupName))
+        (s.isArchived && s.archivedGroupName && teacherGroupNames.has(s.archivedGroupName)) ||
+        (s.fees?.some(f => f.paid && f.collectedBy === currentUser.id))
     );
     const activeFiltered = allFiltered.filter(s => !s.isArchived && !s.isPending);
 

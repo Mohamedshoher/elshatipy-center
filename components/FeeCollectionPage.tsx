@@ -46,13 +46,33 @@ const FeeCollectionPage = React.memo(({ onBack, teachers, groups, students, teac
                 <div className="flex flex-col sm:flex-row justify-between items-end gap-4">
                     <div className="max-w-xs w-full sm:w-auto">
                         <label htmlFor="month-filter" className="block text-sm font-medium text-gray-600 mb-1">عرض بيانات شهر</label>
-                        <input
-                            type="month"
-                            id="month-filter"
-                            value={selectedMonth}
-                            onChange={e => setSelectedMonth(e.target.value)}
-                            className="w-full px-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
-                        />
+                        <div className="space-y-2">
+                            <input
+                                type="month"
+                                id="month-filter"
+                                value={selectedMonth}
+                                onChange={e => setSelectedMonth(e.target.value)}
+                                className="w-full px-4 py-2 border rounded-lg bg-white focus:outline-none focus:ring-2 focus:ring-cyan-500"
+                            />
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setSelectedMonth(getCairoDateString().substring(0, 7))}
+                                    className="flex-1 py-1 px-3 text-xs font-semibold rounded bg-cyan-50 text-cyan-700 hover:bg-cyan-100 transition-colors border border-cyan-200"
+                                >
+                                    الشهر الحالي
+                                </button>
+                                <button
+                                    onClick={() => {
+                                        const [year, month] = selectedMonth.split('-').map(Number);
+                                        const date = new Date(year, month - 2, 1);
+                                        setSelectedMonth(date.toISOString().substring(0, 7));
+                                    }}
+                                    className="flex-1 py-1 px-3 text-xs font-semibold rounded bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors border border-gray-200"
+                                >
+                                    الشهر السابق
+                                </button>
+                            </div>
+                        </div>
                     </div>
 
                     {/* Tabs */}

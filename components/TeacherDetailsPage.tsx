@@ -19,7 +19,7 @@ import BonusReasonModal from './BonusReasonModal';
 import DeductionReasonModal from './DeductionReasonModal';
 import TeacherAttendanceCalendar from './TeacherAttendanceCalendar';
 import AttendanceActionModal from './AttendanceActionModal';
-import { getCairoNow, parseCairoDateString } from '../services/cairoTimeHelper';
+import { getCairoNow, parseCairoDateString, getCairoDateString } from '../services/cairoTimeHelper';
 
 interface TeacherDetailsPageProps {
     onBack: () => void;
@@ -271,21 +271,26 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                 const monthFee = s.fees?.find(f => f.month === monthPrefix && f.paid);
 
                 // 1. Calculate Cash Held by Teacher (From ANY student, even if transferred/archived)
-                if (monthFee && monthFee.collectedBy === teacher.id) {
-                    const amount = monthFee.amountPaid || 0;
-                    collectedByTeacher += amount;
+                if (monthFee) {
+                    const isCollectedByThisTeacher = monthFee.collectedBy === teacher.id;
+                    const isMissingCollectorButInGroup = !monthFee.collectedBy && teacherGroupIds.has(s.groupId);
 
-                    const isTransferred = !teacherGroupIds.has(s.groupId) && !s.isArchived;
-                    const groupName = groups.find(g => g.id === s.groupId)?.name;
+                    if (isCollectedByThisTeacher || isMissingCollectorButInGroup) {
+                        const amount = monthFee.amountPaid || 0;
+                        collectedByTeacher += amount;
 
-                    collectedStudents.push({
-                        name: s.name,
-                        amount: amount,
-                        isArchived: s.isArchived,
-                        isTransferred: isTransferred,
-                        groupName: groupName,
-                        receiptNumber: monthFee.receiptNumber || '' // Ensure it's never undefined
-                    });
+                        const isTransferred = !teacherGroupIds.has(s.groupId) && !s.isArchived;
+                        const groupName = groups.find(g => g.id === s.groupId)?.name;
+
+                        collectedStudents.push({
+                            name: s.name,
+                            amount: amount,
+                            isArchived: s.isArchived,
+                            isTransferred: isTransferred,
+                            groupName: groupName,
+                            receiptNumber: monthFee.receiptNumber || '' // Ensure it's never undefined
+                        });
+                    }
                 }
 
                 // 2. Only consider students in the teacher's groups for Revenue and Expected Expenses
@@ -914,20 +919,27 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                 {activeTab !== 'groups' && (
                     <div className="bg-white p-4 rounded-2xl shadow-sm border border-gray-100 mb-6 flex flex-col sm:flex-row items-center gap-4">
                         <label className="text-sm font-bold text-gray-700 whitespace-nowrap">عرض بيانات شهر:</label>
-                        <div className="flex items-center gap-2 w-full sm:w-auto">
+                        <div className="flex flex-col gap-2 w-full sm:w-auto">
                             <input
                                 type="month"
                                 value={selectedMonth}
                                 onChange={e => setSelectedMonth(e.target.value)}
-                                className="w-full sm:w-auto px-4 py-2 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-teal-100 outline-none transition-all font-bold text-gray-800"
+                                className="w-full sm:w-80 px-4 py-2 border rounded-xl bg-gray-50 focus:ring-2 focus:ring-teal-100 outline-none transition-all font-bold text-gray-800"
                             />
-                            <button
-                                onClick={handlePrevMonth}
-                                className="p-2 bg-gray-100 text-gray-600 rounded-xl hover:bg-gray-200 transition-colors"
-                                title="الشهر السابق"
-                            >
-                                <ArrowRightIcon className="w-5 h-5 transform rotate-180" />
-                            </button>
+                            <div className="flex gap-2">
+                                <button
+                                    onClick={() => setSelectedMonth(getCairoDateString().substring(0, 7))}
+                                    className="flex-1 py-1 px-3 text-sm font-bold rounded-lg bg-teal-50 text-teal-700 hover:bg-teal-100 transition-colors border border-teal-200"
+                                >
+                                    الشهر الحالي
+                                </button>
+                                <button
+                                    onClick={handlePrevMonth}
+                                    className="flex-1 py-1 px-3 text-sm font-bold rounded-lg bg-gray-50 text-gray-700 hover:bg-gray-100 transition-colors border border-gray-200"
+                                >
+                                    الشهر السابق
+                                </button>
+                            </div>
                         </div>
                     </div>
                 )}
@@ -1656,73 +1668,91 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
 
             {/* Collected Students Modal */}
             {isCollectedDetailsOpen && (
-                <div className="fixed inset-0 z-[60] flex items-center justify-center p-4 bg-black/50 backdrop-blur-sm">
-                    <div className="bg-white rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in fade-in zoom-in duration-200">
-                        <div className="p-6 border-b flex justify-between items-center bg-gray-50">
-                            <h3 className="text-lg font-black text-gray-800">تفاصيل ما حصله المدرس ({payrollData.collectedStudents.length})</h3>
+                <div className="fixed inset-0 z-[130] flex items-end sm:items-center justify-center p-0 sm:p-4 bg-black/60 backdrop-blur-sm">
+                    <div className="bg-white rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl w-full max-w-lg overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300 flex flex-col max-h-[92vh] sm:max-h-[85vh]">
+                        <div className="p-6 border-b flex justify-between items-center bg-gray-50/50">
+                            <h3 className="text-xl font-black text-gray-800">تفاصيل المحصل ({payrollData.collectedStudents.length})</h3>
                             <button onClick={() => setIsCollectedDetailsOpen(false)} className="p-2 hover:bg-gray-200 rounded-full transition-colors">
-                                <span className="text-gray-500 text-xl font-bold">✕</span>
+                                <span className="text-gray-400 text-2xl font-bold">✕</span>
                             </button>
                         </div>
-                        <div className="p-6 max-h-[60vh] overflow-y-auto">
-                            <div className="space-y-3">
-                                {payrollData.collectedStudents.length > 0 ? (
-                                    payrollData.collectedStudents.map((s, idx) => {
-                                        // منطق اكتشاف الفجوات في الأرقام
-                                        let isGap = false;
-                                        if (idx > 0 && s.receiptNumber) {
-                                            const prevNum = parseInt(payrollData.collectedStudents[idx - 1].receiptNumber?.replace(/\D/g, '') || '0');
-                                            const currNum = parseInt(s.receiptNumber?.replace(/\D/g, '') || '0');
-                                            if (prevNum > 0 && currNum > prevNum + 1) {
-                                                isGap = true;
-                                            }
+                        <div className="p-5 sm:p-6 overflow-y-auto space-y-4">
+                            {payrollData.collectedStudents.length > 0 ? (
+                                payrollData.collectedStudents.map((s, idx) => {
+                                    // منطق اكتشاف الفجوات في الأرقام
+                                    let isGap = false;
+                                    if (idx > 0 && s.receiptNumber) {
+                                        const prevNum = parseInt(payrollData.collectedStudents[idx - 1].receiptNumber?.replace(/\D/g, '') || '0');
+                                        const currNum = parseInt(s.receiptNumber?.replace(/\D/g, '') || '0');
+                                        if (prevNum > 0 && currNum > prevNum + 1) {
+                                            isGap = true;
                                         }
+                                    }
 
-                                        return (
-                                            <div key={idx} className={`flex items-center gap-3 p-3 bg-white rounded-xl border-2 shadow-sm transition-colors ${isGap ? 'border-red-200 bg-red-50/30' : 'border-gray-100'}`}>
-                                                {/* خانة رقم الوصل - جهة اليمين */}
-                                                <div className="shrink-0 w-20">
-                                                    {s.receiptNumber ? (
-                                                        <div className={`flex flex-col items-center border rounded-lg py-1 px-1 shadow-sm ${isGap ? 'bg-red-600 border-red-700 text-white' : 'bg-blue-50 border-blue-200 text-blue-800'}`}>
-                                                            <span className={`text-[9px] font-bold leading-none mb-1 ${isGap ? 'text-white/90' : 'text-blue-600'}`}>
-                                                                {isGap ? 'فجوة/نقص' : 'رقم الوصل'}
+                                    return (
+                                        <div key={idx} className={`flex items-center gap-4 p-4 bg-white rounded-2xl border-2 shadow-sm transition-all hover:border-teal-200 ${isGap ? 'border-red-100 bg-red-50/20' : 'border-gray-50'}`}>
+                                            {/* خانة رقم الوصل - جهة اليمين */}
+                                            <div className="shrink-0">
+                                                {s.receiptNumber ? (
+                                                    <div className={`flex flex-col items-center border-2 rounded-xl py-1.5 px-3 min-w-[70px] shadow-sm ${isGap ? 'bg-red-600 border-red-700 text-white' : 'bg-blue-50 border-blue-100 text-blue-800'}`}>
+                                                        <span className={`text-[10px] font-black leading-none mb-1 ${isGap ? 'text-red-100' : 'text-blue-500'}`}>
+                                                            {isGap ? 'فجوة' : 'وصل'}
+                                                        </span>
+                                                        <span className="text-sm font-black tracking-wider">{s.receiptNumber}</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="text-[10px] text-gray-400 font-bold bg-gray-50 px-2 py-3 rounded-xl border border-dashed border-gray-200 text-center min-w-[70px]">بدون وصل</div>
+                                                )}
+                                            </div>
+
+                                            {/* بيانات الطالب */}
+                                            <div className="flex-1 min-w-0">
+                                                <div className="flex items-center gap-2 flex-wrap mb-1">
+                                                    <span className="font-black text-gray-900 text-base truncate">{s.name}</span>
+                                                    <div className="flex gap-1">
+                                                        {s.isArchived && (
+                                                            <span className="px-2 py-0.5 bg-gray-100 text-gray-500 rounded-lg text-[10px] font-black border border-gray-200">
+                                                                مؤرشف
                                                             </span>
-                                                            <span className={`text-sm font-black ${isGap ? 'text-white' : 'text-blue-800'}`}>{s.receiptNumber}</span>
-                                                        </div>
-                                                    ) : (
-                                                        <div className="text-[10px] text-gray-300 italic text-center">بدون وصل</div>
-                                                    )}
-                                                </div>
-
-                                                {/* بيانات الطالب */}
-                                                <div className="flex-1 min-w-0">
-                                                    <span className="font-bold text-gray-900 text-sm block truncate">{s.name}</span>
-                                                    <div className="flex items-center gap-2 mt-0.5">
-                                                        <p className="text-[10px] text-gray-500 font-medium truncate">{s.groupName || 'بدون مجموعة'}</p>
-                                                        {isGap && <span className="text-[9px] text-red-600 font-black bg-red-100 px-1 rounded animate-pulse">يوجد وصل مفقود قبل هذا!</span>}
+                                                        )}
+                                                        {s.isTransferred && (
+                                                            <span className="px-2 py-0.5 bg-orange-100 text-orange-600 rounded-lg text-[10px] font-black border border-orange-200">
+                                                                منقول
+                                                            </span>
+                                                        )}
                                                     </div>
                                                 </div>
-
-                                                {/* المبلغ */}
-                                                <div className="shrink-0 text-left border-r pr-3 border-gray-100">
-                                                    <span className="font-black text-teal-600 text-md block">{s.amount.toLocaleString()} <small className="text-[10px]">ج.م</small></span>
+                                                <div className="flex flex-col gap-1">
+                                                    <p className="text-xs text-gray-500 font-bold flex items-center gap-1">
+                                                        <UsersIcon className="w-3 h-3" />
+                                                        {s.groupName || 'بدون مجموعة'}
+                                                    </p>
+                                                    {isGap && <span className="text-[10px] text-red-600 font-black bg-red-50 px-2 py-0.5 rounded-lg border border-red-100 self-start animate-pulse">فجوة في أرقام الإيصالات!</span>}
                                                 </div>
                                             </div>
-                                        );
-                                    })
-                                ) : (
-                                    <p className="text-center text-gray-500 italic py-4">لا توجد بيانات متاحة.</p>
-                                )}
-                            </div>
+
+                                            {/* المبلغ */}
+                                            <div className="shrink-0 text-left border-r-2 pl-2 border-gray-50">
+                                                <span className="font-black text-teal-600 text-lg sm:text-xl block tabular-nums">{s.amount.toLocaleString()} <small className="text-[10px]">ج.م</small></span>
+                                            </div>
+                                        </div>
+                                    );
+                                })
+                            ) : (
+                                <div className="py-20 flex flex-col items-center justify-center text-gray-400">
+                                    <CurrencyDollarIcon className="w-16 h-16 mb-4 opacity-10" />
+                                    <p className="font-bold italic">لا توجد مبالغ محصلة مسجلة</p>
+                                </div>
+                            )}
                         </div>
-                        <div className="p-6 bg-gray-50 border-t">
-                            <div className="flex justify-between items-center text-lg font-black">
-                                <span className="text-gray-700">الإجمالي:</span>
-                                <span className="text-teal-700">{payrollData.collectedByTeacher.toLocaleString()} ج.م</span>
+                        <div className="p-6 bg-gray-50 border-t shrink-0">
+                            <div className="flex justify-between items-center mb-4">
+                                <span className="text-gray-500 font-bold">إجمالي المبلغ المحصل:</span>
+                                <span className="text-2xl font-black text-teal-700 tabular-nums">{payrollData.collectedByTeacher.toLocaleString()} <small className="text-sm">ج.م</small></span>
                             </div>
                             <button
                                 onClick={() => setIsCollectedDetailsOpen(false)}
-                                className="mt-4 w-full py-3 bg-teal-600 text-white rounded-xl font-bold hover:bg-teal-700 transition-colors"
+                                className="w-full py-4 bg-teal-600 text-white rounded-2xl font-black text-lg hover:bg-teal-700 transition-all shadow-xl shadow-teal-100 active:scale-[0.98]"
                             >
                                 إغلاق
                             </button>
@@ -1731,32 +1761,32 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
                 </div>
             )}
             {isDeficitDetailsOpen && (
-                <div className="fixed inset-0 bg-black bg-opacity-60 z-[60] flex justify-center items-center p-4">
-                    <div className="bg-white rounded-2xl shadow-2xl p-6 w-full max-w-2xl max-h-[90vh] flex flex-col overflow-hidden animate-in zoom-in-95 duration-200">
-                        <div className="flex justify-between items-center mb-4 border-b pb-3 shrink-0">
-                            <h3 className="text-xl font-bold text-gray-800 flex items-center gap-2">
-                                <span className="text-2xl">⚠️</span>
-                                تفاصيل وأسباب العجز المالي
+                <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[130] flex justify-center items-end sm:items-center p-0 sm:p-4">
+                    <div className="bg-white rounded-t-[2.5rem] sm:rounded-3xl shadow-2xl p-5 sm:p-8 w-full max-w-2xl max-h-[92vh] sm:max-h-[90vh] flex flex-col overflow-hidden animate-in slide-in-from-bottom-10 sm:zoom-in-95 duration-300">
+                        <div className="flex justify-between items-center mb-6 border-b pb-4 shrink-0">
+                            <h3 className="text-lg sm:text-2xl font-black text-gray-800 flex items-center gap-3">
+                                <span className="bg-orange-100 p-2 rounded-xl text-xl">⚠️</span>
+                                تفاصيل وأسباب العجز
                             </h3>
-                            <button onClick={() => setIsDeficitDetailsOpen(false)} className="text-gray-400 hover:text-gray-600">
-                                <XIcon className="w-6 h-6" />
+                            <button onClick={() => setIsDeficitDetailsOpen(false)} className="p-2 hover:bg-gray-100 rounded-full transition-colors">
+                                <XIcon className="w-6 h-6 text-gray-400" />
                             </button>
                         </div>
 
-                        <div className="overflow-y-auto pr-2 space-y-4">
+                        <div className="overflow-y-auto pr-2 space-y-6 pb-4">
                             {/* 1. Delivery Deficit Reason (On Teacher) */}
                             {payrollData.deliveryDeficit > 0 && (
-                                <div className="bg-white p-4 rounded-xl border border-red-200 shadow-sm">
-                                    <div className="flex items-start gap-3">
-                                        <div className="p-2 bg-red-100 rounded-lg text-red-600 shrink-0">
-                                            <BriefcaseIcon className="w-6 h-6" />
+                                <div className="bg-white p-5 rounded-2xl border-2 border-red-100 shadow-sm relative overflow-hidden group">
+                                    <div className="absolute top-0 right-0 w-1.5 h-full bg-red-500" />
+                                    <div className="flex items-start gap-4">
+                                        <div className="p-3 bg-red-50 rounded-2xl text-red-600 shrink-0">
+                                            <BriefcaseIcon className="w-7 h-7" />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-red-700 text-base mb-1">1. عجز تسليم (في عهدة المدرس)</p>
-                                            <p className="text-sm text-gray-700 leading-relaxed">
-                                                هناك مبلغ <span className="font-black text-red-600 bg-red-50 px-1 rounded mx-1">{payrollData.deliveryDeficit.toLocaleString()} ج.م</span>
-                                                تم تحصيله بواسطة المدرس فعلياً، ولكن لم يتم تسليمه للإدارة بعد.
-                                                (دين على المدرس).
+                                            <p className="font-black text-red-700 text-lg mb-2">1. عجز تسليم (في عهدة المدرس)</p>
+                                            <p className="text-sm text-gray-700 leading-relaxed font-bold">
+                                                هناك مبلغ <span className="text-xl font-black text-red-600 bg-red-50 px-2 py-0.5 rounded-lg mx-1 inline-block">{payrollData.deliveryDeficit.toLocaleString()} ج.م</span>
+                                                تم تحصيله بواسطة المدرس فعلياً، ولكن لم يتم تسليمه للإدارة بعد (دين على المدرس).
                                             </p>
                                         </div>
                                     </div>
@@ -1765,48 +1795,54 @@ const TeacherDetailsPage: React.FC<TeacherDetailsPageProps> = ({
 
                             {/* 2. Group Deficit Reason (On Students) */}
                             {payrollData.groupDeficit > 0 && (
-                                <div className="bg-white p-4 rounded-xl border border-orange-200 shadow-sm">
-                                    <div className="flex items-start gap-3 mb-4">
-                                        <div className="p-2 bg-orange-100 rounded-lg text-orange-600 shrink-0">
-                                            <UsersIcon className="w-6 h-6" />
+                                <div className="bg-white p-5 rounded-2xl border-2 border-orange-100 shadow-sm relative overflow-hidden">
+                                    <div className="absolute top-0 right-0 w-1.5 h-full bg-orange-500" />
+                                    <div className="flex items-start gap-4 mb-5">
+                                        <div className="p-3 bg-orange-50 rounded-2xl text-orange-600 shrink-0">
+                                            <UsersIcon className="w-7 h-7" />
                                         </div>
                                         <div>
-                                            <p className="font-bold text-orange-700 text-base mb-1">2. عجز تحصيل من الطلاب (تقصير في الدفع)</p>
-                                            <p className="text-sm text-gray-700">
-                                                الطلاب التالية أسماؤهم لم يدفعوا المصاريف كاملة أو لم يدفعوا شيئاً:
+                                            <p className="font-black text-orange-700 text-lg mb-2">2. عجز تحصيل من الطلاب</p>
+                                            <p className="text-sm text-gray-600 font-bold">
+                                                الطلاب التالية أسماؤهم لم يدفعوا المصاريف كاملة للمنشأة:
                                             </p>
                                         </div>
                                     </div>
 
-                                    <div className="space-y-2 max-h-80 overflow-y-auto pr-1">
+                                    <div className="space-y-3 max-h-[40vh] overflow-y-auto pr-1">
                                         {deficitBreakdown.map((item, idx) => (
-                                            <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-orange-50 p-3 rounded-lg border border-orange-100 gap-2">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="w-6 h-6 rounded-full bg-orange-200 text-orange-800 flex items-center justify-center text-xs font-bold shrink-0">{idx + 1}</span>
-                                                    <span className="font-bold text-gray-800 text-sm">{item.studentName}</span>
+                                            <div key={idx} className="flex flex-col sm:flex-row sm:items-center justify-between bg-orange-50/50 p-4 rounded-xl border border-orange-100 gap-3 group hover:bg-orange-50 transition-colors">
+                                                <div className="flex items-center gap-3">
+                                                    <span className="w-8 h-8 rounded-xl bg-orange-200 text-orange-800 flex items-center justify-center text-sm font-black shrink-0 shadow-sm">
+                                                        {idx + 1}
+                                                    </span>
+                                                    <span className="font-black text-gray-800 text-base">{item.studentName}</span>
                                                 </div>
 
-                                                <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pl-2 sm:pl-0 border-t sm:border-t-0 border-orange-200 pt-2 sm:pt-0 mt-1 sm:mt-0">
+                                                <div className="flex items-center justify-between sm:justify-end gap-3 w-full sm:w-auto pl-2 sm:pl-0 border-t sm:border-t-0 border-orange-100 pt-3 sm:pt-0">
                                                     {item.isFullDeficit ? (
-                                                        <span className="px-2 py-1 bg-red-100 text-red-700 rounded-md text-xs font-bold whitespace-nowrap">لم يدفع (عليه {item.expected})</span>
+                                                        <span className="px-3 py-1 bg-red-100 text-red-700 rounded-lg text-[11px] font-black uppercase tracking-wider">لم يدفع (عليه {item.expected})</span>
                                                     ) : (
-                                                        <span className="px-2 py-1 bg-yellow-100 text-yellow-700 rounded-md text-xs font-bold whitespace-nowrap">دفع {item.paid} (باقي {item.diff})</span>
+                                                        <span className="px-3 py-1 bg-yellow-100 text-yellow-700 rounded-lg text-[11px] font-black uppercase tracking-wider">دفع {item.paid} (باقي {item.diff})</span>
                                                     )}
-                                                    <span className="font-black text-red-600 dir-ltr whitespace-nowrap text-sm">-{item.diff} ج.م</span>
+                                                    <span className="font-black text-red-600 text-lg tabular-nums">-{item.diff} <small className="text-[10px] font-bold">ج.م</small></span>
                                                 </div>
                                             </div>
                                         ))}
                                         {deficitBreakdown.length === 0 && (
-                                            <p className="text-sm text-gray-500 italic text-center py-4">لا توجد تفاصيل دقيقة متاحة (ربما بسبب عدم تعيين رسوم شهرية للطلاب).</p>
+                                            <div className="py-12 flex flex-col items-center justify-center text-gray-400">
+                                                <UsersIcon className="w-12 h-12 mb-2 opacity-20" />
+                                                <p className="text-sm italic font-bold">لا توجد تفاصيل دقيقة متاحة للطلاب.</p>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
                             )}
                         </div>
-                        <div className="p-6 bg-gray-50 border-t mt-auto">
+                        <div className="p-6 bg-gray-50 border-t mt-auto shrink-0 flex gap-3">
                             <button
                                 onClick={() => setIsDeficitDetailsOpen(false)}
-                                className="w-full py-3 bg-gray-600 text-white rounded-xl font-bold hover:bg-gray-700 transition-colors"
+                                className="flex-1 py-4 bg-gray-800 text-white rounded-2xl font-black text-lg hover:bg-gray-900 transition-all shadow-xl shadow-gray-200 active:scale-[0.98]"
                             >
                                 إغلاق
                             </button>

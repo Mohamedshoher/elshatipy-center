@@ -73,6 +73,18 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, o
               <span className="font-semibold">إدارة المدرسين</span>
             </button>
           </li>
+          <li>
+            <button onClick={() => handleAction(onShowFinance)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-emerald-100 hover:text-emerald-800 transition-colors">
+              <CurrencyDollarIcon className="w-6 h-6 ml-4 text-emerald-600" />
+              <span className="font-semibold">الإدارة المالية</span>
+            </button>
+          </li>
+          <li>
+            <button onClick={() => handleAction(onShowFeeCollection)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-cyan-100 hover:text-cyan-800 transition-colors">
+              <CashIcon className="w-6 h-6 ml-4 text-cyan-600" />
+              <span className="font-semibold">تحصيل الرسوم</span>
+            </button>
+          </li>
           {isDirector && onShowSupervisorManager && (
             <li>
               <button onClick={() => handleAction(onShowSupervisorManager)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-blue-100 hover:text-blue-800 transition-colors">
@@ -89,12 +101,6 @@ const Sidebar: React.FC<SidebarProps> = ({ isOpen, onClose, onShowGeneralView, o
               </button>
             </li>
           )}
-          {/* <li>
-            <button onClick={() => handleAction(onShowFeeCollection)} className="flex items-center w-full text-right p-3 rounded-lg text-gray-700 hover:bg-cyan-100 hover:text-cyan-800 transition-colors">
-              <CashIcon className="w-6 h-6 ml-4 text-cyan-600" />
-              <span className="font-semibold">تحصيل الرسوم</span>
-            </button>
-          </li> */}
 
 
           <li className="px-3 pt-4 pb-2 text-xs font-semibold text-gray-500 uppercase">التقارير والمتابعة</li>
