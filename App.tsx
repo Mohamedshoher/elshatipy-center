@@ -471,7 +471,7 @@ const App: React.FC = () => {
         const dateThreshold = fourMonthsAgo.toISOString().split('T')[0];
 
         if (currentUser.role === 'director' || currentUser.role === 'supervisor') {
-            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('date', '>=', dateThreshold), limit(500)), (snapshot) => {
+            const unsub = onSnapshot(query(collection(db, 'teacherAttendance'), where('date', '>=', dateThreshold), limit(1000)), (snapshot) => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 setTeacherAttendance(data);
             });

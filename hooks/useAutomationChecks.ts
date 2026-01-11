@@ -2,7 +2,7 @@ import React, { useEffect } from 'react';
 import { doc, getDoc, collection, writeBatch } from 'firebase/firestore';
 import { db } from '../services/firebase';
 import { CurrentUser, Student, Teacher, Group, TeacherStatus, TeacherAttendanceStatus, FinancialSettings, TeacherAttendanceRecord, AttendanceStatus } from '../types';
-import { getCairoNow, getCairoDateString, getYesterdayDateString, isCairoAfterMidnight, isCairoAfter12_05, isCairoWorkday, getArabicDayName } from '../services/cairoTimeHelper';
+import { getCairoNow, getCairoDateString, getYesterdayDateString, isCairoAfterMidnight, isCairoAfter12_05, isCairoWorkday, getArabicDayName, parseCairoDateString } from '../services/cairoTimeHelper';
 
 interface UseAutomationChecksProps {
     currentUser: CurrentUser | null;
@@ -25,29 +25,39 @@ export const useAutomationChecks = ({
     const lastRunDateRef = React.useRef<string>('');
 
     useEffect(() => {
-        // تشغيل الفحص فقط للمدير لضمان التنفيذ التلقائي من جهة واحدة وتوفير الموارد
-        if (!currentUser || currentUser.role !== 'director' || !students.length || !teachers.length || !groups.length) return;
+        if (!currentUser || !students.length || !teachers.length || !groups.length) return;
 
         const todayString = getCairoDateString();
         if (lastRunDateRef.current === todayString) return;
 
         const runNotificationChecks = async () => {
             try {
-                // Singleton Execution Guard - لضمان التنفيذ مرة واحدة فقط في اليوم
+                // Singleton Execution Guard - لضمان التنفيذ مرة واحدة فقط في اليوم لأي مستخدم يفتح التطبيق
                 const automationRef = doc(db, 'system', 'automation');
                 const automationSnap = await getDoc(automationRef);
                 const automationData = automationSnap.exists() ? automationSnap.data() : {};
 
-                // If it already ran today on any device, don't run again
+                // If it already ran today on any device, don't run again (for overall system optimization)
                 if (automationData.lastGlobalRun === todayString) {
                     lastRunDateRef.current = todayString;
                     return;
                 }
 
                 const today = getCairoNow();
-                const yesterdayString = getYesterdayDateString();
+                const yesterday = new Date(today);
+                yesterday.setDate(today.getDate() - 1);
+                const yesterdayString = yesterday.toISOString().split('T')[0];
 
-                // Optimized data grouping
+                const dayOfWeek = today.getDay();
+                const isWorkday = isCairoWorkday(yesterday);
+                const isHoliday = (financialSettings.publicHolidays || []).includes(yesterdayString);
+
+                const IS_AFTER_12_05 = isCairoAfter12_05();
+
+                const batch = writeBatch(db);
+                let operationsCount = 0;
+
+                // جهوزية قائمة المدرسين ومجموعاتهم
                 const teacherGroupMap = new Map();
                 groups.forEach(g => {
                     if (g.teacherId) {
@@ -66,124 +76,80 @@ export const useAutomationChecks = ({
                     })
                     .filter(t => t.students.length > 0);
 
-                const lastAbsenceCheck = automationData.lastAbsenceCheck || '';
-                const lastDeductionCheck = automationData.lastDeductionCheck || '';
-
-                // فحص اليوم السابق (Yesterday)
-                const dateToCheck = new Date(today);
-                dateToCheck.setHours(0, 0, 0, 0);
-                const dayOfWeek = today.getDay();
-
-                const yesterdayDate = new Date(today);
-                yesterdayDate.setDate(today.getDate() - 1);
-                const isWorkday = isCairoWorkday(yesterdayDate);
-                const isHoliday = (financialSettings.publicHolidays || []).includes(yesterdayString);
-
-                const IS_AFTER_MIDNIGHT = isCairoAfterMidnight();
-                const IS_AFTER_12_05 = isCairoAfter12_05();
-
-                const batch = writeBatch(db);
-                let operationsCount = 0;
-
-                // 1. نظام موحد: فحص التقارير المفقودة وتسجيل الخصم
-                if (IS_AFTER_12_05 && lastDeductionCheck !== yesterdayString && isWorkday && !isHoliday) {
-                    batch.set(automationRef, { lastDeductionCheck: yesterdayString }, { merge: true });
+                // 1. فحص التقارير المفقودة ليوم أمس فقط
+                if (IS_AFTER_12_05 && automationData.lastDeductionCheck !== yesterdayString) {
+                    // تحديث التاريخ فوراً لمنع التكرار
+                    batch.set(automationRef, {
+                        lastDeductionCheck: yesterdayString,
+                        lastGlobalRun: todayString // تحديث تشغيل النظام الكلي أيضاً
+                    }, { merge: true });
                     operationsCount++;
 
-                    const dayName = getArabicDayName(yesterdayDate);
+                    if (isWorkday && !isHoliday) {
+                        const dayName = getArabicDayName(yesterday);
+                        const targetMidnight = new Date(yesterday);
+                        targetMidnight.setHours(0, 0, 0, 0);
 
-                    for (const teacher of activeTeachersWithStudents) {
-                        if (!teacher.students.some(s => new Date(s.joiningDate) <= dateToCheck)) continue;
-
-                        const alreadyHasDeduction = teacherAttendance.some(r =>
-                            r.teacherId === teacher.id && r.date === yesterdayString && r.status === TeacherAttendanceStatus.MISSING_REPORT
-                        );
-
-                        if (alreadyHasDeduction) continue;
-
-                        const hasAttendanceRecord = teacher.students.some(s => s.attendance.some(r => r.date === yesterdayString));
-
-                        if (!hasAttendanceRecord) {
-                            const deductionId = `auto-missed-${teacher.id}-${yesterdayString}`;
-                            const deductionRef = doc(db, 'teacherAttendance', deductionId);
-
-                            batch.set(deductionRef, {
-                                teacherId: teacher.id,
-                                teacherName: teacher.name,
-                                date: yesterdayString,
-                                status: TeacherAttendanceStatus.MISSING_REPORT,
-                                reason: `تلقائي: لم يتم تسليم تقرير يوم ${dayName}`,
-                                timestamp: getCairoNow().toISOString()
+                        for (const teacher of activeTeachersWithStudents) {
+                            // التحقق هل لدى المدرس طلاب في هذا التاريخ (تاريخ انضمامهم قبل أو يساوي هذا التاريخ)
+                            const hasStudentsThatDay = teacher.students.some(s => {
+                                const joinDate = parseCairoDateString(s.joiningDate);
+                                joinDate.setHours(0, 0, 0, 0);
+                                return joinDate <= targetMidnight;
                             });
 
-                            const dirNoteId = `dir-deduct-${teacher.id}-${yesterdayString}`;
-                            batch.set(doc(db, 'directorNotifications', dirNoteId), {
-                                date: getCairoNow().toISOString(),
-                                forDate: yesterdayString,
-                                content: `⚠️ تم خصم (ربع يوم) للمدرس ${teacher.name} لعدم إرسال تقرير يوم ${dayName}.`,
-                                isRead: false,
-                                type: 'teacher_absent_report',
-                                teacherId: teacher.id,
-                                teacherName: teacher.name,
-                            });
+                            if (!hasStudentsThatDay) continue;
 
-                            const teacherNoteId = `notif-missed-${teacher.id}-${yesterdayString}`;
-                            batch.set(doc(db, 'notifications', teacherNoteId), {
-                                id: teacherNoteId,
-                                date: getCairoNow().toISOString(),
-                                content: `⚠️ تنبيه إداري آلي: تم تسجيل خصم (ربع يوم) من راتبك لعدم إرسال تقرير الحضور الخاص بمجموعاتك ليوم ${dayName}. يرجى الالتزام لتجنب الخصومات المتكررة.`,
-                                senderName: "نظام المتابعة الآلي",
-                                target: { type: 'teacher', id: teacher.id },
-                                readBy: [],
-                                deletedBy: []
-                            });
-                            operationsCount += 3;
-                        }
-                    }
-                }
+                            const alreadyHasDeduction = teacherAttendance.some(r =>
+                                r.teacherId === teacher.id && r.date === yesterdayString && r.status === TeacherAttendanceStatus.MISSING_REPORT
+                            );
+                            if (alreadyHasDeduction) continue;
 
-                // 2. فحص الغياب المتصل - 3 أيام (تم إلغاؤه بناءً على طلب المستخدم)
-                /*
-                if (IS_AFTER_MIDNIGHT && lastAbsenceCheck !== yesterdayString && isWorkday && !isHoliday) {
-                    batch.set(automationRef, { lastAbsenceCheck: yesterdayString }, { merge: true });
-                    operationsCount++;
+                            const hasAttendanceRecord = teacher.students.some(s =>
+                                s.attendance.some(r => r.date === yesterdayString)
+                            );
 
-                    for (const student of students) {
-                        if (student.isArchived || student.isPending) continue;
-                        const sortedAtt = [...student.attendance].sort((a, b) => b.date.localeCompare(a.date));
-                        if (sortedAtt.length >= 3) {
-                            const last3 = sortedAtt.slice(0, 3);
-                            if (last3.every(r => r.status === AttendanceStatus.ABSENT) && last3[0].date === yesterdayString) {
-                                const group = groups.find(g => g.id === student.groupId);
-                                if (group?.teacherId) {
-                                    const tchAbsNoteId = `tch-abs-${student.id}-${yesterdayString}`;
-                                    batch.set(doc(db, 'notifications', tchAbsNoteId), {
-                                        date: getCairoNow().toISOString(),
-                                        content: `📢 تنبيه غياب: الطالب ${student.name} غاب لمدة 3 أيام متصلة. يرجى التواصل مع ولي الأمر.`,
-                                        senderName: "نظام المتابعة",
-                                        target: { type: 'teacher', id: group.teacherId },
-                                        readBy: [],
-                                    });
-                                    operationsCount++;
-                                }
-                                const dirAbsNoteId = `dir-abs-${student.id}-${yesterdayString}`;
-                                batch.set(doc(db, 'directorNotifications', dirAbsNoteId), {
+                            if (!hasAttendanceRecord) {
+                                const deductionId = `auto-missed-${teacher.id}-${yesterdayString}`;
+                                const deductionRef = doc(db, 'teacherAttendance', deductionId);
+
+                                batch.set(deductionRef, {
+                                    teacherId: teacher.id,
+                                    teacherName: teacher.name,
+                                    date: yesterdayString,
+                                    status: TeacherAttendanceStatus.MISSING_REPORT,
+                                    reason: `تلقائي: لم يتم تسليم تقرير يوم ${dayName}`,
+                                    timestamp: getCairoNow().toISOString()
+                                });
+
+                                const dirNoteId = `dir-deduct-${teacher.id}-${yesterdayString}`;
+                                batch.set(doc(db, 'directorNotifications', dirNoteId), {
                                     date: getCairoNow().toISOString(),
                                     forDate: yesterdayString,
-                                    content: `📢 انتباه: الطالب ${student.name} (مجموعة ${group?.name || '...'}) غاب لـ 3 أيام متتالية.`,
+                                    content: `⚠️ تم خصم (ربع يوم) للمدرس ${teacher.name} لعدم إرسال تقرير يوم ${dayName}.`,
                                     isRead: false,
-                                    type: 'student_consecutive_absence',
-                                    teacherId: group?.teacherId || '',
-                                    teacherName: teachers.find(t => t.id === group?.teacherId)?.name || 'غير محدد'
+                                    type: 'teacher_absent_report',
+                                    teacherId: teacher.id,
+                                    teacherName: teacher.name,
                                 });
-                                operationsCount++;
+
+                                const teacherNoteId = `notif-missed-${teacher.id}-${yesterdayString}`;
+                                batch.set(doc(db, 'notifications', teacherNoteId), {
+                                    id: teacherNoteId,
+                                    date: getCairoNow().toISOString(),
+                                    content: `⚠️ تنبيه إداري آلي: تم تسجيل خصم (ربع يوم) من راتبك لعدم إرسال تقرير الحضور الخاص بمجموعاتك ليوم ${dayName}. يرجى الالتزام لتجنب الخصومات المتكررة.`,
+                                    senderName: "نظام المتابعة الآلي",
+                                    target: { type: 'teacher', id: teacher.id },
+                                    readBy: [],
+                                    deletedBy: []
+                                });
+                                operationsCount += 3;
                             }
                         }
                     }
                 }
-                */
 
-                // 3. الفحص الأسبوعي
+                // 2. الفحص الأسبوعي (يتم كل خميس)
                 if (dayOfWeek === 4 && IS_AFTER_12_05) {
                     const diff = (dayOfWeek + 1) % 7;
                     const lastSaturday = new Date(today);
@@ -249,7 +215,7 @@ export const useAutomationChecks = ({
             }
         };
 
-        const timer = setTimeout(runNotificationChecks, 6000); // Wait 6 seconds
+        const timer = setTimeout(runNotificationChecks, 6000); // الانتظار لضمان تحميل كافة البيانات
         return () => clearTimeout(timer);
-    }, [currentUser, students.length, teachers.length, groups.length]);
+    }, [currentUser, students.length, teachers.length, groups.length, financialSettings, teacherAttendance]);
 };
