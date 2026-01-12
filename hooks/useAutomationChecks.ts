@@ -217,5 +217,5 @@ export const useAutomationChecks = ({
 
         const timer = setTimeout(runNotificationChecks, 6000); // الانتظار لضمان تحميل كافة البيانات
         return () => clearTimeout(timer);
-    }, [currentUser, students.length, teachers.length, groups.length, financialSettings, teacherAttendance]);
+    }, [currentUser, students, teachers.length, groups.length, financialSettings, teacherAttendance]);
 };

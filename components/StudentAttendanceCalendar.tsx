@@ -9,9 +9,10 @@ interface StudentAttendanceRecord {
 interface StudentAttendanceCalendarProps {
     month: string; // YYYY-MM
     attendanceRecords: StudentAttendanceRecord[];
+    onDayClick?: (date: string) => void;
 }
 
-const StudentAttendanceCalendar: React.FC<StudentAttendanceCalendarProps> = ({ month, attendanceRecords }) => {
+const StudentAttendanceCalendar: React.FC<StudentAttendanceCalendarProps> = ({ month, attendanceRecords, onDayClick }) => {
     const calendarDays = useMemo(() => {
         const [yearStr, monthStr] = month.split('-');
         const year = parseInt(yearStr);
@@ -69,22 +70,25 @@ const StudentAttendanceCalendar: React.FC<StudentAttendanceCalendarProps> = ({ m
                     const dateStr = `${month}-${String(day).padStart(2, '0')}`;
                     const colorClass = getStatusColor(dateStr);
                     const record = attendanceRecords.find(r => r.date === dateStr);
+                    const isToday = new Date().toISOString().startsWith(dateStr);
 
                     return (
-                        <div
+                        <button
                             key={day}
-                            className={`aspect-square rounded-2xl flex flex-col items-center justify-center border transition-all relative ${colorClass}`}
+                            onClick={() => onDayClick && onDayClick(dateStr)}
+                            disabled={!onDayClick}
+                            className={`aspect-square rounded-2xl flex flex-col items-center justify-center border transition-all relative ${colorClass} ${onDayClick ? 'cursor-pointer active:scale-95' : 'cursor-default'} ${isToday ? 'ring-2 ring-blue-400 ring-offset-2' : ''}`}
                         >
                             <span className="font-bold text-sm sm:text-lg">{day}</span>
                             {record && (
                                 <div className={`mt-1 w-2 h-2 rounded-full ${record.status === AttendanceStatus.PRESENT ? 'bg-green-500' : 'bg-red-500'} opacity-60 sm:hidden`}></div>
                             )}
                             {record && (
-                                <span className="hidden sm:block text-[10px] mt-1 font-bold">
+                                <span className="hidden sm:block text-[10px] sm:mt-1 font-bold">
                                     {record.status === AttendanceStatus.PRESENT ? 'حاضر' : 'غائب'}
                                 </span>
                             )}
-                        </div>
+                        </button>
                     );
                 })}
             </div>

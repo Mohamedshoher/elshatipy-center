@@ -16,6 +16,7 @@ import CheckCircleIcon from './icons/CheckCircleIcon';
 import CheckIcon from './icons/CheckIcon';
 import PlanSection from './PlanSection';
 import StudentAttendanceCalendar from './StudentAttendanceCalendar';
+import StudentAttendanceActionModal from './StudentAttendanceActionModal';
 
 interface StudentDetailsPageProps {
     student: Student;
@@ -33,6 +34,7 @@ interface StudentDetailsPageProps {
     onCancelFeePayment: (studentId: string, month: string) => void;
     onAddBadge: (studentId: string, badge: Omit<Badge, 'id' | 'dateEarned'>) => void;
     onRemoveBadge: (studentId: string, badgeId: string) => void;
+    onToggleAttendance: (studentId: string, date: string, status: AttendanceStatus | null) => void;
     onBack: () => void;
 }
 
@@ -58,7 +60,7 @@ const testGradeInfo: Record<TestGrade, { label: string; className: string }> = {
 };
 
 const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
-    const { student, initialTab, currentUser, notes, onOpenFeeModal, onAddTest, onDeleteTest, onAddNote, onSaveProgressPlan, onUpdatePlanRecord, onTogglePlanCompletion, onDeletePlanRecord, onCancelFeePayment, onAddBadge, onRemoveBadge, onBack } = props;
+    const { student, initialTab, currentUser, notes, onOpenFeeModal, onAddTest, onDeleteTest, onAddNote, onSaveProgressPlan, onUpdatePlanRecord, onTogglePlanCompletion, onDeletePlanRecord, onCancelFeePayment, onAddBadge, onRemoveBadge, onToggleAttendance, onBack } = props;
 
     const [activeTab, setActiveTab] = useState(initialTab);
     const [suraName, setSuraName] = useState('');
@@ -77,6 +79,10 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
     const [editingPlanId, setEditingPlanId] = useState<string | null>(null);
     const [editingPlanData, setEditingPlanData] = useState<ProgressPlan>({});
     const [selectedTestCategory, setSelectedTestCategory] = useState<TestType | null>(null);
+
+    // Attendance Action State
+    const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [isAttendanceModalOpen, setIsAttendanceModalOpen] = useState(false);
 
     useEffect(() => {
         window.scrollTo(0, 0);
@@ -400,6 +406,22 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
         }
     };
 
+    const handleDayClick = (date: string) => {
+        // Only allow Directors and Supervisors to edit attendance
+        if (currentUser?.role === 'director' || currentUser?.role === 'supervisor') {
+            setSelectedDate(date);
+            setIsAttendanceModalOpen(true);
+        }
+    };
+
+    const handleAttendanceAction = (status: AttendanceStatus | null) => {
+        if (!selectedDate) return;
+
+        onToggleAttendance(student.id, selectedDate, status);
+        setIsAttendanceModalOpen(false);
+        setSelectedDate(null);
+    };
+
     if (!comprehensiveReportData) return null;
 
     return (
@@ -493,8 +515,23 @@ const StudentDetailsPage: React.FC<StudentDetailsPageProps> = (props) => {
                             <StudentAttendanceCalendar
                                 month={attendanceMonthFilter}
                                 attendanceRecords={student.attendance}
+                                onDayClick={currentUser?.role === 'director' || currentUser?.role === 'supervisor' ? handleDayClick : undefined}
                             />
                         </div>
+
+                        {/* Attendance Action Modal */}
+                        {selectedDate && (
+                            <StudentAttendanceActionModal
+                                isOpen={isAttendanceModalOpen}
+                                onClose={() => {
+                                    setIsAttendanceModalOpen(false);
+                                    setSelectedDate(null);
+                                }}
+                                date={selectedDate}
+                                currentStatus={student.attendance.find(a => a.date === selectedDate)?.status}
+                                onSetStatus={handleAttendanceAction}
+                            />
+                        )}
 
                         {/* Old List View (Optional: could be kept but user asked for calendar like teacher) */}
                         {/* 

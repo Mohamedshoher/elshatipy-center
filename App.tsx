@@ -1073,15 +1073,25 @@ const App: React.FC = () => {
         }
     }, [notes]);
 
-    const handleToggleAttendance = useCallback(async (studentId: string, date: string, status: AttendanceStatus) => {
+    const handleToggleAttendance = useCallback(async (studentId: string, date: string, status: AttendanceStatus | null) => {
         try {
             const studentDoc = await getDoc(doc(db, 'students', studentId));
             if (!studentDoc.exists()) return;
             const studentData = studentDoc.data() as Student;
             const attendance = [...studentData.attendance];
             const recordIndex = attendance.findIndex(a => a.date === date);
-            recordIndex > -1 ? attendance[recordIndex].status = status : attendance.push({ date, status });
-            await updateDoc(doc(db, 'students', studentId), { attendance });
+
+            if (status === null) {
+                // Delete record if it exists
+                if (recordIndex > -1) {
+                    attendance.splice(recordIndex, 1);
+                    await updateDoc(doc(db, 'students', studentId), { attendance });
+                }
+            } else {
+                // Update or Add
+                recordIndex > -1 ? attendance[recordIndex].status = status : attendance.push({ date, status });
+                await updateDoc(doc(db, 'students', studentId), { attendance });
+            }
         } catch (error) { console.error("Error toggling attendance: ", error); }
     }, []);
 
@@ -2548,6 +2558,7 @@ const App: React.FC = () => {
                             onCancelFeePayment={handleCancelFeePayment}
                             onAddBadge={handleAddBadge}
                             onRemoveBadge={handleRemoveBadge}
+                            onToggleAttendance={handleToggleAttendance}
                             onBack={() => handleBackButton()}
                         />;
                         if (viewingTeacherReportId) {
@@ -2715,6 +2726,7 @@ const App: React.FC = () => {
                             onCancelFeePayment={handleCancelFeePayment}
                             onAddBadge={handleAddBadge}
                             onRemoveBadge={handleRemoveBadge}
+                            onToggleAttendance={handleToggleAttendance}
                             onBack={() => handleBackButton()}
                         />;
                         if (viewingTeacherReportId) {
