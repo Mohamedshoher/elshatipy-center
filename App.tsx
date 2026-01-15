@@ -301,17 +301,18 @@ const App: React.FC = () => {
         const publicCollections: { name: string, setter: React.Dispatch<any>, roles?: string[] }[] = [
             { name: 'teachers', setter: setTeachers },
             { name: 'supervisors', setter: setSupervisors },
-            { name: 'parents', setter: setParents, roles: ['director', 'supervisor'] },
+            { name: 'parents', setter: setParents },
         ];
 
         const loadPublicData = async () => {
             try {
                 // Filter collections to fetch based on current role
+                // For Login, we need parents, teachers, supervisors
                 const toFetch = [
                     { name: 'teachers', setter: setTeachers },
                     { name: 'supervisors', setter: setSupervisors },
-                    { name: 'parents', setter: setParents, roles: ['director', 'supervisor'] },
-                ].filter(c => !c.roles || (currentUser && c.roles.includes(currentUser.role)));
+                    { name: 'parents', setter: setParents },
+                ];
 
                 // Execute all fetches in parallel
                 const fetchResults = await Promise.all(
@@ -2837,6 +2838,7 @@ const App: React.FC = () => {
                             onCancelFeePayment={handleCancelFeePayment}
                             onAddBadge={handleAddBadge}
                             onRemoveBadge={handleRemoveBadge}
+                            onToggleAttendance={handleToggleAttendance}
                             onBack={() => handleBackButton()}
                         />;
                         return <Navigate to="/students" replace />;
