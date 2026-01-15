@@ -100,20 +100,37 @@ export const useAutomationChecks = ({
 
                             if (!hasStudentsThatDay) continue;
 
-                            const alreadyHasDeduction = teacherAttendance.some(r =>
-                                r.teacherId === teacher.id && r.date === yesterdayString && r.status === TeacherAttendanceStatus.MISSING_REPORT
-                            );
-                            if (alreadyHasDeduction) continue;
+                            if (!hasStudentsThatDay) continue;
 
-                            const hasAttendanceRecord = teacher.students.some(s =>
+                            // Check if teacher has ANY attendance record for yesterday (Present, Absent, Excuse, etc.)
+                            // If they have a record, it means the system or admin already handled them.
+                            const existingRecord = teacherAttendance.find(r =>
+                                r.teacherId === teacher.id && r.date === yesterdayString
+                            );
+
+                            if (existingRecord) continue;
+
+                            // If no teacher record, check if they actually took student attendance
+                            const hasStudentAttendance = teacher.students.some(s =>
                                 s.attendance.some(r => r.date === yesterdayString)
                             );
 
-                            if (!hasAttendanceRecord) {
+                            // If they took attendance (even partially) -> Mark them as PRESENT automatically
+                            if (hasStudentAttendance) {
+                                // Auto-mark as PRESENT since they worked
+                                const presentId = `auto-present-${teacher.id}-${yesterdayString}`;
+                                batch.set(doc(db, 'teacherAttendance', presentId), {
+                                    teacherId: teacher.id,
+                                    teacherName: teacher.name,
+                                    date: yesterdayString,
+                                    status: TeacherAttendanceStatus.PRESENT,
+                                    timestamp: getCairoNow().toISOString()
+                                });
+                                operationsCount++;
+                            } else {
+                                // rigorous check: really no attendance? then deduct.
                                 const deductionId = `auto-missed-${teacher.id}-${yesterdayString}`;
-                                const deductionRef = doc(db, 'teacherAttendance', deductionId);
-
-                                batch.set(deductionRef, {
+                                batch.set(doc(db, 'teacherAttendance', deductionId), {
                                     teacherId: teacher.id,
                                     teacherName: teacher.name,
                                     date: yesterdayString,

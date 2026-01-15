@@ -374,17 +374,18 @@ const App: React.FC = () => {
     useEffect(() => {
         if (!currentUser) return;
 
-        // Cleanup any existing subscription
-        if (activeUnsubRef.current) {
-            activeUnsubRef.current();
-            activeUnsubRef.current = null;
-        }
+        let activeStudentsQuery = null;
 
-        let activeStudentsQuery = query(collection(db, 'students'), where('isArchived', '==', false));
-
-        if (currentUser.role === 'parent') {
+        // Role-based query construction
+        if (currentUser.role === 'director' || currentUser.role === 'supervisor') {
+            // Directors/Supervisors: Fetch ALL non-archived students
+            // Optimization: Stable query, doesn't depend on groups/parents length
+            activeStudentsQuery = query(collection(db, 'students'), where('isArchived', '==', false));
+        } else if (currentUser.role === 'parent') {
+            // Parents: Fetch by studentIds
             const liveParent = parents.find(p => p.id === (currentUser as any).id);
             const studentIds = liveParent ? liveParent.studentIds : (currentUser as any).studentIds;
+
             if (studentIds && studentIds.length > 0) {
                 activeStudentsQuery = query(collection(db, 'students'), where(documentId(), 'in', studentIds.slice(0, 30)));
             } else {
@@ -393,25 +394,35 @@ const App: React.FC = () => {
                 return;
             }
         } else if (currentUser.role === 'teacher') {
-            if (groups.length === 0) {
-                setIsDataLoading(true);
-                return; // Wait for groups to load
-            }
+            // Teachers: Fetch by groups
             const teacherGroupIds = groups.filter(g => g.teacherId === currentUser.id).map(g => g.id);
+
             if (teacherGroupIds.length > 0) {
                 activeStudentsQuery = query(collection(db, 'students'), where('groupId', 'in', teacherGroupIds.slice(0, 30)));
             } else {
+                // If no groups found, clear students and stop loading (Fixes infinite skeleton)
                 setActiveStudentsRaw([]);
                 setIsDataLoading(false);
                 return;
             }
         }
 
+        if (!activeStudentsQuery) return;
+
+        // Prevent unnecessary re-subscriptions if query hasn't meaningfully changed (rudimentary check logic could go here, but React deps handle it)
+        // However, we want to avoid unsubscribing for Directors when groups.length changes.
+        // We can't easily skip the effect, but we can check if we actively need to switch.
+        // For now, standard pattern is safe if 'groups' is stable.
+
+        // Cleanup previous sub
+        if (activeUnsubRef.current) {
+            activeUnsubRef.current();
+        }
+
         const unsub = onSnapshot(activeStudentsQuery, (snapshot) => {
             const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as Student));
             setActiveStudentsRaw(data);
             setIsDataLoading(false);
-            // Single summary log instead of multiple logs
             if (snapshot.metadata.fromCache) {
                 console.log(`🚀 [Cache] Loaded ${snapshot.size} students`);
             } else {
@@ -423,13 +434,15 @@ const App: React.FC = () => {
         });
 
         activeUnsubRef.current = unsub;
+
         return () => {
             if (activeUnsubRef.current) {
                 activeUnsubRef.current();
                 activeUnsubRef.current = null;
             }
         };
-    }, [currentUser?.id, currentUser?.role, groups.length, parents.length]);
+    }, [currentUser?.id, currentUser?.role, (currentUser?.role === 'teacher' ? groups.length : 0), (currentUser?.role === 'parent' ? parents.length : 0)]); // Optimized deps
+
 
     // 2c. Other Collections (Role Scoped for Teachers)
     useEffect(() => {
