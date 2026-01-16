@@ -1293,8 +1293,11 @@ const App: React.FC = () => {
     const handleConfirmUnarchive = async (newGroupId: string) => {
         if (!studentToUnarchiveId) return;
 
-        // Store the ID before the modal closes
+        // تخزين الـ ID قبل إغلاق الـ Modal
         const studentId = studentToUnarchiveId;
+
+        // إغلاق الـ Modal فورًا لتجربة مستخدم أفضل
+        setStudentToUnarchiveId(null);
 
         try {
             const isTeacher = currentUser?.role === 'teacher';
@@ -1322,14 +1325,19 @@ const App: React.FC = () => {
 
             await updateDoc(doc(db, 'students', studentId), updateData);
 
-            // Alerts removed as per user request
+            // رسالة نجاح
+            const student = students.find(s => s.id === studentId);
+            const studentName = student?.name || 'الطالب';
             if (isTeacher) {
-                // Optional: You might want a toast notification here instead, or nothing.
-                // For now, removing the alert as requested.
+                alert(`تم طلب استعادة "${studentName}".\nسيتم مراجعته من قبل المشرف أو المدير.`);
+            } else {
+                alert(`تم استعادة "${studentName}" بنجاح.`);
             }
 
-        } catch (error) { console.error("Error unarchiving student: ", error); }
-        // Modal is now closed before this function is called, so no need to close it here
+        } catch (error) {
+            console.error("خطأ في استعادة الطالب: ", error);
+            alert("حدث خطأ أثناء استعادة الطالب.");
+        }
     };
 
     const handleDeleteStudentPermanently = async (studentId: string) => {
@@ -1465,15 +1473,22 @@ const App: React.FC = () => {
             const updatedDebtMonths = student.debtMonths?.filter(m => m !== month) || [];
             const hasRemainingDebt = updatedDebtMonths.length > 0;
 
-            // 3. Save Updates
+            // 3. حفظ التحديثات
             await updateDoc(doc(db, 'students', studentId), {
                 fees,
                 debtMonths: updatedDebtMonths,
                 hasDebt: hasRemainingDebt
             });
+
+            // 4. إظهار رسالة نجاح
+            if (!hasRemainingDebt) {
+                alert(`تم سداد جميع الديون للطالب "${student.name}".\nيمكنك الآن استعادته من صفحة الأرشيف.`);
+            } else {
+                const remainingCount = updatedDebtMonths.length;
+                alert(`تم دفع الشهر بنجاح.\nمتبقي ${remainingCount} ${remainingCount === 1 ? 'شهر' : 'أشهر'} للسداد.`);
+            }
         } catch (error) {
-            console.error("Error paying debt: ", error);
-            alert("حدث خطأ أثناء دفع الدين.");
+            console.error("خطأ في دفع الدين: ", error);
         }
     };
 

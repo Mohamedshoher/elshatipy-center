@@ -29,11 +29,12 @@ const UnarchiveModal: React.FC<UnarchiveModalProps> = ({ isOpen, onClose, onConf
       return;
     }
 
-    // Close modal immediately for faster UX
-    onClose();
-
-    // Then confirm unarchive in background
+    // Call confirm first (before closing the modal), 
+    // so that studentToUnarchiveId is still available
     onConfirm(selectedGroupId);
+
+    // Then close the modal
+    onClose();
   };
 
   return (
