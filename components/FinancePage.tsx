@@ -11,6 +11,7 @@ import FinanceExpenseModal from './FinanceExpenseModal';
 import FinanceCollectionsModal from './FinanceCollectionsModal';
 import AttendanceCheckModal from './AttendanceCheckModal';
 import { getCairoDateString } from '../services/cairoTimeHelper';
+import CloudOffIcon from './icons/CloudOffIcon'; // Import icon for offline status
 
 interface FinancePageProps {
     onBack: () => void;
@@ -40,6 +41,7 @@ interface FinancePageProps {
     onAddDonation: (donation: Omit<Donation, 'id'>) => void;
     onDeleteDonation: (donationId: string) => void;
     onAddHoliday?: (dateStr: string) => void;
+    pendingWritesCount?: number;
 }
 
 const expenseCategoryLabels: Record<ExpenseCategory, string> = {
@@ -52,6 +54,8 @@ const expenseCategoryLabels: Record<ExpenseCategory, string> = {
     [ExpenseCategory.TEACHER_BONUS]: 'مكافأة مدرس',
     [ExpenseCategory.OTHER]: 'مصاريف أخرى',
 };
+
+// ... (keep helper functions same) ...
 
 const getAbsenceValue = (status: TeacherAttendanceStatus): number => {
     switch (status) {
@@ -80,7 +84,7 @@ const getBonusValue = (status: TeacherAttendanceStatus): number => {
 };
 
 const FinancePage: React.FC<FinancePageProps> = (props) => {
-    const { onBack, students, teachers, staff, supervisors, expenses, teacherAttendance, teacherPayrollAdjustments, financialSettings, onLogExpense, onDeleteExpense, onUpdatePayrollAdjustments, onSetTeacherAttendance, onAddStaff, onUpdateStaff, onDeleteStaff, onUpdateFinancialSettings, groups, onResetTeacherPayment, onResetStaffPayment, teacherCollections, onViewTeacherDetails, onApplyDeductions, donations, onAddDonation, onDeleteDonation, onAddHoliday } = props;
+    const { onBack, students, teachers, staff, supervisors, expenses, teacherAttendance, teacherPayrollAdjustments, financialSettings, onLogExpense, onDeleteExpense, onUpdatePayrollAdjustments, onSetTeacherAttendance, onAddStaff, onUpdateStaff, onDeleteStaff, onUpdateFinancialSettings, groups, onResetTeacherPayment, onResetStaffPayment, teacherCollections, onViewTeacherDetails, onApplyDeductions, donations, onAddDonation, onDeleteDonation, onAddHoliday, pendingWritesCount = 0 } = props;
 
     const [activeTab, setActiveTab] = useState<'overview' | 'teacher_payroll' | 'staff_expenses' | 'settings'>('overview');
     const [selectedMonth, setSelectedMonth] = useState(() => new Date().toISOString().substring(0, 7));
@@ -225,7 +229,18 @@ const FinancePage: React.FC<FinancePageProps> = (props) => {
     return (
         <main className="container mx-auto px-4 sm:px-6 lg:px-8 py-8">
             <div className="bg-white rounded-xl shadow-lg overflow-hidden">
-                <div className="border-b border-gray-200 flex flex-wrap">
+                <div className="border-b border-gray-200 flex flex-wrap relative">
+                    {/* Offline Indicator */}
+                    {pendingWritesCount > 0 && (
+                        <div className="absolute top-2 left-2 z-10 flex items-center gap-2 bg-orange-100 border border-orange-200 text-orange-700 px-3 py-1.5 rounded-full shadow-sm animate-pulse" title="يوجد تغييرات معلقة بانتظار الاتصال بالإنترنت">
+                            <span className="font-bold text-xs">جارٍ المزامنة...</span>
+                            <span className="bg-orange-500 text-white text-[10px] font-bold w-5 h-5 flex items-center justify-center rounded-full">
+                                {pendingWritesCount}
+                            </span>
+                            <CloudOffIcon className="w-4 h-4" />
+                        </div>
+                    )}
+
                     <button onClick={() => setActiveTab('overview')} className={getTabClass('overview')}>نظرة عامة</button>
                     <button onClick={() => setActiveTab('teacher_payroll')} className={getTabClass('teacher_payroll')}>رواتب المدرسين والمشرفين</button>
                     <button onClick={() => setActiveTab('staff_expenses')} className={getTabClass('staff_expenses')}>الموظفون</button>

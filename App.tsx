@@ -139,6 +139,10 @@ const App: React.FC = () => {
     // --- Error State ---
     const [permissionError, setPermissionError] = useState(false);
 
+    // --- Pending Writes State (Offline Sync) ---
+    const [pendingCounts, setPendingCounts] = useState<Record<string, number>>({});
+    const totalPendingWrites = useMemo(() => Object.values(pendingCounts).reduce((a, b) => a + b, 0), [pendingCounts]);
+
     // --- Local UI State & Session ---
     const [currentUser, setCurrentUser] = useLocalStorage<CurrentUser | null>('shatibi-center-currentUser', null);
 
@@ -570,6 +574,14 @@ const App: React.FC = () => {
                 const data = snapshot.docs.map(doc => ({ ...doc.data(), id: doc.id } as any));
                 console.log(`📊 [Firestore Read] ${name}: ${snapshot.size} docs`);
                 setter(data);
+
+                // Update pending writes count for this collection
+                const pending = snapshot.docs.filter(d => d.metadata.hasPendingWrites).length;
+                setPendingCounts(prev => {
+                    if (prev[name] === pending) return prev; // Avoid unnecessary re-renders
+                    return { ...prev, [name]: pending };
+                });
+
             }, (err) => console.error(`Finance listener error (${name}):`, err));
             unsubscribers.push(unsub);
         });
@@ -1089,10 +1101,10 @@ const App: React.FC = () => {
 
     const handleToggleAttendance = useCallback(async (studentId: string, date: string, status: AttendanceStatus | null) => {
         try {
-            const studentDoc = await getDoc(doc(db, 'students', studentId));
-            if (!studentDoc.exists()) return;
-            const studentData = studentDoc.data() as Student;
-            const attendance = [...studentData.attendance];
+            const student = students.find(s => s.id === studentId);
+            if (!student) return;
+
+            const attendance = [...student.attendance];
             const recordIndex = attendance.findIndex(a => a.date === date);
 
             if (status === null) {
@@ -1103,11 +1115,15 @@ const App: React.FC = () => {
                 }
             } else {
                 // Update or Add
-                recordIndex > -1 ? attendance[recordIndex].status = status : attendance.push({ date, status });
+                if (recordIndex > -1) {
+                    attendance[recordIndex].status = status;
+                } else {
+                    attendance.push({ date, status });
+                }
                 await updateDoc(doc(db, 'students', studentId), { attendance });
             }
         } catch (error) { console.error("Error toggling attendance: ", error); }
-    }, []);
+    }, [students]);
 
     const handleSaveStudentProgressPlan = useCallback(async (studentId: string, plan: ProgressPlan, authorName: string) => {
         try {
@@ -1635,15 +1651,13 @@ const App: React.FC = () => {
         }
     };
 
-    const handleSetTeacherAttendance = async (teacherId: string, date: string, status: TeacherAttendanceStatus, reason?: string) => {
+    const handleSetTeacherAttendance = useCallback(async (teacherId: string, date: string, status: TeacherAttendanceStatus, reason?: string) => {
         try {
-            const q = query(collection(db, "teacherAttendance"), where("teacherId", "==", teacherId), where("date", "==", date));
-            const querySnapshot = await getDocs(q);
-            const existingDoc = querySnapshot.docs[0];
+            const existingRecord = teacherAttendance.find(r => r.teacherId === teacherId && r.date === date);
 
             if (status === TeacherAttendanceStatus.PRESENT) {
-                if (existingDoc) {
-                    await deleteDoc(existingDoc.ref);
+                if (existingRecord) {
+                    await deleteDoc(doc(db, "teacherAttendance", existingRecord.id));
                 }
             } else {
                 const attendanceData: any = { teacherId, date, status };
@@ -1651,8 +1665,8 @@ const App: React.FC = () => {
                     attendanceData.reason = reason;
                 }
 
-                if (existingDoc) {
-                    await updateDoc(existingDoc.ref, attendanceData);
+                if (existingRecord) {
+                    await updateDoc(doc(db, "teacherAttendance", existingRecord.id), attendanceData);
                 } else {
                     await addDoc(collection(db, "teacherAttendance"), attendanceData);
                 }
@@ -1696,7 +1710,7 @@ const App: React.FC = () => {
                 }
             }
         } catch (error) { console.error("Error setting teacher attendance:", error); }
-    };
+    }, [teacherAttendance]);
 
     const handleUpdatePayrollAdjustments = async (adjustment: Partial<TeacherPayrollAdjustment> & Pick<TeacherPayrollAdjustment, 'teacherId' | 'month'> & { isPaid?: boolean }) => {
         const q = query(collection(db, "teacherPayrollAdjustments"), where("teacherId", "==", adjustment.teacherId), where("month", "==", adjustment.month));
